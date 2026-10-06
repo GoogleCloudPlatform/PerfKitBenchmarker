@@ -1005,7 +1005,7 @@ class Bigquery(edw_service.EdwService):
     vm_util.IssueCommand(cmd)
 
   def LoadDataset(  # pyrefly: ignore[bad-override]
-      self,  # pytype: disable=signature-mismatch  # overriding-parameter-count-checks
+      self,
       source_bucket,
       tables,
       schema_dir,

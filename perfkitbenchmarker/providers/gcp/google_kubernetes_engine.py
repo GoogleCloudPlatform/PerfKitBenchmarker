@@ -619,7 +619,7 @@ class GkeCluster(BaseGkeCluster):
     )
     compute_manifest['spec'] = {'priorities': priorities}  # pyrefly: ignore[bad-assignment]
     if is_default_class:
-      compute_manifest['spec']['nodePoolAutoCreation'] = {'enabled': True}  # pyrefly: ignore[bad-assignment, unsupported-operation]
+      compute_manifest['spec']['nodePoolAutoCreation'] = {'enabled': True}  # pyrefly: ignore[unsupported-operation]
     kubernetes_commands.ApplyYaml([compute_manifest])
     if is_default_class:
       return

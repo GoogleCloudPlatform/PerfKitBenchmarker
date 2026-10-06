@@ -368,7 +368,7 @@ class AwsVpc(resource.BaseResource):
       vm_util.IssueCommand(cmd)  # pyrefly: ignore[bad-argument-type]
     except errors.VmUtil.IssueCommandError as ex:
       # do not retry if this rule already exists
-      if ex.message.find('InvalidPermission.Duplicate') == -1:  # pytype: disable=attribute-error  # enable-nested-classes
+      if ex.message.find('InvalidPermission.Duplicate') == -1:  # pyrefly: ignore[missing-attribute]
         raise ex
 
   def AllowVpcPeerInBound(self, peer_vpc):

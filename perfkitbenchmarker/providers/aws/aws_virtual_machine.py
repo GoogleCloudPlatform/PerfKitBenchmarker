@@ -1162,7 +1162,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       if self.host in self.host_list:
         self.host_list.remove(self.host)
       if self.host not in self.deleted_hosts:
-        self.host.Delete()  # pytype: disable=attribute-error
+        self.host.Delete()
         self.deleted_hosts.add(self.host)
 
   def _Create(self):
@@ -1342,7 +1342,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
           '--region=%s' % self.region,
           'ec2',
           'cancel-spot-instance-requests',
-          '--spot-instance-request-ids=%s' % self.spot_instance_request_id,  # pytype: disable=attribute-error
+          '--spot-instance-request-ids=%s' % self.spot_instance_request_id,
       ]
       vm_util.IssueCommand(cancel_cmd, raise_on_failure=False)
 
@@ -1574,7 +1574,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Adds metadata to the VM."""
     util.AddTags(self.id, self.region, **kwargs)
     if self.use_spot_instance:
-      util.AddDefaultTags(self.spot_instance_request_id, self.region)  # pytype: disable=attribute-error
+      util.AddDefaultTags(self.spot_instance_request_id, self.region)
 
   def InstallCli(self):
     """Installs the AWS cli and credentials on this AWS vm."""

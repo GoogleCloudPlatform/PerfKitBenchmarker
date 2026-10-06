@@ -200,29 +200,29 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
   client_vm.Install('hammerdb')
 
   if not FLAGS.use_managed_db:
-    _PrepareServer(db)  # pyrefly: ignore[bad-argument-type]
+    _PrepareServer(db)
 
   db_service = None
 
   hammerdb.SetupConfig(
       vm=client_vm,
-      db_engine=db.engine,  # pyrefly: ignore[bad-argument-type]
+      db_engine=db.engine,
       hammerdb_script=hammerdb.HAMMERDB_SCRIPT.value,
-      ip=db.endpoint,  # pyrefly: ignore[missing-attribute]
-      port=db.port,  # pyrefly: ignore[missing-attribute]
-      password=db.spec.database_password,  # pyrefly: ignore[missing-attribute]
-      user=db.spec.database_username,  # pyrefly: ignore[missing-attribute]
+      ip=db.endpoint,
+      port=db.port,
+      password=db.spec.database_password,
+      user=db.spec.database_username,
       is_managed_azure=(
           FLAGS.cloud == 'Azure'
           and FLAGS.use_managed_db
           and db.engine != sql_engine_utils.LAKEBASE_POSTGRES
       ),
-      db_engine_version=db.spec.engine_version,  # pyrefly: ignore[missing-attribute]
+      db_engine_version=db.spec.engine_version,
       db_service=db_service,
   )
 
   if db.engine == sql_engine_utils.ALLOYDB:
-    _PrepareAlloyDb(db)  # pyrefly: ignore[bad-argument-type]
+    _PrepareAlloyDb(db)
 
 
 def SetOptimizedServerConfiguration(
@@ -445,7 +445,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
 
   hammerdb.SetDefaultConfig(num_cpus)
 
-  metadata = hammerdb.GetMetadata(db.engine)  # pyrefly: ignore[missing-attribute]
+  metadata = hammerdb.GetMetadata(db.engine)
   # Consider if we should have separate versioning for each config.
   metadata['hammerdbcli_config_version'] = CONFIG_VERSION
   virtual_users_list = hammerdb.GetNumVirtualUsersList()
@@ -462,7 +462,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
         )
       PreRun(db)
       start_time = datetime.datetime.now()
-      stdout = hammerdb.Run(client_vm, db.engine, script, timeout=timeout)  # pyrefly: ignore[missing-attribute]
+      stdout = hammerdb.Run(client_vm, db.engine, script, timeout=timeout)
       end_time = datetime.datetime.now()
       current_samples = hammerdb.ParseResults(
           script=script, stdout=stdout, vm=client_vm
@@ -470,13 +470,13 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
       PostRun(db)
       if (
           db.engine == sql_engine_utils.ALLOYDB
-          and db.enable_columnar_engine_recommendation  # pyrefly: ignore[missing-attribute]
+          and db.enable_columnar_engine_recommendation
       ):
         database_name = hammerdb.MAP_SCRIPT_TO_DATABASE_NAME[script]
         current_samples = _CheckAlloyDbColumnarEngine(
-            db, client_vm, script, timeout, database_name  # pyrefly: ignore[bad-argument-type]
+            db, client_vm, script, timeout, database_name
         )
-      current_samples.extend(db.CollectMetrics(start_time, end_time))  # pyrefly: ignore[missing-attribute]
+      current_samples.extend(db.CollectMetrics(start_time, end_time))
 
       run_metadata = dict(metadata)
       run_metadata['hammerdbcli_vu'] = num_virtual_users
@@ -493,7 +493,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
       )
   finally:
     if _ENABLE_HAMMERDBCLI_VALIDATION.value:
-      hammerdb.RunValidation(client_vm, db.engine, script, timeout=timeout)  # pyrefly: ignore[bad-argument-type]
+      hammerdb.RunValidation(client_vm, db.engine, script, timeout=timeout)
 
   return results
 

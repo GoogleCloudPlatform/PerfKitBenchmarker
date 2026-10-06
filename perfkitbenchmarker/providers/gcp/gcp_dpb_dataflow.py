@@ -313,11 +313,9 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
       )
 
     # For some reason, pytype doesn't play well with functools.cached_property
-    # pytype: disable=unsupported-operands
     total_vcpu_time = self.job_stats['total_vcpu_time']
     total_mem_usage = self.job_stats['total_mem_usage']
     total_pd_usage = self.job_stats['total_pd_usage']
-    # pytype: enable=unsupported-operands
 
     if pricing_type == DATAFLOW_TYPE_BATCH:
       vcpu_hr = total_vcpu_time * VCPU_PER_HR_BATCH
@@ -622,6 +620,6 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
       Last value across intervals
     """
     try:
-      return list(time_series)[0].points[0].value.int64_value  # pyrefly: ignore[bad-argument-type]
+      return list(time_series)[0].points[0].value.int64_value
     except IndexError:
       return None

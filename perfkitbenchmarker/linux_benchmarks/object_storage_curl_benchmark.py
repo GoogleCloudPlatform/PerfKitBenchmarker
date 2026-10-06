@@ -105,7 +105,7 @@ def CheckPrerequisites(_):
 
 # PyType does not currently support returning Abstract classes
 # TODO(user): stop suppressing
-def _GetService() -> object_storage_service.ObjectStorageService:  # pytype: disable=not-instantiable
+def _GetService() -> object_storage_service.ObjectStorageService:
   """Get a ready to use instance of ObjectStorageService."""
   # TODO(pclay): consider using FLAGS.storage to allow cross cloud testing?
   cloud = FLAGS.cloud

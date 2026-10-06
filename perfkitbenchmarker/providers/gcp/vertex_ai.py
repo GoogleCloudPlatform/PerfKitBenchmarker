@@ -154,7 +154,7 @@ class BaseVertexAiModel(managed_ai_model.BaseManagedAiModel):
         name=self.name + '2',
         # Reuse the same bucket for the next model.
         bucket_uri=self.bucket_uri,
-    )  # pytype: disable=not-instantiable
+    )
 
   def GetRegionFromZone(self, zone: str) -> str:
     return util.GetRegionFromZone(zone)
@@ -262,13 +262,13 @@ class BaseVertexAiModel(managed_ai_model.BaseManagedAiModel):
       gcs_bucket_copy_start_time = time.time()
       self.gcs_client.MakeBucket(
           self.bucket_uri
-      )  # pytype: disable=attribute-error
+      )
       self.gcs_client.Copy(
           self.model_spec.model_garden_bucket,
           self.model_bucket_path,
           recursive=True,
           timeout=60 * 40,
-      )  # pytype: disable=attribute-error
+      )
       self.gcs_bucket_copy_time = time.time() - gcs_bucket_copy_start_time
     self.endpoint.Create()
 
@@ -286,7 +286,7 @@ class BaseVertexAiModel(managed_ai_model.BaseManagedAiModel):
     if self.gcs_client:
       self.gcs_client.DeleteBucket(
           self.bucket_uri
-      )  # pytype: disable=attribute-error
+      )
 
 
 class BaseCliVertexAiModel(BaseVertexAiModel):

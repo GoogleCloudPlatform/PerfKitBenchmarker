@@ -68,7 +68,7 @@ def InstallPackages(benchmark_spec):
   if lssd_workloads_util.LSSD_WORKLOAD_PRECONDITION_DISK.value:
     server.InstallPackages('fio')
 
-  config_path = mysql80.GetOSDependentDefaults(server.OS_TYPE)[  # pyrefly: ignore[missing-argument]
+  config_path = mysql80.GetOSDependentDefaults(server.OS_TYPE)[
       mysql80.MYSQL_CONFIG_PATH
   ]
   server.RemoteCommand(f'sudo mkdir -p {MYSQL_DATA_DIR}/tmp')

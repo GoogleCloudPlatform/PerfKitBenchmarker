@@ -179,7 +179,7 @@ class AwsAuroraDsqlRelationalDb(aws_relational_db.BaseAwsRelationalDb):
       cmd = self._GetRestoreCommandMultiRegion()
     else:
       cmd = self._GetRestoreCommandRegional()
-    stdout, _, _ = vm_util.IssueCommand(cmd)  # pyrefly: ignore[bad-argument-type]
+    stdout, _, _ = vm_util.IssueCommand(cmd)
     response = json.loads(stdout)
     self.restore_job_id = response['RestoreJobId']
     if self.restore_job_id:

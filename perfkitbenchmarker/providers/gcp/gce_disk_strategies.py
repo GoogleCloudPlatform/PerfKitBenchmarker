@@ -89,7 +89,7 @@ class CreatePDDiskStrategy(GCPCreateDiskStrategy):
             name,
             vm.zone,
             vm.project,
-            replica_zones=disk_spec.replica_zones,  # pytype: disable=attribute-error
+            replica_zones=disk_spec.replica_zones,  # pyrefly: ignore[missing-attribute]
         )
         if gce_disk.PdDriveIsNvme(vm):
           data_disk.interface = gce_disk.NVME
@@ -139,11 +139,11 @@ class CreatePDDiskStrategy(GCPCreateDiskStrategy):
   def GetSetupDiskStrategy(self) -> disk_strategies.SetUpDiskStrategy:
     """Returns the SetUpDiskStrategy for the disk."""
     if self.disk_spec.multi_writer_mode:
-      self.setup_disk_strategy = SetUpMultiWriterPDDiskStrategy(  # pytype: disable=wrong-arg-types
+      self.setup_disk_strategy = SetUpMultiWriterPDDiskStrategy(
           self.vm, self.disk_specs  # pyrefly: ignore[bad-argument-type]
       )
     elif self.setup_disk_strategy is None:
-      self.setup_disk_strategy = SetUpPDDiskStrategy(self.vm, self.disk_specs)  # pytype: disable=wrong-arg-types
+      self.setup_disk_strategy = SetUpPDDiskStrategy(self.vm, self.disk_specs)  # pyrefly: ignore[bad-argument-type]
     return self.setup_disk_strategy
 
 

@@ -71,7 +71,7 @@ class CreateLocalDiskStrategy(AWSCreateDiskStrategy):
 
   def GetSetupDiskStrategy(self) -> disk_strategies.SetUpDiskStrategy:
     """Returns the SetUpDiskStrategy for the disk."""
-    return SetUpLocalDiskStrategy(self.vm, self.disk_specs)  # pytype: disable=wrong-arg-types
+    return SetUpLocalDiskStrategy(self.vm, self.disk_specs)  # pyrefly: ignore[bad-argument-type]
 
   def GetBlockDeviceMap(self) -> list[dict[str, str]]:
     mappings = []
@@ -135,7 +135,7 @@ class CreateRemoteDiskStrategy(AWSCreateDiskStrategy):
   def GetSetupDiskStrategy(self) -> disk_strategies.SetUpDiskStrategy:
     """Returns the SetUpDiskStrategy for the disk."""
     if self.setup_disk_strategy is None:
-      self.setup_disk_strategy = SetUpRemoteDiskStrategy(  # pytype: disable=wrong-arg-types
+      self.setup_disk_strategy = SetUpRemoteDiskStrategy(
           self.vm, self.disk_specs  # pyrefly: ignore[bad-argument-type]
       )
     return self.setup_disk_strategy
@@ -289,7 +289,6 @@ class AWSSetupDiskStrategy(disk_strategies.SetUpDiskStrategy):
 
     if not local_devices and not ebs_devices:
       return
-    # pytype: disable=attribute-error
     disks = scratch_disk.disks if scratch_disk.is_striped else [scratch_disk]
     for d in disks:
       if d.disk_type == disk.NFS:
@@ -317,7 +316,6 @@ class AWSSetupDiskStrategy(disk_strategies.SetUpDiskStrategy):
       if d.disk_type == disk.NFS:
         continue
       device_name = self.GetDeviceByDiskSpecId(d.disk_spec_id)
-      # pytype: enable=attribute-error
       d.device_path = self.GetPathByDevice(device_name)
 
   def GetPathByDevice(self, disk_name):
@@ -413,7 +411,7 @@ class SetUpLocalDiskStrategy(AWSSetupDiskStrategy):
         ord(self.LOCAL_DRIVE_START_LETTER) + self.vm.local_disk_counter
     )
     nvme_boot_drive_index = self._GetNvmeBootIndex()
-    data_disk.AssignDeviceLetter(device_letter, nvme_boot_drive_index)  # pytype: disable=wrong-arg-types
+    data_disk.AssignDeviceLetter(device_letter, nvme_boot_drive_index)
     data_disk.disk_number = self.vm.local_disk_counter + 1
     self.vm.local_disk_counter += 1
     if self.vm.local_disk_counter > self.vm.max_local_disks:

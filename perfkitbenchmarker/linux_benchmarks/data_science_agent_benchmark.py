@@ -48,7 +48,7 @@ class DataScienceAgent(agent.BaseAgent):
   _MOCK_DATA_GEN_PATH = 'agents/data_science/prepare/mock_data_gen.py'
 
   def _ConstructPrompt(self, prompt_id: str):
-    parsed_url = urllib.parse.urlparse(self.agent_service.base_dir)  # pyrefly: ignore[missing-attribute]
+    parsed_url = urllib.parse.urlparse(self.agent_service.base_dir)
     data_bucket = parsed_url.netloc
     data_prefix = os.path.join(parsed_url.path, 'data')
     output_prefix = os.path.join(parsed_url.path, 'output', prompt_id)
@@ -115,7 +115,7 @@ class DataScienceAgent(agent.BaseAgent):
     )
 
     # upload outputs
-    remote_data_dir = os.path.join(self.agent_service.base_dir, 'data')  # pyrefly: ignore[missing-attribute]
+    remote_data_dir = os.path.join(self.agent_service.base_dir, 'data')
     # TODO(odiego): Don't depend on gsutil explicitly
     self.client_vm.RemoteCommand(
         'gcloud storage cp data/logistics_analytical.db'

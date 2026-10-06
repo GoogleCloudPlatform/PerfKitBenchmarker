@@ -194,7 +194,7 @@ class _BenchmarkPerformanceSuite:
       gt_iteration_performance = (
           results_aggregator.EdwPowerIterationPerformance(
               iteration_id=iteration_id,
-              total_queries=len(self.gt_expected_queries),  # pyrefly: ignore[bad-argument-type]
+              total_queries=len(self.gt_expected_queries),
           )
       )
     else:

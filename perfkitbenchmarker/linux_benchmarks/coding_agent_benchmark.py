@@ -65,7 +65,7 @@ class CodingAgent(agent.BaseAgent):
       datum = json.load(f)
 
     prompt_id = 'default'
-    output_dir = os.path.join(self.agent_service.base_dir, 'output', prompt_id)  # pyrefly: ignore[missing-attribute]
+    output_dir = os.path.join(self.agent_service.base_dir, 'output', prompt_id)
     prompt_text = self._ConstructPrompt(datum, output_dir)
     return [agent.Prompt(id=prompt_id, session_id=prompt_id, text=prompt_text)]
 
