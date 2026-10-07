@@ -716,3 +716,5 @@
 -   Add GKE postgres sysbench default benchmark config alias.
 -   Standardize around numpy for some aggregation methods with e.g. netperf.
 -   Add support for Netapp Volumes.
+-   Fix `--dpdk_pktgen_packet_size` being silently ignored by dpdk_pktgen on the
+    single-NIC path.
