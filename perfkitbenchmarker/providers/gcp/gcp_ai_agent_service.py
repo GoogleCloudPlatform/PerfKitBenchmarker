@@ -615,13 +615,13 @@ class VertexAiAgentEngineAiAgentService(GcpAiAgentService):
         f' GOOGLE_CLOUD_LOCATION={location} && cd workload/{agent_framework}'
         ' && python3 run_agent_engine.py --config_file run_config.yaml'
     )
-    stdout, stderr = self.client_vm.RemoteCommand(
-        command, raise_on_failure=False
+    stdout, stderr, return_code = self.client_vm.RemoteCommandWithReturnCode(
+        command, ignore_failure=True
     )
-    if stderr:
+    if return_code:
       if (
-          '503' in stderr
-          or '429' in stderr
+          "'code': 503" in stderr
+          or "'code': 429" in stderr
           or 'RESOURCE_EXHAUSTED' in stderr
           or 'ResourceExhausted' in stderr
           or 'Quota exceeded' in stderr
