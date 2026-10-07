@@ -16,6 +16,7 @@
 See https://github.com/IO500/io500 for more info.
 """
 
+import configparser
 import logging
 import math
 import os
@@ -104,11 +105,30 @@ SUMMARY_REGEX = (r'\[SCORE \] Bandwidth ([\d\.]*) ([\w\/]*) : '
 RESULT_REGEX = r'\[RESULT\]\s+([\w\-]*)\s+([\d\.]+) ([\w\/]+) : time ([\d\.]+)'
 IO500_OUTPUT = 'data'
 BENCHMARK_DIR = '/opt/pkb'
-TRANSFER_SIZE_4MIB = 4194304
+# default ior-easy transfersize is 2MiB by default in io500.
+# https://github.com/IO500/io500/blob/main/config-sample-all.ini
+DEFAULT_IOR_EASY_TRANSFER_SIZE = 2 * 1024 * 1024  # 2 MiB
 
 
 def GetConfig(user_config):
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+
+
+def _GetIorEasyTransferSize(ini_path):
+  """Returns the transferSize from the [ior-easy] block of the INI template.
+
+  Args:
+    ini_path: Local path to the io500 INI template.
+
+  Returns:
+    transferSize in bytes, or DEFAULT_IOR_EASY_TRANSFER_SIZE if it is not set.
+  """
+  parser = configparser.ConfigParser(interpolation=None)
+  parser.read(ini_path)
+  transfer_size = parser.get('ior-easy', 'transferSize', fallback='').strip()
+  if not transfer_size:
+    return DEFAULT_IOR_EASY_TRANSFER_SIZE
+  return int(transfer_size)
 
 
 def CheckPrerequisites(_=None):
@@ -319,6 +339,8 @@ def Run(benchmark_spec):
 
   local_path = data.ResourcePath(f'io500/{io500_ini_filename}.j2')
   remote_path = f'{BENCHMARK_DIR}/{io500_ini_filename}'
+  transfer_size = _GetIorEasyTransferSize(local_path)
+  logging.info('Using ior-easy transferSize of %s bytes.', transfer_size)
   tests_to_run = _IO500_TESTS.value
   run_all = 'all' in tests_to_run
 
@@ -348,8 +370,8 @@ def Run(benchmark_spec):
       # BlockSize * total_ranks = max total size, which must be a multiple of
       # TransferSize.
       block_size = (
-          _IO500_MAX_TOTAL_SIZE.value // total_ranks // TRANSFER_SIZE_4MIB
-      ) * TRANSFER_SIZE_4MIB
+          _IO500_MAX_TOTAL_SIZE.value // total_ranks // transfer_size
+      ) * transfer_size
       io500_context = {
           'directory': headnode.scratch_disks[0].mount_point,
           'block_size': block_size,
