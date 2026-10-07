@@ -45,15 +45,22 @@ def _Install(vm):
   vm.RemoteCommand(
       f'cd {DPDK_PKTGEN_GIT_REPO_DIR} && patch -l -p1 < pktgen.patch'
   )
+  # The regexes below are value-agnostic; the trailing grep makes the
+  # install fail loudly instead of silently building with upstream values.
   vm.RemoteCommand(
-      'sudo sed -i "s/MBUF_CACHE_SIZE                   = 128/MBUF_CACHE_SIZE '
-      f'                  = {DPDK_PKTGEN_MBUF_CACHE_SIZE.value}/g"'
+      'sudo sed -i -E "s/(MBUF_CACHE_SIZE *= *)[0-9]+/'
+      f'\\1{DPDK_PKTGEN_MBUF_CACHE_SIZE.value}/"'
+      f' {DPDK_PKTGEN_GIT_REPO_DIR}/app/pktgen-constants.h'
+      ' && grep -Eq "MBUF_CACHE_SIZE *='
+      f' *{DPDK_PKTGEN_MBUF_CACHE_SIZE.value}\\b"'
       f' {DPDK_PKTGEN_GIT_REPO_DIR}/app/pktgen-constants.h'
   )
   vm.RemoteCommand(
-      'sudo sed -i "s/DEFAULT_MBUFS_PER_PORT_MULTIPLIER ='
-      ' 8/DEFAULT_MBUFS_PER_PORT_MULTIPLIER ='
-      f' {DPDK_PKTGEN_MBUFS_PER_PORT_MULTIPLIER.value}/g"'
+      'sudo sed -i -E "s/(DEFAULT_MBUFS_PER_PORT_MULTIPLIER *= *)[0-9]+/'
+      f'\\1{DPDK_PKTGEN_MBUFS_PER_PORT_MULTIPLIER.value}/"'
+      f' {DPDK_PKTGEN_GIT_REPO_DIR}/app/pktgen-constants.h'
+      ' && grep -Eq "DEFAULT_MBUFS_PER_PORT_MULTIPLIER *='
+      f' *{DPDK_PKTGEN_MBUFS_PER_PORT_MULTIPLIER.value}\\b"'
       f' {DPDK_PKTGEN_GIT_REPO_DIR}/app/pktgen-constants.h'
   )
   vm.RemoteCommand(f'cd {DPDK_PKTGEN_GIT_REPO_DIR} && make')

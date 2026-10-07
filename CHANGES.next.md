@@ -718,3 +718,6 @@
 -   Add support for Netapp Volumes.
 -   Fix `--dpdk_pktgen_packet_size` being silently ignored by dpdk_pktgen on the
     single-NIC path.
+-   Fix `--dpdk_pktgen_mbuf_cache_size` and
+    `--dpdk_pktgen_mbufs_per_port_multiplier` having no effect since the
+    pktgen-26.03.0 upgrade.
