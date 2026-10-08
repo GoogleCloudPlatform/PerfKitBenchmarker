@@ -13,6 +13,7 @@ randrepeat=0
 disable_lat=1
 disable_slat=1
 disable_clat=1
+norandommap
 
 {%- for scenario in scenarios %}
 
