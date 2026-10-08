@@ -29,6 +29,7 @@ from perfkitbenchmarker import mysql_iaas_relational_db
 from perfkitbenchmarker import postgres_iaas_relational_db
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import relational_db
+from perfkitbenchmarker import sample
 from perfkitbenchmarker import sqlserver_iaas_relational_db
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import azure
@@ -294,3 +295,90 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
 
   def _FailoverHA(self) -> None:
     raise NotImplementedError()
+
+  def _GetResourceId(self) -> str:
+    """Returns the ARM resource ID used for Azure Monitor metric queries."""
+    raise NotImplementedError()
+
+  @vm_util.Retry(poll_interval=60, max_retries=5, retryable_exceptions=KeyError)
+  def _CollectProviderMetric(
+      self,
+      metric: relational_db.MetricSpec,
+      start_time: datetime.datetime,
+      end_time: datetime.datetime,
+      collect_percentiles: bool = False,
+  ) -> list[sample.Sample]:
+    """Collects metrics from Azure Monitor."""
+    if end_time - start_time < datetime.timedelta(minutes=1):
+      logging.warning(
+          'Not collecting metrics since end time %s is within 1 minute of start'
+          ' time %s.',
+          end_time,
+          start_time,
+      )
+      return []
+    metric_name = metric.provider_name
+    logging.info(
+        'Collecting metric %s for instance %s', metric_name, self.instance_id
+    )
+    aggregation = 'Average'
+    if 'count' in metric_name:
+      aggregation = 'Total'
+    cmd = [
+        azure.AZURE_PATH,
+        'monitor',
+        'metrics',
+        'list',
+        '--resource',
+        self._GetResourceId(),
+        '--metric',
+        metric_name,
+        '--start-time',
+        relational_db.FormatMetricsTime(start_time),
+        '--end-time',
+        relational_db.FormatMetricsTime(end_time),
+        '--interval',
+        'pt1m',
+        '--aggregation',
+        aggregation,
+    ]
+    try:
+      stdout, _ = vm_util.IssueRetryableCommand(cmd)
+    except errors.VmUtil.IssueCommandError as e:
+      logging.warning(
+          'Could not collect metric %s for instance %s: %s',
+          metric.provider_name,
+          self.instance_id,
+          e,
+      )
+      return []
+    response = json.loads(stdout)
+    if (
+        not response
+        or not response['value']
+        or not response['value'][0]['timeseries']
+    ):
+      logging.warning('No timeseries for metric %s', metric_name)
+      return []
+
+    datapoints = response['value'][0]['timeseries'][0]['data']
+    if not datapoints:
+      logging.warning('No datapoints for metric %s', metric_name)
+      return []
+
+    points: list[tuple[datetime.datetime, float]] = []
+    key = aggregation.lower()
+    for dp in datapoints:
+      if dp[key] is None:
+        continue
+      value = dp[key]
+      if metric.conversion_func:
+        value = metric.conversion_func(value)
+      points.append((
+          datetime.datetime.fromisoformat(dp['timeStamp']),
+          value,
+      ))
+
+    return self._CreateSamples(
+        points, metric.sample_name, metric.unit, collect_percentiles
+    )

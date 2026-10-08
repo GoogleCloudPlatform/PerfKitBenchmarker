@@ -1,4 +1,6 @@
+import datetime
 import inspect
+import json
 import unittest
 
 from absl import flags
@@ -310,6 +312,74 @@ class AzureSqlManagedInstanceTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.instance._Delete()
     self.assertFalse(self.instance._Exists())
     mock_show.assert_called_once()
+
+  def testGetResourceId(self):
+    self.assertEqual(
+        self.instance._GetResourceId(),
+        '/subscriptions/test-sub/resourceGroups/az_resource/providers/'
+        'Microsoft.Sql/managedInstances/pkb-db-instance-test_uri',
+    )
+
+  def testCollectMetrics(self):
+    mock_response = {
+        'value': [{
+            'timeseries': [{
+                'data': [
+                    {
+                        'timeStamp': '2025-11-26T10:00:00Z',
+                        'average': 1024 * 1024 * 10.0,
+                    },
+                    {
+                        'timeStamp': '2025-11-26T10:01:00Z',
+                        'average': 1024 * 1024 * 20.0,
+                    },
+                ]
+            }]
+        }]
+    }
+    mock_issue_cmd = self.enter_context(
+        mock.patch.object(
+            vm_util,
+            'IssueRetryableCommand',
+            return_value=(json.dumps(mock_response), ''),
+        )
+    )
+    self.enter_context(
+        mock.patch.object(self.instance, 'METRICS_COLLECTION_DELAY_SECONDS', 0)
+    )
+    start_time = datetime.datetime(2025, 11, 26, 10, 0, 0)
+    end_time = datetime.datetime(2025, 11, 26, 10, 1, 0)
+
+    samples = self.instance.CollectMetrics(start_time, end_time)
+
+    # 4 samples (min, max, average, time_series) per metric * 5 metrics.
+    self.assertLen(samples, 20)
+    sample_names = {s.metric for s in samples}
+    with self.subTest(name='metric_names'):
+      self.assertContainsSubset(
+          [
+              'cpu_utilization_average',
+              'disk_iops_average',
+              'disk_read_throughput_average',
+              'disk_write_throughput_average',
+              'disk_bytes_used_average',
+          ],
+          sample_names,
+      )
+    with self.subTest(name='throughput_conversion'):
+      read_tp = next(
+          s for s in samples if s.metric == 'disk_read_throughput_average'
+      )
+      self.assertEqual(read_tp.value, 15.0)
+      self.assertEqual(read_tp.unit, 'MB/s')
+    with self.subTest(name='iops_no_conversion'):
+      iops = next(s for s in samples if s.metric == 'disk_iops_max')
+      self.assertEqual(iops.value, 1024 * 1024 * 20.0)
+      self.assertEqual(iops.unit, 'iops')
+    with self.subTest(name='resource_id'):
+      call_args = mock_issue_cmd.call_args[0][0]
+      self.assertIn(self.instance._GetResourceId(), call_args)
+      self.assertIn('Microsoft.Sql/managedInstances', ' '.join(call_args))
 
 
 if __name__ == '__main__':

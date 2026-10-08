@@ -19,9 +19,7 @@ MySQL Flexible Server is created with provisioned IOPS unless omitted, in which
 case it is created with auto-scale IOPS.
 """
 
-import datetime
 import json
-import logging
 import re
 from typing import Any, Tuple
 
@@ -29,7 +27,6 @@ from absl import flags
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import relational_db
-from perfkitbenchmarker import sample
 from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import azure
@@ -406,90 +403,3 @@ class AzureFlexibleServer(azure_relational_db.AzureRelationalDb):
           relational_db.MetricSpec('storage_used', 'disk_bytes_used', 'GB', lambda x: x / (1024 * 1024 * 1024)),
       ]
     # pyformat: enable
-
-  @vm_util.Retry(poll_interval=60, max_retries=5, retryable_exceptions=KeyError)
-  def _CollectProviderMetric(
-      self,
-      metric: relational_db.MetricSpec,
-      start_time: datetime.datetime,
-      end_time: datetime.datetime,
-      collect_percentiles: bool = False,
-  ) -> list[sample.Sample]:
-    """Collects metrics from Azure Monitor."""
-    if end_time - start_time < datetime.timedelta(minutes=1):
-      logging.warning(
-          'Not collecting metrics since end time %s is within 1 minute of start'
-          ' time %s.',
-          end_time,
-          start_time,
-      )
-      return []
-    metric_name = metric.provider_name
-    logging.info(
-        'Collecting metric %s for instance %s', metric_name, self.instance_id
-    )
-    aggregation = 'Average'
-    if 'count' in metric_name:
-      aggregation = 'Total'
-    cmd = [
-        azure.AZURE_PATH,
-        'monitor',
-        'metrics',
-        'list',
-        '--resource',
-        self._GetResourceId(),
-        '--metric',
-        metric_name,
-        '--start-time',
-        start_time.astimezone(datetime.timezone.utc).strftime(
-            relational_db.METRICS_TIME_FORMAT
-        ),
-        '--end-time',
-        end_time.astimezone(datetime.timezone.utc).strftime(
-            relational_db.METRICS_TIME_FORMAT
-        ),
-        '--interval',
-        'pt1m',
-        '--aggregation',
-        aggregation,
-    ]
-    try:
-      stdout, _ = vm_util.IssueRetryableCommand(cmd)
-    except errors.VmUtil.IssueCommandError as e:
-      logging.warning(
-          'Could not collect metric %s for instance %s: %s',
-          metric.provider_name,
-          self.instance_id,
-          e,
-      )
-      return []
-    response = json.loads(stdout)
-    if (
-        not response
-        or not response['value']
-        or not response['value'][0]['timeseries']
-    ):
-      logging.warning('No timeseries for metric %s', metric_name)
-      return []
-
-    datapoints = response['value'][0]['timeseries'][0]['data']
-    if not datapoints:
-      logging.warning('No datapoints for metric %s', metric_name)
-      return []
-
-    points = []
-    key = aggregation.lower()
-    for dp in datapoints:
-      if dp[key] is None:
-        continue
-      value = dp[key]
-      if metric.conversion_func:
-        value = metric.conversion_func(value)
-      points.append((
-          datetime.datetime.fromisoformat(dp['timeStamp']),
-          value,
-      ))
-
-    return self._CreateSamples(
-        points, metric.sample_name, metric.unit, collect_percentiles
-    )

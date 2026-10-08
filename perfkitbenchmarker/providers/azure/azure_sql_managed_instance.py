@@ -17,6 +17,7 @@ from typing import Any
 
 from absl import flags
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import azure
@@ -50,6 +51,8 @@ class AzureSqlManagedInstance(azure_relational_db.AzureRelationalDb):
   SERVER_TYPE = 'mi'
   ENGINE = [sql_engine_utils.SQLSERVER]
   IS_MANAGED = True
+  # Azure Monitor platform metrics can lag by a few minutes.
+  METRICS_COLLECTION_DELAY_SECONDS = 300
 
   def __init__(self, relational_db_spec: Any):
     super().__init__(relational_db_spec)
@@ -304,3 +307,29 @@ class AzureSqlManagedInstance(azure_relational_db.AzureRelationalDb):
     if self._deleted:
       return False
     return super()._Exists()
+
+  def _GetResourceId(self) -> str:
+    return (
+        f'/subscriptions/{util.GetSubscriptionId()}/resourceGroups/'
+        f'{self.resource_group.name}/providers/Microsoft.Sql/managedInstances/'
+        f'{self.instance_id}'
+    )
+
+  def _GetMetricsToCollect(self) -> list[relational_db.MetricSpec]:
+    """Returns a list of metrics to collect.
+
+    See
+    https://learn.microsoft.com/en-us/azure/azure-monitor/reference/supported-metrics/microsoft-sql-managedinstances-metrics
+    The IO metrics are 1-minute averages of per-second rates, so io_requests
+    maps directly to IOPS and io_bytes_* to bytes/s. SQL MI does not split IO
+    requests into reads and writes, so IOPS is reported as a single series.
+    """
+    # pyformat: disable
+    return [
+        relational_db.MetricSpec('avg_cpu_percent', 'cpu_utilization', '%', None),
+        relational_db.MetricSpec('io_requests', 'disk_iops', 'iops', None),
+        relational_db.MetricSpec('io_bytes_read', 'disk_read_throughput', 'MB/s', lambda x: x / (1024 * 1024)),
+        relational_db.MetricSpec('io_bytes_written', 'disk_write_throughput', 'MB/s', lambda x: x / (1024 * 1024)),
+        relational_db.MetricSpec('storage_space_used_mb', 'disk_bytes_used', 'GB', lambda x: x / 1024),
+    ]
+    # pyformat: enable

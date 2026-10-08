@@ -570,15 +570,11 @@ class BaseAwsRelationalDb(relational_db.BaseRelationalDb):
         metric.provider_name,
         self.instance_id,
     )
-    start_time_str = (
-        (start_time - metric.time_period_padding)
-        .astimezone(datetime.timezone.utc)
-        .strftime(relational_db.METRICS_TIME_FORMAT)
+    start_time_str = relational_db.FormatMetricsTime(
+        start_time - metric.time_period_padding
     )
-    end_time_str = (
-        (end_time + metric.time_period_padding)
-        .astimezone(datetime.timezone.utc)
-        .strftime(relational_db.METRICS_TIME_FORMAT)
+    end_time_str = relational_db.FormatMetricsTime(
+        end_time + metric.time_period_padding
     )
     dimensions = [f'Name={n},Value={v}' for n, v in metric.dimensions.items()]
     cmd = util.AWS_PREFIX + [

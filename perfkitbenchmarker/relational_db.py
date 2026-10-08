@@ -329,6 +329,11 @@ def VmsToBoot(vm_groups):
   }
 
 
+def FormatMetricsTime(dt: datetime.datetime) -> str:
+  """Converts a datetime to UTC and formats it with METRICS_TIME_FORMAT."""
+  return dt.astimezone(datetime.timezone.utc).strftime(METRICS_TIME_FORMAT)
+
+
 @dataclasses.dataclass
 class MetricSpec:
   provider_name: str

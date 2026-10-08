@@ -1,5 +1,6 @@
 """Unit tests for the BaseRelationalDb class in relational_db."""
 
+import datetime
 import unittest
 from absl import flags
 import mock
@@ -67,6 +68,13 @@ class RelationalDbTest(pkb_common_test_case.PkbCommonTestCase):
     test_db.SetVms({'default': [vm2]})
 
     self.assertEqual(test_db.client_vm_query_tools.vm, vm2)
+
+  def test_format_metrics_time(self):
+    tz_minus_5 = datetime.timezone(datetime.timedelta(hours=-5))
+    dt = datetime.datetime(2025, 11, 26, 5, 30, 0, tzinfo=tz_minus_5)
+    self.assertEqual(
+        relational_db.FormatMetricsTime(dt), '2025-11-26T10:30:00Z'
+    )
 
 
 if __name__ == '__main__':
