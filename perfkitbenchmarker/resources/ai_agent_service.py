@@ -64,7 +64,7 @@ class BaseAiAgentService(resource.BaseResource):
     )
     config_str = yaml.safe_dump(config_dict)
     config_local_path = vm_util.WriteTemporaryFile(
-        config_str, origin='run_config.yaml'
+        config_str, origin=f'run_config_{session_id}.yaml'
     )
     self.client_vm.PushDataFile(config_local_path, client_vm_path)
 

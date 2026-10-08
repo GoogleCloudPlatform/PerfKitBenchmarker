@@ -3,6 +3,7 @@
 import abc
 import collections.abc
 import json
+import os
 from typing import Any, Self
 import urllib.parse
 
@@ -114,9 +115,17 @@ class BaseAgentHandler(abc.ABC):
     """Exports results to destination."""
 
 
-def upload_dict_to_gcs(payload: dict[str, Any], target_uri: str) -> None:
+def upload_dict_to_gcs(
+    payload: dict[str, Any],
+    target_uri: str,
+    local_file: str | None = None,
+) -> None:
   """Writes dict to a local file. Uploads it to GCS if URI starts with gs://."""
-  results_file = "results.json"
+  if local_file:
+    results_file = local_file
+  else:
+    parent = os.path.basename(os.path.dirname(target_uri.rstrip("/")))
+    results_file = f"results_{parent}.json" if parent else "results.json"
   with open(results_file, "w") as f:
     json.dump(payload, f, indent=2)
 

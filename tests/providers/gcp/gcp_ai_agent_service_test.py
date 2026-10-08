@@ -59,6 +59,23 @@ class GcpAiAgentServiceTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(service.project, 'my-project')
     self.assertEqual(service.region, 'us-central1')
 
+  def test_client_vm_execute_success(self):
+    service = gcp_ai_agent_service.GcpClientVmAiAgentService(
+        self.mock_vm, self.mock_spec
+    )
+    service.UploadRunConfigToClientVm = mock.MagicMock()
+    service.Execute(
+        output_dir='gs://my-bucket/output',
+        prompt='test prompt',
+        session_id='session_1',
+    )
+    self.mock_vm.RobustRemoteCommand.assert_called_once()
+    called_command = self.mock_vm.RobustRemoteCommand.call_args[0][0]
+    self.assertIn(
+        'python3 run_local_agent.py --config_file "run_config_session_1.yaml"',
+        called_command,
+    )
+
   def test_agent_engine_execute_success(self):
     service = gcp_ai_agent_service.VertexAiAgentEngineAiAgentService(
         self.mock_vm, self.mock_spec
@@ -74,6 +91,12 @@ class GcpAiAgentServiceTest(pkb_common_test_case.PkbCommonTestCase):
         output_dir='gs://my-bucket/output',
         prompt='test prompt',
         session_id='session_1',
+    )
+    self.mock_vm.RemoteCommandWithReturnCode.assert_called_once()
+    called_command = self.mock_vm.RemoteCommandWithReturnCode.call_args[0][0]
+    self.assertIn(
+        'python3 run_agent_engine.py --config_file "run_config_session_1.yaml"',
+        called_command,
     )
 
   def test_agent_engine_execute_quota_error(self):

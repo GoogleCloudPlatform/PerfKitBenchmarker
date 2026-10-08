@@ -1,7 +1,9 @@
 """Base class and utilities for agents."""
 
 import abc
+from collections.abc import Sequence
 import dataclasses
+import itertools
 import json
 import logging
 import os
@@ -9,6 +11,7 @@ import time
 from typing import Any, Iterable, Self
 
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import data
 from perfkitbenchmarker import sample
@@ -33,6 +36,13 @@ _MODEL_LOCATION = flags.DEFINE_string(
     None,
     'Which location to use for the model under the framework. If not set,'
     ' defaults to the VM region.',
+)
+
+_CONCURRENCY = flags.DEFINE_integer(
+    'ai_agent_concurrency',
+    1,
+    'Number of concurrent prompts to run in parallel.',
+    lower_bound=1,
 )
 
 
@@ -62,10 +72,15 @@ class MissingArtifactError(Exception):
 def _FetchOutputFromObjectStorage(
     agent_service: ai_agent_service.BaseAiAgentService, output_dir: str
 ) -> PromptResults:
-  local_output_path = os.path.join(temp_dir.GetRunDirPath(), 'output')
+  """Fetches agent output and results from object storage."""
+  prompt_id = os.path.basename(output_dir.rstrip('/'))
+  local_output_path = os.path.join(
+      temp_dir.GetRunDirPath(), 'output', prompt_id
+  )
   local_results_path = os.path.join(local_output_path, 'results.json')
+  os.makedirs(local_output_path, exist_ok=True)
   agent_service.storage_service.Copy(
-      os.path.join(output_dir, 'results.json'), os.path.join(local_results_path)
+      os.path.join(output_dir, 'results.json'), local_results_path
   )
   with open(local_results_path) as f:
     results_dict = json.load(f)
@@ -104,6 +119,7 @@ class BaseAgent(abc.ABC):
         'agent': self.agent_name,
         'agent_deployment': self.agent_service.DEPLOYMENT_TYPE,
     }
+    self.metrics_metadata['concurrency'] = _CONCURRENCY.value
 
   def BeforeCreateAgent(self) -> None:
     """Hook for subclasses to run stuff before Agent Service creation."""
@@ -137,25 +153,61 @@ class BaseAgent(abc.ABC):
     raw_samples = self._RunWorkload()
     return self.ProcessSamples(raw_samples)
 
-  def _RunWorkload(self) -> list[sample.Sample]:
-    """Iterates over prompts and executes/validates them."""
-    samples = []
-    for prompt in self.GetPrompts():
-      results, exec_samples = self.ExecutePrompt(prompt)
-      samples.extend(exec_samples)
-      val_samples = self.ValidatePrompt(prompt, results)
-      samples.extend(val_samples)
+  def _ExecuteAndValidatePrompt(
+      self, prompt: Prompt
+  ) -> tuple[float, list[sample.Sample]]:
+    """Executes a single prompt and runs validation logic on the results."""
+    results, exec_samples = self.ExecutePrompt(prompt)
+    val_samples = self.ValidatePrompt(prompt, results)
+    samples = list(exec_samples) + list(val_samples)
+    success_score = 0.0
+    for s in val_samples:
+      if s.metric == 'success':
+        success_score = s.value
+        break
+    return success_score, samples
 
-      success_score = 0.0
-      for s in val_samples:
-        if s.metric == 'success':
-          success_score = s.value
-          break
+  def _ExecuteAndValidatePrompts(
+      self, prompts: Sequence[Prompt]
+  ) -> list[sample.Sample]:
+    """Executes a sequence of prompts belonging to a single session.
 
+    Aborts early if any prompt fails validation and has
+    abort_on_validation_failure set.
+
+    Args:
+      prompts: A sequence of prompts to execute.
+
+    Returns:
+      A list of samples collected from prompt execution and validation.
+    """
+    session_samples: list[sample.Sample] = []
+    for prompt in prompts:
+      success_score, prompt_samples = self._ExecuteAndValidatePrompt(prompt)
+      session_samples.extend(prompt_samples)
       if prompt.abort_on_validation_failure and success_score < 1.0:
         break
+    return session_samples
 
-    return samples
+  def _RunWorkload(self) -> list[sample.Sample]:
+    """Partitions prompts by session_id and executes sessions concurrently."""
+    prompts = list(self.GetPrompts())
+
+    sorted_prompts = sorted(prompts, key=lambda p: p.session_id)
+    groups = itertools.groupby(sorted_prompts, key=lambda p: p.session_id)
+    session_partitions = [list(group) for _, group in groups]
+
+    results = background_tasks.RunThreaded(
+        self._ExecuteAndValidatePrompts,
+        session_partitions,
+        max_concurrent_threads=_CONCURRENCY.value,
+    )
+
+    all_samples: list[sample.Sample] = []
+    for partition_samples in results:
+      all_samples.extend(partition_samples)
+
+    return all_samples
 
   def ProcessSamples(self, samples: list[sample.Sample]) -> list[sample.Sample]:
     """A hook to reduce, filter, or aggregate metrics."""

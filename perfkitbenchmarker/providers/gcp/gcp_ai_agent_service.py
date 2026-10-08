@@ -149,12 +149,14 @@ class GcpClientVmAiAgentService(GcpAiAgentService):
     """Runs the prompt on the client VM."""
     location = self.spec.model_location or self.region
     agent_name = f'{self.spec.agent}_{self.spec.framework}'
+    session = session_id or 'default_session'
+    config_file = f'run_config_{session}.yaml'
 
     self.UploadRunConfigToClientVm(
-        f'workload/{agent_name}/run_config.yaml',
+        f'workload/{agent_name}/{config_file}',
         output_dir,
         prompt or '',
-        session_id or 'default_session',
+        session,
         user_id or 'default_user',
         agent_config,
     )
@@ -164,8 +166,7 @@ class GcpClientVmAiAgentService(GcpAiAgentService):
         f' export GOOGLE_CLOUD_PROJECT={self.project} &&'
         f' export GOOGLE_CLOUD_LOCATION={location} &&'
         f' cd workload/{agent_name} &&'
-        ' python3 run_local_agent.py'
-        ' --config_file run_config.yaml'
+        f' python3 run_local_agent.py --config_file "{config_file}"'
     )
     self.client_vm.RobustRemoteCommand(command)
 
@@ -600,11 +601,14 @@ class VertexAiAgentEngineAiAgentService(GcpAiAgentService):
 
     logging.info('Running agent on Vertex AI Agent Engine via client VM...')
 
+    session = session_id or 'default_session'
+    config_file = f'run_config_{session}.yaml'
+
     self.UploadRunConfigToClientVm(
-        f'workload/{agent_framework}/run_config.yaml',
+        f'workload/{agent_framework}/{config_file}',
         output_dir,
         prompt or '',
-        session_id or 'default_session',
+        session,
         user_id or 'default_user',
         agent_config,
     )
@@ -613,7 +617,7 @@ class VertexAiAgentEngineAiAgentService(GcpAiAgentService):
     command = (
         f'export GOOGLE_CLOUD_PROJECT={self.project} && export'
         f' GOOGLE_CLOUD_LOCATION={location} && cd workload/{agent_framework}'
-        ' && python3 run_agent_engine.py --config_file run_config.yaml'
+        f' && python3 run_agent_engine.py --config_file "{config_file}"'
     )
     stdout, stderr, return_code = self.client_vm.RemoteCommandWithReturnCode(
         command, ignore_failure=True
