@@ -444,10 +444,14 @@ class SetUpGcsFuseDiskStrategy(disk_strategies.SetUpDiskStrategy):
       gcs_client.Create()
 
     self.vm.RemoteCommand(f'sudo gcsfuse -o {opts} {bucket_name} {target}')
-    # Increase kernel read-ahead size
+    # Increase kernel read-ahead size and FUSE background queue limits
     self.vm.RemoteCommand(
         'echo 32768 | sudo tee /sys/class/bdi/0:$(stat -c "%d"'
-        f' {target})/read_ahead_kb'
+        f' {target})/read_ahead_kb; '
+        'for dir in /sys/fs/fuse/connections/*; do '
+        '  echo 1024 | sudo tee "$dir/max_background" > /dev/null; '
+        '  echo 1024 | sudo tee "$dir/congestion_threshold" > /dev/null; '
+        'done'
     )
     self.vm.scratch_disks.append(gcs_client)
 

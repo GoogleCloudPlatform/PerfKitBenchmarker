@@ -565,6 +565,15 @@ class SetUpS3MountPointDiskStrategy(AWSSetupDiskStrategy):
       s3_client.Create()
 
     self.vm.RemoteCommand(f'sudo mount-s3 {bucket_name} {target} {opts}')
+    # Increase FUSE background queue limits without increasing read_ahead_kb,
+    # as large kernel readahead causes out-of-order FUSE reads that reset
+    # mount-s3's sequential prefetcher.
+    self.vm.RemoteCommand(
+        'for dir in /sys/fs/fuse/connections/*; do '
+        '  echo 1024 | sudo tee "$dir/max_background" > /dev/null; '
+        '  echo 1024 | sudo tee "$dir/congestion_threshold" > /dev/null; '
+        'done'
+    )
     self.vm.scratch_disks.append(s3_client)
 
 
