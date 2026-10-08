@@ -290,6 +290,24 @@ class GcpMysqlRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
       db = CreateDbFromSpec(self.createMySQLSpecDict())
       self.assertEqual(True, db._IsReady())
 
+  def testIsReadyReadsThreadsPerCore(self):
+    path = os.path.join(
+        os.path.dirname(__file__),
+        '../../data',
+        'gcloud-describe-db-instances-available.json',
+    )
+    with open(path) as fp:
+      test_output = json.loads(fp.read())
+    test_output['settings']['advancedMachineFeatures'] = {'threadsPerCore': 1}
+
+    with PatchCriticalObjects(stdout=json.dumps(test_output)):
+      db = CreateDbFromSpec(self.createMySQLSpecDict())
+      self.assertTrue(db._IsReady())
+      self.assertEqual(db.threads_per_core, 1)
+      metadata = db.GetResourceMetadata()
+      self.assertEqual(metadata['threads_per_core'], 1)
+      self.assertTrue(metadata['disable_smt'])
+
   def testExists(self):
     path = os.path.join(
         os.path.dirname(__file__),

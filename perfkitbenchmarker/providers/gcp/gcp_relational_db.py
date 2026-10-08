@@ -501,6 +501,13 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
     stdout, _, _ = cmd.Issue()
     json_output = json.loads(stdout)
     self.endpoint = self._ParseEndpoint(json_output)
+    threads_per_core = (
+        json_output.get('settings', {})
+        .get('advancedMachineFeatures', {})
+        .get('threadsPerCore')
+    )
+    if threads_per_core is not None:
+      self.threads_per_core = int(threads_per_core)
     return True
 
   def _ParseEndpoint(self, describe_instance_json):
@@ -596,6 +603,7 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
       ]
     if relational_db.DISABLE_SMT.value:
       metadata['disable_smt'] = True
+      metadata.setdefault('threads_per_core', 1)
     return metadata
 
   @staticmethod

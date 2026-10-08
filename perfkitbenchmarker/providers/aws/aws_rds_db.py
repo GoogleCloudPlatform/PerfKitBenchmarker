@@ -13,6 +13,8 @@
 # limitations under the License.
 """Managed relational database provisioning and teardown for AWS RDS."""
 
+import re
+
 from absl import flags
 from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker import vm_util
@@ -49,6 +51,44 @@ _RDS_ENGINES = [
     sql_engine_utils.SQLSERVER_ENTERPRISE,
 ]
 
+# Matches e.g. 'db.m7i.2xlarge' -> ('m', '7', 'i', '2').
+_INSTANCE_CLASS_REGEX = re.compile(
+    r'^(?:db\.)?([a-z]+)(\d+)([a-z-]*)\.(?:(\d*)xlarge|large|medium|small|micro)$'
+)
+
+
+def GetSqlServerThreadsPerCore(machine_type: str) -> int:
+  """Returns the default threads per core for an RDS SQL Server instance class.
+
+  RDS does not report threadsPerCore in describe-db-instances unless it was
+  explicitly overridden, so derive the default from the instance class. See
+  https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/SQLServer.Concepts.General.InstanceClasses.html:
+    - AMD classes (e.g. m8a, r8a): each vCPU is a physical core.
+    - 7th generation and newer classes, and x2m: hyper-threading is disabled
+      for sizes 2xlarge and above.
+    - Everything else: hyper-threading enabled.
+
+  Args:
+    machine_type: The RDS instance class, e.g. 'db.m7i.2xlarge'.
+
+  Returns:
+    1 if hyper-threading is disabled, otherwise 2.
+  """
+  match = _INSTANCE_CLASS_REGEX.match(machine_type.lower())
+  if not match:
+    return 2
+  prefix, generation, suffix, xlarge_multiplier = match.groups()
+  family = f'{prefix}{generation}{suffix}'
+  if suffix.startswith('a'):
+    return 1
+  if xlarge_multiplier is None:
+    # large and smaller sizes always keep hyper-threading.
+    return 2
+  size_multiplier = int(xlarge_multiplier) if xlarge_multiplier else 1
+  if (int(generation) >= 7 or family == 'x2m') and size_multiplier >= 2:
+    return 1
+  return 2
+
 
 class AwsRDSRelationalDb(aws_relational_db.BaseAwsRelationalDb):
   """Implements the RDS database for AWS."""
@@ -56,6 +96,13 @@ class AwsRDSRelationalDb(aws_relational_db.BaseAwsRelationalDb):
   CLOUD = 'AWS'
   IS_MANAGED = True
   ENGINE = _RDS_ENGINES
+
+  def __init__(self, relational_db_spec):
+    super().__init__(relational_db_spec)
+    if self.spec.engine in _SQL_SERVER_ENGINES:
+      self.threads_per_core = GetSqlServerThreadsPerCore(
+          self.spec.db_spec.machine_type
+      )
 
   def _Create(self):
     """Creates the AWS RDS instance.

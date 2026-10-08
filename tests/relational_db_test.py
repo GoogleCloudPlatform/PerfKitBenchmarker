@@ -76,6 +76,26 @@ class RelationalDbTest(pkb_common_test_case.PkbCommonTestCase):
         relational_db.FormatMetricsTime(dt), '2025-11-26T10:30:00Z'
     )
 
+  def test_metadata_threads_per_core_unset(self):
+    test_db = TestBaseRelationalDb(self.spec)
+    metadata = test_db.GetResourceMetadata()
+    self.assertNotIn('threads_per_core', metadata)
+    self.assertNotIn('disable_smt', metadata)
+
+  def test_metadata_threads_per_core_smt_disabled(self):
+    test_db = TestBaseRelationalDb(self.spec)
+    test_db.threads_per_core = 1
+    metadata = test_db.GetResourceMetadata()
+    self.assertEqual(metadata['threads_per_core'], 1)
+    self.assertTrue(metadata['disable_smt'])
+
+  def test_metadata_threads_per_core_smt_enabled(self):
+    test_db = TestBaseRelationalDb(self.spec)
+    test_db.threads_per_core = 2
+    metadata = test_db.GetResourceMetadata()
+    self.assertEqual(metadata['threads_per_core'], 2)
+    self.assertNotIn('disable_smt', metadata)
+
 
 if __name__ == '__main__':
   unittest.main()

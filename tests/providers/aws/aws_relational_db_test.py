@@ -37,6 +37,7 @@ from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker import virtual_machine_spec
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import aws_disk
+from perfkitbenchmarker.providers.aws import aws_rds_db
 from perfkitbenchmarker.providers.aws import aws_relational_db
 from perfkitbenchmarker.resources import aws_relational_db_spec
 from tests import matchers
@@ -802,6 +803,86 @@ class ConstructAwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
     FLAGS.cloud = 'AWS'
     with self.assertRaises(errors.Config.InvalidValue):
       pkb_common_test_case.CreateBenchmarkSpecFromYaml(invalid_spec, 'sysbench')
+
+  def testGetSqlServerThreadsPerCore(self):
+    cases = {
+        # Pre-7th generation: hyper-threading enabled at all sizes.
+        'db.t3.xlarge': 2,
+        'db.m5.large': 2,
+        'db.m5.2xlarge': 2,
+        'db.r5b.24xlarge': 2,
+        'db.m6i.8xlarge': 2,
+        'db.r6i.32xlarge': 2,
+        'db.z1d.12xlarge': 2,
+        'db.x2iedn.32xlarge': 2,
+        # 7th generation and newer: disabled for 2xlarge and above.
+        'db.m7i.large': 2,
+        'db.m7i.xlarge': 2,
+        'db.m7i.2xlarge': 1,
+        'db.r7i.48xlarge': 1,
+        'db.m8i.xlarge': 2,
+        'db.r8i.96xlarge': 1,
+        # x2m: disabled for 2xlarge and above.
+        'db.x2m.xlarge': 2,
+        'db.x2m.2xlarge': 1,
+        'db.x2m.32xlarge': 1,
+        # AMD: each vCPU is a physical core.
+        'db.m8a.large': 1,
+        'db.m8a.xlarge': 1,
+        'db.r8a.16xlarge': 1,
+        # Unknown formats default to hyper-threading enabled.
+        'not-a-machine-type': 2,
+    }
+    for machine_type, expected in cases.items():
+      with self.subTest(machine_type=machine_type):
+        self.assertEqual(
+            aws_rds_db.GetSqlServerThreadsPerCore(machine_type), expected
+        )
+
+  def _CreateDbFromSpec(self, engine: str, machine_type: str) -> Any:
+    FLAGS.run_uri = '123'
+    FLAGS.cloud = 'AWS'
+    test_spec = inspect.cleandoc(f"""
+    sysbench:
+      relational_db:
+        engine: {engine}
+        db_spec:
+          AWS:
+            machine_type: {machine_type}
+            zone: us-west-1a
+        db_disk_spec:
+          AWS:
+            disk_size: 50
+            disk_type: io1
+        vm_groups:
+          clients:
+            vm_spec: *default_dual_core
+            disk_spec: *default_50_gb
+    """)
+    spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
+        test_spec, 'sysbench'
+    )
+    spec.ConstructRelationalDb()
+    return spec.relational_db
+
+  def testSqlServerThreadsPerCoreSmtDisabled(self):
+    db = self._CreateDbFromSpec('sqlserver-se', 'db.m7i.2xlarge')
+    self.assertEqual(db.threads_per_core, 1)
+    metadata = db.GetResourceMetadata()
+    self.assertEqual(metadata['threads_per_core'], 1)
+    self.assertTrue(metadata['disable_smt'])
+
+  def testSqlServerThreadsPerCoreSmtEnabled(self):
+    db = self._CreateDbFromSpec('sqlserver-se', 'db.m5.2xlarge')
+    self.assertEqual(db.threads_per_core, 2)
+    metadata = db.GetResourceMetadata()
+    self.assertEqual(metadata['threads_per_core'], 2)
+    self.assertNotIn('disable_smt', metadata)
+
+  def testNonSqlServerThreadsPerCoreUnset(self):
+    db = self._CreateDbFromSpec('mysql', 'db.m7i.2xlarge')
+    self.assertIsNone(db.threads_per_core)
+    self.assertNotIn('threads_per_core', db.GetResourceMetadata())
 
 
 if __name__ == '__main__':

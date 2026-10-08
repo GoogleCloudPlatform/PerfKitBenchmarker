@@ -260,6 +260,13 @@ class AzureSqlManagedInstanceTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertEqual(metadata['engine_version'], 'AlwaysUpToDate')
 
   @flagsaver.flagsaver(run_uri='test_uri')
+  def testThreadsPerCoreAlwaysTwo(self):
+    self.assertEqual(self.instance.threads_per_core, 2)
+    metadata = self.instance.GetResourceMetadata()
+    self.assertEqual(metadata['threads_per_core'], 2)
+    self.assertNotIn('disable_smt', metadata)
+
+  @flagsaver.flagsaver(run_uri='test_uri')
   def testCreate(self):
     self.instance.subnet = mock.Mock()
     self.instance.subnet.name = 'subnet-name'

@@ -68,6 +68,9 @@ class AzureSqlManagedInstance(azure_relational_db.AzureRelationalDb):
     self.memory = self.spec.db_spec.memory
     if self.tier == _GENERAL_PURPOSE_TIER and self.memory is None:
       self.memory = _DEFAULT_MEMORY_MB
+    # Azure SQL MI does not expose a hyperthreading setting; vCores are always
+    # hyperthreads (2 threads per physical core).
+    self.threads_per_core = 2
 
     self._CheckPrerequisites()
 

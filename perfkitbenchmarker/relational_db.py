@@ -371,6 +371,7 @@ class BaseRelationalDb(resource.BaseResource):
     self.replica_endpoint = ''
     self.client_vms = []
     self.simulated_dataset_size_gb = 0.0
+    self.threads_per_core: int | None = None
 
   @property
   def client_vm(self):
@@ -646,6 +647,11 @@ class BaseRelationalDb(resource.BaseResource):
       metadata.update(
           {'disk_throughput_mb': self.spec.db_disk_spec.provisioned_throughput}
       )
+
+    if self.threads_per_core is not None:
+      metadata['threads_per_core'] = self.threads_per_core
+      if self.threads_per_core == 1:
+        metadata['disable_smt'] = True
 
     return metadata
 
