@@ -139,6 +139,42 @@ class DpdkBenchmarkTestCase(parameterized.TestCase, unittest.TestCase):
           expected_output_sample.value,
       )
 
+  @parameterized.named_parameters(
+      dict(
+          testcase_name='single_port',
+          total_pkts=600_000_000,
+          duration=60,
+          num_ports=1,
+          expected_pps=10_000_000,
+      ),
+      dict(
+          testcase_name='two_ports',
+          total_pkts=600_000_000,
+          duration=60,
+          num_ports=2,
+          expected_pps=5_000_000,
+      ),
+      dict(
+          testcase_name='floor_division',
+          total_pkts=601,
+          duration=60,
+          num_ports=2,
+          expected_pps=5,
+      ),
+      dict(
+          testcase_name='negative_passthrough',
+          total_pkts=-1,
+          duration=60,
+          num_ports=2,
+          expected_pps=-1,
+      ),
+  )
+  def testPerPortPps(self, total_pkts, duration, num_ports, expected_pps):
+    self.assertEqual(
+        dpdk_pktgen_benchmark._PerPortPps(total_pkts, duration, num_ports),
+        expected_pps,
+    )
+
 
 if __name__ == '__main__':
   unittest.main()

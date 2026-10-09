@@ -161,6 +161,27 @@ _PKTGEN_FILE = 'pktgen.pkt'
 _PKTGEN_2NIC_FILE = 'pktgen_2nics.pkt'
 
 
+def _PerPortPps(total_pkts: int, duration: int, num_ports: int) -> int:
+  """Converts an aggregate packet count over all ports into per-port PPS.
+
+  The `pps` compiled into app/pktgen.c is the rate of one TX thread on one
+  port, so a rate seeded from a previous run's aggregate receiver count must
+  be divided by the number of ports it was collected over.
+  Negative counts are passed through unchanged.
+
+  Args:
+    total_pkts: Packets received, summed over all ports.
+    duration: Run duration in seconds.
+    num_ports: Number of ports the count was collected over.
+
+  Returns:
+    Per-port packets per second.
+  """
+  if total_pkts < 0:
+    return total_pkts
+  return total_pkts // duration // num_ports
+
+
 def GetConfig(user_config: Mapping[Any, Any]) -> Mapping[Any, Any]:
   """Merge BENCHMARK_CONFIG with user_config to create benchmark_spec.
 
@@ -642,7 +663,11 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
           rx_cmd,
           packet_loss_threshold,
           prev_rate,
-          max_receiver_pkts // _DPDK_PKTGEN_DURATION.value,
+          _PerPortPps(
+              max_receiver_pkts,
+              _DPDK_PKTGEN_DURATION.value,
+              len(tx_core_lists),
+          ),
       )
       s_tx, s_rx, r_rx, loss = (
           stats.sender_tx_pkts,
