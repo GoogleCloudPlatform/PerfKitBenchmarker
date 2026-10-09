@@ -87,8 +87,11 @@ class GoogleCloudStorageBucket(object_storage_service.Bucket):
     self.service = GoogleCloudStorageService()
 
   def _Create(self):
+    location = self.region
+    if object_storage_service.STORAGE_CLASS.value == 'RAPID':
+      location = self.zone
     self.service.PrepareService(
-        self.zone,
+        location,
         self.hierarchical_name_space,
         self.uniform_bucket_level_access,
     )

@@ -183,7 +183,7 @@ class GCECreateNonResourceDiskStrategy(disk_strategies.EmptyCreateDiskStrategy):
       return disk_strategies.SetUpRamDiskStrategy(self.vm, self.disk_spec)
 
     elif self.disk_spec.disk_type == disk.OBJECT_STORAGE:
-      return SetUpGcsFuseDiskStrategy(self.vm, self.disk_spec)
+      return SetUpObjectStorageStrategy(self.vm, self.disk_spec)
 
     elif self.disk_spec.disk_type == disk.NFS:
       return GCPSetUpNFSDiskStrategy(self.vm, self.disk_spec)
@@ -374,7 +374,7 @@ class SetUpPDDiskStrategy(SetUpGCEResourceDiskStrategy):
     self.time_to_visible = return_from_threads[0]
 
 
-class SetUpGcsFuseDiskStrategy(disk_strategies.SetUpDiskStrategy):
+class SetUpObjectStorageStrategy(disk_strategies.SetUpDiskStrategy):
   """Strategies to set up ram disks."""
 
   # Performance tuning -
@@ -404,9 +404,30 @@ class SetUpGcsFuseDiskStrategy(disk_strategies.SetUpDiskStrategy):
   ]
 
   def SetUpDiskOnLinux(self):
-    """Performs Linux specific setup of GCSFuse."""
-    self.vm.Install('gcsfuse')
+    """Performs Linux specific setup of GCS bucket and optional GCSFuse."""
     target = self.disk_spec.mount_point
+    bucket_name = (
+        FLAGS.object_storage_fuse_bucket_name or f'gcsfuse-{FLAGS.run_uri}'
+    )
+    gcs_spec = gcs.GoogleCloudStorageBucketSpec(
+        mount_point=target,
+        bucket_name=bucket_name,
+        region=util.GetRegionFromZone(self.vm.zone),
+        zone=self.vm.zone,
+        hierarchical_name_space=True,
+        uniform_bucket_level_access=True,
+    )
+    gcs_client = gcs.GoogleCloudStorageBucket(gcs_spec)
+    if not FLAGS.object_storage_fuse_bucket_name:
+      gcs_client.Create()
+    self.vm.scratch_disks.append(gcs_client)
+
+    if FLAGS.object_storage_use_fuse:
+      self._MountGcsFuse(bucket_name, target)
+
+  def _MountGcsFuse(self, bucket_name: str, target: str) -> None:
+    """Installs and mounts GCSFuse on the VM."""
+    self.vm.Install('gcsfuse')
     self.vm.RemoteCommand(
         f'sudo mkdir -p {target} && sudo chmod a+w {target} && '
         'sudo mkdir -p /tmp/logs && sudo chmod a+w /tmp/logs'
@@ -428,21 +449,6 @@ class SetUpGcsFuseDiskStrategy(disk_strategies.SetUpDiskStrategy):
           '--log-file=/tmp/logs/gcsfuse.log',
       ]
     opts = ' '.join(all_mount_options)
-    bucket_name = (
-        FLAGS.object_storage_fuse_bucket_name or f'gcsfuse-{FLAGS.run_uri}'
-    )
-    gcs_spec = gcs.GoogleCloudStorageBucketSpec(
-        mount_point=target,
-        bucket_name=bucket_name,
-        region=util.GetRegionFromZone(self.vm.zone),
-        zone=self.vm.zone,
-        hierarchical_name_space=True,
-        uniform_bucket_level_access=True,
-    )
-    gcs_client = gcs.GoogleCloudStorageBucket(gcs_spec)
-    if not FLAGS.object_storage_fuse_bucket_name:
-      gcs_client.Create()
-
     self.vm.RemoteCommand(f'sudo gcsfuse -o {opts} {bucket_name} {target}')
     # Increase kernel read-ahead size and FUSE background queue limits
     self.vm.RemoteCommand(
@@ -453,7 +459,6 @@ class SetUpGcsFuseDiskStrategy(disk_strategies.SetUpDiskStrategy):
         '  echo 1024 | sudo tee "$dir/congestion_threshold" > /dev/null; '
         'done'
     )
-    self.vm.scratch_disks.append(gcs_client)
 
 
 class SetUpHyperdiskMLDiskStrategy(SetUpGCEResourceDiskStrategy):

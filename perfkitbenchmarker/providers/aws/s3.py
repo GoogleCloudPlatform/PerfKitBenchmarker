@@ -64,7 +64,7 @@ class S3Bucket(object_storage_service.Bucket):
     self.service = S3Service()
 
   def _Create(self):
-    location = self.zone or self.region
+    location = self.zone if self.is_s3_express else self.region
     self.service.PrepareService(location)
     self.service.MakeBucket(self.bucket_name)
 

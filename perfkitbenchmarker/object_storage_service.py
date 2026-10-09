@@ -52,6 +52,12 @@ OBJECT_STORAGE_FUSE_LOG_TRACE = flags.DEFINE_boolean(
     False,
     'Whether to enable logging trace for object storage FUSE mount.',
 )
+OBJECT_STORAGE_USE_FUSE = flags.DEFINE_boolean(
+    'object_storage_use_fuse',
+    True,
+    'Whether to install and mount FUSE (gcsfuse, mount-s3, blobfuse2) when '
+    'setting up an object_storage disk.',
+)
 
 
 FLAGS = flags.FLAGS

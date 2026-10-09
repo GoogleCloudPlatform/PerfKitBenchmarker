@@ -162,7 +162,7 @@ class AzureCreateNonResourceDiskStrategy(
     elif self.disk_spec.disk_type == disk.LUSTRE:
       return AzLustreSetupDiskStrategy(self.vm, self.disk_spec)
     elif self.disk_spec.disk_type == disk.OBJECT_STORAGE:
-      return AzureSetUpBlobFuseDiskStrategy(self.vm, self.disk_spec)
+      return SetUpObjectStorageStrategy(self.vm, self.disk_spec)
 
     return disk_strategies.EmptySetupDiskStrategy(self.vm, self.disk_spec)
 
@@ -369,7 +369,7 @@ class AzLustreSetupDiskStrategy(disk_strategies.SetUpLustreDiskStrategy):
       vm.RemoteCommand('echo "module load mpi/hpcx" >> .bashrc')
 
 
-class AzureSetUpBlobFuseDiskStrategy(disk_strategies.SetUpDiskStrategy):
+class SetUpObjectStorageStrategy(disk_strategies.SetUpDiskStrategy):
   """Strategies to set up Azure Blob Containers."""
 
   DEFAULT_MOUNT_OPTIONS = [
@@ -377,12 +377,8 @@ class AzureSetUpBlobFuseDiskStrategy(disk_strategies.SetUpDiskStrategy):
   ]
 
   def SetUpDiskOnLinux(self):
-    """Performs setup of Blobfuse2 containers on Linux."""
-    self.vm.Install('blobfuse2')
+    """Performs setup of Azure Blob containers and optional Blobfuse2 mount."""
     target = self.disk_spec.mount_point
-    self.vm.RemoteCommand(f'sudo mkdir -p {target} && sudo chmod a+w {target}')
-
-    opts = ' '.join(self.DEFAULT_MOUNT_OPTIONS + FLAGS.mount_options)
     bucket_name = (
         FLAGS.object_storage_fuse_bucket_name
         or f'blobfuse2-{FLAGS.run_uri.lower()}'
@@ -396,7 +392,17 @@ class AzureSetUpBlobFuseDiskStrategy(disk_strategies.SetUpDiskStrategy):
     blob_client = azure_blob_storage.BlobStorageContainer(blob_spec)
     if not FLAGS.object_storage_fuse_bucket_name:
       blob_client.Create()
+    self.vm.scratch_disks.append(blob_client)
 
+    if FLAGS.object_storage_use_fuse:
+      self._MountBlobFuse(bucket_name, target)
+
+  def _MountBlobFuse(self, bucket_name: str, target: str) -> None:
+    """Installs and mounts Blobfuse2 on the VM."""
+    self.vm.Install('blobfuse2')
+    self.vm.RemoteCommand(f'sudo mkdir -p {target} && sudo chmod a+w {target}')
+
+    opts = ' '.join(self.DEFAULT_MOUNT_OPTIONS + FLAGS.mount_options)
     # Refer to azure_blob_storage.py for the storage account name.
     account_name = f'pkb{FLAGS.run_uri}absstorage'
     account_key = util.GetAzureStorageAccountKey(
@@ -427,4 +433,3 @@ class AzureSetUpBlobFuseDiskStrategy(disk_strategies.SetUpDiskStrategy):
         f'--config-file={config_file} '
         f'--container-name={bucket_name} {opts}'
     )
-    self.vm.scratch_disks.append(blob_client)

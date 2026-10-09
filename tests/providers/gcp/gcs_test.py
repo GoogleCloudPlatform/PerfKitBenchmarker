@@ -103,6 +103,39 @@ class GoogleCloudStorageServiceTestCase(pkb_common_test_case.PkbCommonTestCase):
     }
     self.assertEqual(content, expected_content)
 
+  def testBucketCreateRegionalByDefault(self):
+    spec = gcs.GoogleCloudStorageBucketSpec(
+        mount_point='/mnt',
+        bucket_name='test-bucket',
+        region='us-central1',
+        zone='us-central1-a',
+        hierarchical_name_space=True,
+        uniform_bucket_level_access=True,
+    )
+    bucket = gcs.GoogleCloudStorageBucket(spec)
+    with mock.patch.object(bucket.service, 'MakeBucket') as mock_make_bucket:
+      bucket._Create()
+      mock_make_bucket.assert_called_once_with('test-bucket')
+    self.assertEqual(bucket.service.location, 'us-central1')
+    self.assertIsNone(bucket.service.placement)
+
+  @flagsaver.flagsaver(object_storage_storage_class='RAPID')
+  def testBucketCreateZonalWhenRapid(self):
+    spec = gcs.GoogleCloudStorageBucketSpec(
+        mount_point='/mnt',
+        bucket_name='test-bucket',
+        region='us-central1',
+        zone='us-central1-a',
+        hierarchical_name_space=True,
+        uniform_bucket_level_access=True,
+    )
+    bucket = gcs.GoogleCloudStorageBucket(spec)
+    with mock.patch.object(bucket.service, 'MakeBucket') as mock_make_bucket:
+      bucket._Create()
+      mock_make_bucket.assert_called_once_with('test-bucket')
+    self.assertEqual(bucket.service.location, 'us-central1')
+    self.assertEqual(bucket.service.placement, 'us-central1-a')
+
 
 if __name__ == '__main__':
   unittest.main()

@@ -26,6 +26,7 @@ from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import disk_strategies
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import object_storage_service
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import aws_disk
@@ -200,7 +201,7 @@ class CreateNonResourceDiskStrategy(  # pyrefly: ignore[inconsistent-inheritance
     elif self.disk_spec.disk_type == disk.NFS:
       return AWSSetUpNFSDiskStrategy(self.vm, self.disk_spec)
     elif self.disk_spec.disk_type == disk.OBJECT_STORAGE:
-      return SetUpS3MountPointDiskStrategy(self.vm, self.disk_spec)
+      return SetUpObjectStorageStrategy(self.vm, self.disk_spec)
     elif self.disk_spec.disk_type == disk.LUSTRE:
       return AwsLustreSetupDiskStrategy(self.vm, self.disk_spec)
 
@@ -512,7 +513,7 @@ class SetUpRemoteDiskStrategy(AWSSetupDiskStrategy):
     self.time_to_visible = return_from_threads[0]
 
 
-class SetUpS3MountPointDiskStrategy(AWSSetupDiskStrategy):
+class SetUpObjectStorageStrategy(AWSSetupDiskStrategy):
   """Strategies to set up S3 buckets."""
 
   DEFAULT_MOUNT_OPTIONS = [
@@ -527,9 +528,37 @@ class SetUpS3MountPointDiskStrategy(AWSSetupDiskStrategy):
   ]
 
   def SetUpDiskOnLinux(self):
-    """Performs setup of S3 buckets."""
-    self.vm.Install('mountpoint')
+    """Performs setup of S3 buckets and optional Mountpoint FUSE."""
     target = self.disk_spec.mount_point
+    is_s3_express = (
+        object_storage_service.STORAGE_CLASS.value == 'EXPRESS_ONEZONE'
+    )
+    suffix = ''
+    if is_s3_express:
+      zone_id = util.GetZoneId(self.vm.zone)
+      suffix = f'--{zone_id}--x-s3'
+    bucket_name = (
+        FLAGS.object_storage_fuse_bucket_name
+        or f'mountpoint-{FLAGS.run_uri.lower()}{suffix}'
+    )
+    s3_spec = s3.S3BucketSpec(
+        mount_point=target,
+        bucket_name=bucket_name,
+        region=util.GetRegionFromZone(self.vm.zone),
+        zone=self.vm.zone,
+        is_s3_express=is_s3_express,
+    )
+    s3_client = s3.S3Bucket(s3_spec)
+    if not FLAGS.object_storage_fuse_bucket_name:
+      s3_client.Create()
+    self.vm.scratch_disks.append(s3_client)
+
+    if FLAGS.object_storage_use_fuse:
+      self._MountS3(bucket_name, target)
+
+  def _MountS3(self, bucket_name: str, target: str) -> None:
+    """Installs and mounts Mountpoint for Amazon S3 on the VM."""
+    self.vm.Install('mountpoint')
     self.vm.RemoteCommand(f'sudo mkdir -p {target} && sudo chmod a+w {target}')
 
     logging_options = []
@@ -547,23 +576,6 @@ class SetUpS3MountPointDiskStrategy(AWSSetupDiskStrategy):
       all_mount_options += ['--metadata-ttl=0']
 
     opts = ' '.join(all_mount_options)
-    zone_id = util.GetZoneId(self.vm.zone)
-    s3_express_zonal_suffix = f'--{zone_id}--x-s3'
-    bucket_name = (
-        FLAGS.object_storage_fuse_bucket_name
-        or f'mountpoint-{FLAGS.run_uri.lower()}{s3_express_zonal_suffix}'
-    )
-    s3_spec = s3.S3BucketSpec(
-        mount_point=target,
-        bucket_name=bucket_name,
-        region=util.GetRegionFromZone(self.vm.zone),
-        zone=self.vm.zone,
-        is_s3_express=True,
-    )
-    s3_client = s3.S3Bucket(s3_spec)
-    if not FLAGS.object_storage_fuse_bucket_name:
-      s3_client.Create()
-
     self.vm.RemoteCommand(f'sudo mount-s3 {bucket_name} {target} {opts}')
     # Increase FUSE background queue limits without increasing read_ahead_kb,
     # as large kernel readahead causes out-of-order FUSE reads that reset
@@ -574,7 +586,6 @@ class SetUpS3MountPointDiskStrategy(AWSSetupDiskStrategy):
         '  echo 1024 | sudo tee "$dir/congestion_threshold" > /dev/null; '
         'done'
     )
-    self.vm.scratch_disks.append(s3_client)
 
 
 class AWSPrepareScratchDiskStrategy(disk_strategies.PrepareScratchDiskStrategy):
