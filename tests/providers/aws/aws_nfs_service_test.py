@@ -226,12 +226,12 @@ class AwsNfsServiceTest(BaseTest):
     self.assertEqual(samples[0].metadata['resource_type'], 'BaseNfsService')
     self.assertEqual(samples[0].metadata['resource_class'], 'AwsNfsService')
 
-  def testGetSamplesWithMountAttachTime(self):
+  def testGetSamplesWithTimeToMount(self):
     nfs = self._CreateNfsService()
-    nfs.mount_attach_time = 1.5
+    nfs.time_to_mount = 1.5
     samples = nfs.GetSamples()
     self.assertLen(samples, 1)
-    self.assertEqual(samples[0].metric, 'Time to Attach Mount')
+    self.assertEqual(samples[0].metric, 'Time to Mount')
     self.assertEqual(samples[0].value, 1.5)
     self.assertEqual(samples[0].unit, 'seconds')
     self.assertEqual(samples[0].metadata['resource_type'], 'BaseNfsService')
@@ -239,17 +239,19 @@ class AwsNfsServiceTest(BaseTest):
 
   def testGetSamplesWithAllMetrics(self):
     nfs = self._CreateNfsService()
-    nfs.time_to_mount = 10.1
+    nfs.create_start_time = 100.0
+    nfs.resource_ready_time = 110.0
+    nfs.time_to_mount = 1.5
     nfs.time_to_resolve_dns = 3.4
     nfs.create_mount_target_time = 2.0
-    nfs.mount_attach_time = 1.5
     samples = nfs.GetSamples()
-    self.assertLen(samples, 4)
+    self.assertLen(samples, 5)
     metrics = {s.metric: s.value for s in samples}
-    self.assertEqual(metrics['Time to Mount'], 10.1)
+    self.assertEqual(metrics['Time to Ready'], 10.0)
+    self.assertEqual(metrics['Time to Mount'], 1.5)
+    self.assertEqual(metrics['Time To Mountable'], 13.4)
     self.assertEqual(metrics['Time to Resolve DNS'], 3.4)
     self.assertEqual(metrics['Time to Create Mount Target'], 2.0)
-    self.assertEqual(metrics['Time to Attach Mount'], 1.5)
 
   def testIsReady(self):
     nfs = self._CreateNfsService()

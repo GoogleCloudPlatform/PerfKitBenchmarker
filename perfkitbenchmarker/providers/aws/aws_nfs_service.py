@@ -84,7 +84,6 @@ class AwsNfsService(nfs_service.BaseNfsService):
     self.provisioned_throughput = FLAGS.efs_provisioned_throughput
     self.time_to_resolve_dns: float | None = None
     self.create_mount_target_time: float | None = None
-    self.mount_attach_time: float | None = None
 
   @property
   def network(self):
@@ -156,15 +155,6 @@ class AwsNfsService(nfs_service.BaseNfsService):
           sample.Sample(
               'Time to Create Mount Target',
               self.create_mount_target_time,
-              'seconds',
-              metadata,
-          )
-      )
-    if self.mount_attach_time is not None:
-      samples.append(
-          sample.Sample(
-              'Time to Attach Mount',
-              self.mount_attach_time,
               'seconds',
               metadata,
           )

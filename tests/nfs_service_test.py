@@ -110,6 +110,45 @@ class NfsServiceTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(samples[0].metadata['resource_type'], 'BaseNfsService')
     self.assertEqual(samples[0].metadata['resource_class'], '_DemoNfsService')
 
+  def testGetSamplesWithTimeToMountable(self):
+    nfs = self._NewNfsResource()
+    nfs.create_start_time = 100.0
+    nfs.resource_ready_time = 110.0
+    nfs.time_to_resolve_dns = 2.5
+    samples = nfs.GetSamples()
+    metrics = {s.metric: s.value for s in samples}
+    self.assertEqual(metrics['Time To Mountable'], 12.5)
+    self.assertEqual(metrics['Time to Ready'], 10.0)
+
+  def testGetSamplesWithTimeToMountAndMountable(self):
+    nfs = self._NewNfsResource()
+    nfs.time_to_mount = 5.0
+    nfs.create_start_time = 100.0
+    nfs.resource_ready_time = 110.0
+    nfs.time_to_resolve_dns = 2.5
+    samples = nfs.GetSamples()
+    metrics = {s.metric: s.value for s in samples}
+    self.assertEqual(metrics['Time to Mount'], 5.0)
+    self.assertEqual(metrics['Time To Mountable'], 12.5)
+    self.assertEqual(metrics['Time to Ready'], 10.0)
+
+  def testTimeToMountableWithoutDnsResolution(self):
+    nfs = self._NewNfsResource()
+    nfs.create_start_time = 100.0
+    nfs.resource_ready_time = 115.0
+    self.assertEqual(nfs.time_to_mountable, 15.0)
+    nfs.time_to_resolve_dns = 3.0
+    self.assertEqual(nfs.time_to_mountable, 18.0)
+
+  def testTimeToMountableNoneWhenMissing(self):
+    nfs = self._NewNfsResource()
+    self.assertIsNone(nfs.time_to_mountable)
+    nfs.create_start_time = 100.0
+    self.assertIsNone(nfs.time_to_mountable)
+    nfs.create_start_time = None
+    nfs.resource_ready_time = 110.0
+    self.assertIsNone(nfs.time_to_mountable)
+
 
 class UnmanagedNfsServiceTest(pkb_common_test_case.PkbCommonTestCase):
 
