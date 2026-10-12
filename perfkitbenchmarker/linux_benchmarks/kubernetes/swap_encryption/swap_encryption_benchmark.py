@@ -356,7 +356,7 @@ def Prepare(spec: _BenchmarkSpec) -> None:  # pylint: disable=invalid-name
   daemonset.Create()
   logging.info('[swap_encryption] Benchmark pod ready: %s', daemonset.pod_name)
   try:
-    cluster.DeleteNodePool(_DEFAULT_POOL)  # pytype: disable=attribute-error
+    cluster.DeleteNodePool(_DEFAULT_POOL)  # pyrefly: ignore[missing-attribute]
   except NotImplementedError:
     pass
   except Exception as e:  # pylint: disable=broad-except
