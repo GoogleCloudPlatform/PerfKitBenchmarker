@@ -730,3 +730,4 @@
     `MEMPOOL_CACHE_SIZE` constant in `app/l2p.h`).
 -   Replace deprecated `pkg_resources` usages with `importlib.resources`,
     `importlib.metadata`, and `packaging.requirements`.
+-   Add support for AWS FSx for NetApp ONTAP volumes.
