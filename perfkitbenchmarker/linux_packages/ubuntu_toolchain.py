@@ -12,7 +12,6 @@ def YumInstall(vm):
 
 
 def AptInstall(vm):
-  # sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys
   vm.InstallPackages('curl')
   vm.RemoteCommand('sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test')
   for key in _REQUIRED_KEYS:

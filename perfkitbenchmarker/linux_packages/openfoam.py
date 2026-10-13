@@ -46,7 +46,10 @@ def AptInstall(vm):
   """Install OpenFOAM https://openfoam.org/download/7-ubuntu/."""
   remote_key_file = '/tmp/openfoam.key'
   vm.PushDataFile(_OPENFOAM_REPOSITORY_KEY, remote_key_file)
-  vm.RemoteCommand(f'sudo apt-key add {remote_key_file}; rm {remote_key_file}')
+  vm.RemoteCommand(
+      f'cat {remote_key_file} | sudo gpg --dearmor -o'
+      f' /etc/apt/trusted.gpg.d/openfoam.gpg; rm {remote_key_file}'
+  )
   vm.RemoteCommand(f'sudo add-apt-repository {_OPENFOAM_REPOSITORY_URL}')
   vm.RemoteCommand('sudo apt-get -y update')
   vm.Install('build_tools')

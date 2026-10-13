@@ -203,9 +203,12 @@ def EnrollSigningKey(vm):
         ' /usr/share/keyrings/'
     )
   else:
+    cuda_key_url = GPG_KEY.format(
+        os=_CudaOs(vm.OS_TYPE), cpu_arch=GetCpuArchPath(vm), key=_KEY.value
+    )
     vm.RemoteCommand(
-        'sudo apt-key adv --fetch-keys'
-        f' {GPG_KEY.format(os=_CudaOs(vm.OS_TYPE), cpu_arch=GetCpuArchPath(vm), key=_KEY.value)}'
+        f'wget -qO- {cuda_key_url} | '
+        'sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/cuda.gpg'
     )
 
 
@@ -272,14 +275,11 @@ def _InstallCuda10Point0(vm):
   Args:
     vm: VM to install CUDA on
   """
-  basename = (
-      f'{posixpath.basename(CUDA_10_0_TOOLKIT.format(os=_CudaOs(vm.OS_TYPE), cpu_arch=_GetCpuArch(vm)))}.deb'
+  cuda_url = CUDA_10_0_TOOLKIT.format(
+      os=_CudaOs(vm.OS_TYPE), cpu_arch=_GetCpuArch(vm)
   )
-  vm.RemoteCommand(
-      'wget -q'
-      f' {CUDA_10_0_TOOLKIT.format(os=_CudaOs(vm.OS_TYPE), cpu_arch=_GetCpuArch(vm))} -O'
-      f' {basename}'
-  )
+  basename = f'{posixpath.basename(cuda_url)}.deb'
+  vm.RemoteCommand(f'wget -q {cuda_url} -O {basename}')
   vm.RemoteCommand('sudo dpkg -i %s' % basename)
   EnrollSigningKey(vm)
   vm.AptUpdate()

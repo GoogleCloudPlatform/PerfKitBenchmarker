@@ -64,7 +64,10 @@ def AptInstall(vm):
   Args:
     vm: Virtual Machine to install on.
   """
-  vm.RemoteCommand('curl {key} | sudo apt-key add -'.format(key=_DEB_REPO_KEY))
+  vm.RemoteCommand(
+      'curl -fsSL {key} | sudo gpg --dearmor -o'
+      ' /etc/apt/trusted.gpg.d/mssql.gpg'.format(key=_DEB_REPO_KEY)
+  )
   deb_repro_file = _DEB_REPO_FILE.format(os=OS_TYPE_MAPPING[vm.OS_TYPE])
   vm.RemoteCommand(
       'curl {file} | sudo tee {location}'.format(
@@ -73,8 +76,7 @@ def AptInstall(vm):
   )
   vm.RemoteCommand('sudo apt-get update')
   vm.RemoteCommand(
-      'sudo ACCEPT_EULA=Y apt-get -y install mssql-tools18 '
-      'unixodbc-dev'
+      'sudo ACCEPT_EULA=Y apt-get -y install mssql-tools18 unixodbc-dev'
   )
   vm.RemoteCommand('sudo ln -s /opt/mssql-tools18 /opt/mssql-tools')
   vm.RemoteCommand(

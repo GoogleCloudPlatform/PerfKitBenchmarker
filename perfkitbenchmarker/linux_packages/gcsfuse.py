@@ -16,8 +16,10 @@ def AptInstall(vm):
       ' /etc/apt/sources.list.d/gcsfuse.list'
   )
   vm.RemoteCommand(
-      'curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo'
-      ' apt-key add -'
+      'curl -fsSL '
+      'https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo gpg '
+      '--dearmor -o '
+      '/etc/apt/trusted.gpg.d/google-cloud.gpg'
   )
   vm.RemoteCommand('sudo apt-get update')
   vm.InstallPackages('fuse gcsfuse')

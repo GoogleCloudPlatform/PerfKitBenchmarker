@@ -85,8 +85,10 @@ def AptInstall(vm):
         ' main" | sudo tee /etc/apt/sources.list.d/google-fast-socket.list'
     )
     vm.RemoteCommand(
-        'curl -s -L https://packages.cloud.google.com/apt/doc/apt-key.gpg '
-        '| sudo apt-key add -'
+        'curl -s -L '
+        'https://packages.cloud.google.com/apt/doc/apt-key.gpg | '
+        'sudo gpg --dearmor -o '
+        '/etc/apt/trusted.gpg.d/google-cloud.gpg'
     )
     vm.AptUpdate()
     vm.InstallPackages(f'{FLAGS.nccl_net_plugin}')

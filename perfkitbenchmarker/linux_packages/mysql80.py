@@ -112,8 +112,9 @@ def AptInstall(vm):
       if match:
         key = match.group(1)
         vm.RemoteCommand(
-            'sudo apt-key adv '
-            f'--keyserver keyserver.ubuntu.com --recv-keys {key}'
+            'sudo gpg --no-default-keyring --keyring'
+            ' /etc/apt/trusted.gpg.d/mysql.gpg --keyserver'
+            f' keyserver.ubuntu.com --recv-keys {key}'
         )
       else:
         raise RuntimeError('No public key found by regex.')
@@ -153,6 +154,7 @@ def _StopServiceIfRunning(vm):
 
 def YumGetPathToConfig(vm):
   """Returns the path to the mysql config file."""
+  del vm
   raise NotImplementedError
 
 
@@ -164,6 +166,7 @@ def AptGetPathToConfig(vm):
 
 def YumGetServiceName(vm):
   """Returns the name of the mysql service."""
+  del vm
   raise NotImplementedError
 
 

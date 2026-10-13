@@ -27,9 +27,8 @@ def _Install(vm):
   )
   vm.InstallPackages('wget')
   vm.RemoteCommand(
-      'wget --quiet -O - '
-      'https://www.postgresql.org/media/keys/ACCC4CF8.asc '
-      '| sudo apt-key add -'
+      'wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc |'
+      ' sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/postgres.gpg'
   )
   vm.InstallPackages('postgresql-client')
 

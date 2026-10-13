@@ -30,7 +30,7 @@ def AptInstall(vm: virtual_machine.BaseVirtualMachine) -> None:
   """
   vm.RemoteCommand(
       'wget -O - https://packages.lunarg.com/lunarg-signing-key-pub.asc | '
-      'sudo apt-key add -'
+      'sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/lunarg-vulkan.gpg'
   )
   vulkan_version, _ = _VERSION.value.split('-')
   vm.RemoteCommand(

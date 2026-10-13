@@ -32,7 +32,8 @@ _APT_REPO_FILE = 'intel_repo_list.txt'
 _APT_REMOTE_REPO_FILE = posixpath.join(vm_util.VM_TMP_DIR, 'intel.list')
 # Command to add the GPG key and update the repo list.
 _APT_INSTALL_REPO_CMD = ';'.join([
-    f'sudo apt-key add {_REMOTE_KEY_FILE}',
+    f'cat {_REMOTE_KEY_FILE} | sudo gpg --dearmor -o '
+    '/etc/apt/trusted.gpg.d/intel.gpg',
     f'rm {_REMOTE_KEY_FILE}',
     f'sudo mv {_APT_REMOTE_REPO_FILE} /etc/apt/sources.list.d/',
     'sudo apt-get update',
@@ -41,7 +42,8 @@ _APT_INSTALL_REPO_CMD = ';'.join([
 _ONEAPI_APT_URL = 'https://apt.repos.intel.com/oneapi'
 _ONEAPI_APT_FILE = '/etc/apt/sources.list.d/oneAPI.list'
 _ONEAPI_APT_INSTALL_REPO_CMD = ';'.join([
-    f'sudo apt-key add {_REMOTE_KEY_FILE}',
+    f'cat {_REMOTE_KEY_FILE} | sudo gpg --dearmor -o '
+    '/etc/apt/trusted.gpg.d/oneapi.gpg',
     f'rm {_REMOTE_KEY_FILE}',
     f'echo "deb {_ONEAPI_APT_URL} all main" | sudo tee {_ONEAPI_APT_FILE}',
     'sudo apt-get update',

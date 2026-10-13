@@ -37,8 +37,8 @@ def AptInstall(vm):
     return
   vm.Install('docker')
   vm.RemoteCommand(
-      'curl -s -L https://nvidia.github.io/nvidia-docker/gpgkey '
-      '| sudo apt-key add -'
+      'curl -s -L https://nvidia.github.io/nvidia-docker/gpgkey | '
+      'sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/nvidia-docker.gpg'
   )
   vm.RemoteCommand(
       'curl -s -L https://nvidia.github.io/nvidia-docker/'

@@ -26,8 +26,8 @@ def AptInstall(vm):
   )
   vm.InstallPackages('wget')
   vm.RemoteCommand(
-      'wget --quiet -O - '
-      'https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -'
+      'wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc |'
+      ' sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/postgres.gpg'
   )
   vm.RemoteCommand('sudo apt-get update')
   vm.RemoteCommand('sudo apt-get -y install postgresql-13')

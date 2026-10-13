@@ -48,11 +48,11 @@ class IntelRepoTestCase(pkb_common_test_case.PkbCommonTestCase):
     )
     self.assertLen(vm.PushDataFile.call_args_list, 1)
     expected_command = (
-        'sudo apt-key add /tmp/pkb/intel_repo_key.txt;'
-        'rm /tmp/pkb/intel_repo_key.txt;'
-        'echo "deb https://apt.repos.intel.com/oneapi all main" '
-        '| sudo tee /etc/apt/sources.list.d/oneAPI.list;'
-        'sudo apt-get update'
+        'cat /tmp/pkb/intel_repo_key.txt | sudo gpg --dearmor -o'
+        ' /etc/apt/trusted.gpg.d/oneapi.gpg;rm'
+        ' /tmp/pkb/intel_repo_key.txt;echo "deb'
+        ' https://apt.repos.intel.com/oneapi all main" | sudo tee'
+        ' /etc/apt/sources.list.d/oneAPI.list;sudo apt-get update'
     )
     vm.RemoteCommand.assert_called_with(expected_command)
 
