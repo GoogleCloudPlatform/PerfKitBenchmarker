@@ -412,12 +412,13 @@ class SetUpObjectStorageStrategy(disk_strategies.SetUpDiskStrategy):
     context = {
         'account_name': account_name,
         'account_key': account_key,
-        'block_size_mb': FLAGS.blobfuse_block_size_mb,
+        'block_size_mb': FLAGS.azure_blobfuse_block_size_mb,
+        'mem_size_mb': FLAGS.azure_blobfuse_mem_size_mb,
         'log_trace': FLAGS.object_storage_fuse_log_trace,
     }
     self.vm.RenderTemplate(
         template_path=data.ResourcePath(
-            f'blobfuse2/{FLAGS.blobfuse_config_file}'
+            f'blobfuse2/{FLAGS.azure_blobfuse_config_file}'
         ),
         remote_path='blobfuse_config.yaml',
         context=context,
@@ -427,7 +428,7 @@ class SetUpObjectStorageStrategy(disk_strategies.SetUpDiskStrategy):
         remote_path='prefill_config.yaml',
         context=context,
     )
-    config_file = FLAGS.blobfuse_mount_config_file
+    config_file = FLAGS.azure_blobfuse_mount_config_file
     self.vm.RemoteCommand(
         f'sudo blobfuse2 mount {target} '
         f'--config-file={config_file} '

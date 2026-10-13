@@ -599,6 +599,7 @@ fio_object_storage_latency_20000mb:
     fio_fill_block_size: 2M
     fio_nr_files: 10000
     fio_runtime: 0
+    azure_blobfuse_mem_size_mb: 25600
 
 fio_object_storage_latency_10000_10MB:
   name: fio_object_storage
@@ -607,7 +608,7 @@ fio_object_storage_latency_10000_10MB:
     fio_fill_size: 100000M
     fio_fill_block_size: 2M
     fio_nr_files: 10000
-    blobfuse_block_size_mb: 0.00390625  # 4KB
+    azure_blobfuse_block_size_mb: 0.00390625  # 4KB
 
 fio_managed_lustre_latency_10000_10MB:
   name: fio_managed_lustre
@@ -668,8 +669,8 @@ fuse_io500:
     scratch_dir: fuse_dir
     openmpi_version: 4.1.6
     mpi_ranks_list: [1, 2, 4, 8, 16, 32, 64, 128, 192]
-    blobfuse_mount_config_file: blobfuse_config.yaml
-    blobfuse_config_file: io500_config.yaml.j2
+    azure_blobfuse_mount_config_file: blobfuse_config.yaml
+    azure_blobfuse_config_file: io500_config.yaml.j2
   vm_groups:
     default:
       vm_spec:

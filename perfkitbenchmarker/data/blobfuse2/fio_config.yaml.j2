@@ -28,7 +28,7 @@ libfuse:
 block_cache:
   block-size-mb: {{ block_size_mb }}
   # Minimal RAM footprint
-  mem-size-mb: 128
+  mem-size-mb: {{ mem_size_mb }}
   prefetch: 0
   parallelism: 1
 
