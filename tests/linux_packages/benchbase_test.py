@@ -217,6 +217,7 @@ class BenchbaseTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(
         txn_metrics[0].metadata['benchbase_use_foreign_key'], False
     )
+    self.assertEqual(txn_metrics[0].metadata['benchbase_rate'], '1000')
 
     with self.subTest(name='new_order_metrics'):
       new_order_metrics = {

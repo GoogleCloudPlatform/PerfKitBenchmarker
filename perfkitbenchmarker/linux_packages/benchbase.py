@@ -345,6 +345,7 @@ def ParseResults(
       parsed.
   """
   metadata['benchbase_use_foreign_key'] = _BENCHBASE_USE_FOREIGN_KEY.value
+  metadata['benchbase_rate'] = _BENCHBASE_RATE.value
   samples = _ParseSummaryMetrics(vm, metadata)
   samples.extend(_ParsePerTransactionTypeMetrics(vm, metadata))
   return samples
