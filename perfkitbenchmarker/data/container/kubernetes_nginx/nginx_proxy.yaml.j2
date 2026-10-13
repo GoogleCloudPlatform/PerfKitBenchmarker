@@ -65,6 +65,7 @@ metadata:
   name: nginx-cluster
 spec:
   type: LoadBalancer
+  externalTrafficPolicy: Local
   ports:
   - port: {{ nginx_port }}
     targetPort: {{ nginx_port }}
