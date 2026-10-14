@@ -21,7 +21,12 @@ DPDK_PKTGEN_GIT_REPO_DIR = 'Pktgen-DPDK'
 DPDK_PKTGEN_GIT_REPO_TAG = 'pktgen-26.03.0'
 
 DPDK_PKTGEN_MBUF_CACHE_SIZE = flags.DEFINE_integer(
-    'dpdk_pktgen_mbuf_cache_size', 512, 'The size of the mbuf cache per lcore.'
+    'dpdk_pktgen_mbuf_cache_size',
+    512,
+    'The size of the per-lcore mbuf mempool cache. 0 disables the cache. DPDK'
+    ' rejects values above RTE_MEMPOOL_CACHE_MAX_SIZE (512).',
+    lower_bound=0,
+    upper_bound=512,
 )
 DPDK_PKTGEN_MBUFS_PER_PORT_MULTIPLIER = flags.DEFINE_integer(
     'dpdk_pktgen_mbufs_per_port_multiplier',
@@ -54,6 +59,11 @@ def _Install(vm):
       ' && grep -Eq "MBUF_CACHE_SIZE *='
       f' *{DPDK_PKTGEN_MBUF_CACHE_SIZE.value}\\b"'
       f' {DPDK_PKTGEN_GIT_REPO_DIR}/app/pktgen-constants.h'
+      # pktgen-26.03.0 sizes its pools from MEMPOOL_CACHE_SIZE (app/l2p.h),
+      # not MBUF_CACHE_SIZE. pktgen.patch redirects the former to the latter;
+      # fail the install if that hunk is ever lost, or the flag is a no-op.
+      ' && grep -Eq "define MEMPOOL_CACHE_SIZE +MBUF_CACHE_SIZE\\b"'
+      f' {DPDK_PKTGEN_GIT_REPO_DIR}/app/l2p.h'
   )
   vm.RemoteCommand(
       'sudo sed -i -E "s/(DEFAULT_MBUFS_PER_PORT_MULTIPLIER *= *)[0-9]+/'

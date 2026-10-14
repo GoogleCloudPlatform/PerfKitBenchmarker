@@ -90,3 +90,30 @@
          char buff[64];
  
          snprintf(buff, sizeof(buff), "RxMbufs-%u-%d", pid, qid);
+--- Pktgen-DPDK/app/l2p.h
++++ pktgen_patch/app/l2p.h
+@@ -45,7 +45,10 @@
+ 
+ #define MAX_MAPPINGS       32   /**< Maximum number of port/queue mappings */
+ #define MAX_ALLOCA_SIZE    1024 /**< Maximum size of a stack allocation */
+-#define MEMPOOL_CACHE_SIZE (RTE_MEMPOOL_CACHE_MAX_SIZE / 2) /**< Per-lcore mempool cache size */
++/* PKB: size the per-lcore pool cache from MBUF_CACHE_SIZE (pktgen-constants.h,
++ * rewritten by --dpdk_pktgen_mbuf_cache_size) instead of an unrelated constant.
++ * MBUF_CACHE_SIZE is visible at the l2p.c use sites via pktgen.h. */
++#define MEMPOOL_CACHE_SIZE MBUF_CACHE_SIZE /**< Per-lcore mempool cache size */
+ 
+ struct port_info_s;
+ 
+--- Pktgen-DPDK/app/l2p.c
++++ pktgen_patch/app/l2p.c
+@@ -79,8 +79,8 @@
+                  "Cannot create mbuf pool (%s) port %d, queue %u, nb_mbufs %d, NUMA %d: %s\n", name,
+                  port->pid, qid, nb_mbufs, sid, rte_strerror(rte_errno));
+ 
+-    pktgen_log_info("  Create: '%-*s' - Memory used (MBUFs %'6u x size %'6u) = %'8lu KB @ %p\n", 24,
+-                    name, nb_mbufs, bufSize, sz / 1024, mp);
++    pktgen_log_info("  Create: '%-*s' - Memory used (MBUFs %'6u x size %'6u, cache %d) = %'8lu KB @ %p\n",
++                    24, name, nb_mbufs, bufSize, cache_size, sz / 1024, mp);
+ 
+     return mp;
+ }
