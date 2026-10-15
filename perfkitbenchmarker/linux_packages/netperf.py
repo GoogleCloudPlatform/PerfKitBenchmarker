@@ -67,7 +67,8 @@ def _Install(vm):
 
   vm.RemoteCommand(
       f'cd {NETPERF_DIR} && '
-      'CFLAGS="-fcommon '
+      'CFLAGS="-fcommon -std=gnu17 -Wno-error=implicit-function-declaration '
+      '-Wno-error=incompatible-pointer-types '
       f'-DHIST_NUM_OF_BUCKET={FLAGS.netperf_histogram_buckets}" '
       './configure --enable-burst '
       '--enable-demo --enable-histogram '
