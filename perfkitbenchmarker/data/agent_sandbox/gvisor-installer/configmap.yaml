@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gvisor-installer-script
+  namespace: kube-system
+# This ConfigMap serves as a receptacle for the gVisor installation script
+# (install.sh). It is populated by the k8s_agent_sandbox cluster creation
+# logic before deploying the DaemonSet.
+data: {}
