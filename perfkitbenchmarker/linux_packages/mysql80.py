@@ -111,6 +111,11 @@ def AptInstall(vm):
       match = re.match('.*NO_PUBKEY ([A-Z0-9]*)', stderr)
       if match:
         key = match.group(1)
+        if vm.HasPackage('dirmngr'):
+          vm.InstallPackages('dirmngr')
+        vm.RemoteCommand(
+            'sudo mkdir -p /root/.gnupg && sudo chmod 700 /root/.gnupg'
+        )
         vm.RemoteCommand(
             'sudo gpg --no-default-keyring --keyring'
             ' /etc/apt/trusted.gpg.d/mysql.gpg --keyserver'

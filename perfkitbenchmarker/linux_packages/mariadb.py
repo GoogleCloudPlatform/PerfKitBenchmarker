@@ -25,7 +25,12 @@ MARIADB = 'mariadb'
 def AptInstall(vm):
   """Installs the mysql package on the VM."""
   vm.InstallPackages('mariadb-server')
-  vm.RemoteCommand(f"""sudo mysql_secure_installation <<EOF
+  cmd = (
+      'mariadb-secure-installation'
+      if vm.TryRemoteCommand('which mariadb-secure-installation')
+      else 'mysql_secure_installation'
+  )
+  vm.RemoteCommand(f"""sudo {cmd} <<EOF
 
 # Set root password (modify as needed)
 y

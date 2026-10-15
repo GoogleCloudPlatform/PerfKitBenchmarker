@@ -22,6 +22,7 @@ from absl import flags
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
 IOR_DIR = '%s/ior' % linux_packages.INSTALL_DIR
@@ -48,9 +49,14 @@ def Install(vm):
   vm.Install('openmpi')
   vm.RemoteCommand('git clone {} {}'.format(GIT_REPO, IOR_DIR))
   vm.RemoteCommand('cd {} && git checkout {}'.format(IOR_DIR, GIT_TAG))
-  vm.RemoteCommand(
-      'cd {} && ./bootstrap && ./configure && make && '
-      'sudo make install'.format(IOR_DIR)
+  # autoreconf inside ./bootstrap can segfault on some runs, so retry.
+  vm_util.Retry(max_retries=5)(vm.RemoteCommand)(
+      f'cd {IOR_DIR} && ./bootstrap'
+  )
+  vm.RobustRemoteCommand(
+      f'cd {IOR_DIR} && '
+      'CFLAGS="-Wno-error=incompatible-pointer-types" ./configure && '
+      'make && sudo make install'
   )
 
 

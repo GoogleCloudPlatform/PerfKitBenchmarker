@@ -31,7 +31,9 @@ def Install(vm):
     if vm.TryRemoteCommand('dpkg -s python3-typing-extensions'):
       vm.RemoteCommand('sudo apt remove -y python3-typing-extensions')
     vm.RemoteCommand(
-        'sudo pip install google-cloud-storage[grpc]'
+        'sudo pip install --ignore-installed google-cloud-storage[grpc]'
     )
   else:
-    vm.RemoteCommand('sudo pip install google-cloud-storage')
+    vm.RemoteCommand(
+        'sudo pip install --ignore-installed google-cloud-storage'
+    )

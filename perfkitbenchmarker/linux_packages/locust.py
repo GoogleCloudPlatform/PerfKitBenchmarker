@@ -48,8 +48,11 @@ def Install(vm: 'linux_virtual_machine.BaseLinuxVirtualMachine') -> None:
   Raises:
     errors.VirtualMachine.RemoteCommandError: If an error occurred on the VM.
   """
-  vm.RunCommand(['sudo', 'apt', 'update'])
-  vm.RunCommand(['sudo', 'apt', 'install', 'python3-locust', '-y'])
+  if vm.HasPackage('python3-locust'):  # pyrefly: ignore[missing-attribute]
+    vm.InstallPackages('python3-locust')
+  else:
+    vm.Install('pip')
+    vm.RemoteCommand('sudo pip3 install --ignore-installed locust')
 
 
 def Prep(

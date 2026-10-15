@@ -18,9 +18,12 @@
 
 def _Install(vm, dev_package: str):
   """Installs python rrdtool on the VM."""
-  vm.Install('pip')
   vm.InstallPackages('rrdtool ' + dev_package)
-  vm.RemoteCommand('sudo pip3 install rrdtool')
+  if vm.HasPackage('python3-rrdtool'):
+    vm.InstallPackages('python3-rrdtool')
+  else:
+    vm.Install('pip')
+    vm.RemoteCommand('sudo pip3 install rrdtool')
 
 
 def YumInstall(vm):
