@@ -873,5 +873,39 @@ class GetTotalCpuMillicoresTest(pkb_common_test_case.PkbCommonTestCase):
       )
 
 
+class CheckForQuotaFailureTest(pkb_common_test_case.PkbCommonTestCase):
+
+  @parameterized.parameters(
+      ('FailedScaleUp', 'out of resources', errors.Benchmarks.QuotaFailure),
+      ('FailedScaleUp', 'failed to appear', errors.Benchmarks.QuotaFailure),
+      (
+          'FailedScaleUp',
+          'insufficient capacity',
+          errors.Benchmarks.InsufficientCapacityCloudFailure,
+      ),
+      (
+          'FailedScaleUp',
+          'zone_resource_pool_exhausted',
+          errors.Benchmarks.InsufficientCapacityCloudFailure,
+      ),
+      (
+          'InsufficientCapacityError',
+          'no inf2',
+          errors.Benchmarks.InsufficientCapacityCloudFailure,
+      ),
+  )
+  def test_check_for_quota_failure(self, reason, msg, expected_error):
+    poller = kubernetes_events.KubernetesEventPoller(set)
+    event = kubernetes_events.KubernetesEvent(
+        resource=kubernetes_events.KubernetesEventResource('Pod', 'p'),
+        message=msg,
+        reason=reason,
+        type='Warning',
+        timestamp=0,
+    )
+    with self.assertRaises(expected_error):
+      poller.CheckForQuotaFailure({reason: [event]})
+
+
 if __name__ == '__main__':
   unittest.main()

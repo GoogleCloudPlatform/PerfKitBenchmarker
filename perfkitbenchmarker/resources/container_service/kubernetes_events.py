@@ -16,6 +16,24 @@ from typing import Any, Callable
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import events
 
+_QUOTA_ERROR_MESSAGES: list[str] = [
+    'quota exceeded',
+    'out of resources',
+    'failed to appear',
+]
+
+_INSUFFICIENT_CAPACITY_ERROR_MESSAGES: list[str] = [
+    'insufficient capacity',
+    'insufficientinstancecapacity',
+    'does not have enough resources available',
+    'zone_resource_pool_exhausted',
+    'allocationfailed',
+    'overconstrainedallocationrequest',
+    'overconstrainedzonalallocationrequest',
+    'zonalallocationfailed',
+    'skunotavailable',
+]
+
 K8S_EVENT_POLLER: KubernetesEventPoller | None = None
 
 
@@ -139,17 +157,33 @@ class KubernetesEventPoller:
   def CheckForQuotaFailure(
       self, failure_events_by_reason: dict[str | None, list['KubernetesEvent']]
   ) -> None:
-    """Raises a quota failure if one is detected."""
+    """Raises a quota or insufficient capacity failure if detected in events."""
+    # TODO(user): Change INSUFFICIENT CAPACITY errors to file bugs.
     if 'FailedScaleUp' in failure_events_by_reason:
-      for event in failure_events_by_reason['FailedScaleUp']:
-        if (
-            'quota exceeded' in event.message
-            or 'out of resources' in event.message
-        ):
-          raise errors.Benchmarks.QuotaFailure(
-              'At least one resource %s/%s ran into a quota error: %s'
-              % (event.resource.kind, event.resource.name, event.message)
-          )
+      combined_message = ', '.join(
+          event.message for event in failure_events_by_reason['FailedScaleUp']
+      ).lower()
+      if any(msg in combined_message for msg in _QUOTA_ERROR_MESSAGES):
+        raise errors.Benchmarks.QuotaFailure(
+            'At least one resource ran into a quota error: %s'
+            % combined_message
+        )
+      if any(
+          msg in combined_message
+          for msg in _INSUFFICIENT_CAPACITY_ERROR_MESSAGES
+      ):
+        raise errors.Benchmarks.InsufficientCapacityCloudFailure(
+            'At least one resource ran into an insufficient capacity error: %s'
+            % combined_message
+        )
+
+    if 'InsufficientCapacityError' in failure_events_by_reason:
+      event = failure_events_by_reason['InsufficientCapacityError'][0]
+      raise errors.Benchmarks.InsufficientCapacityCloudFailure(
+          'At least one resource %s/%s ran into an insufficient capacity'
+          ' error: %s'
+          % (event.resource.kind, event.resource.name, event.message)
+      )
 
 
 @dataclasses.dataclass(eq=True, frozen=True)
