@@ -22,10 +22,11 @@ inference server pattern and is attached to a cluster as cluster.agent_sandbox.
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Any
 
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import resource as pkb_resource
+from perfkitbenchmarker.resources import agent_sandbox_spec
 
 
 class BaseAgentSandbox(pkb_resource.BaseResource):
@@ -34,7 +35,11 @@ class BaseAgentSandbox(pkb_resource.BaseResource):
   RESOURCE_TYPE = 'BaseAgentSandbox'
   REQUIRED_ATTRS = ['SANDBOX_TYPE']
 
-  def __init__(self, spec, cluster):
+  def __init__(
+      self,
+      spec: agent_sandbox_spec.BaseAgentSandboxConfigSpec,
+      cluster: Any,
+  ):
     super().__init__()
     self.spec = spec
     self.cluster = cluster
@@ -43,11 +48,16 @@ class BaseAgentSandbox(pkb_resource.BaseResource):
           'A kubernetes cluster is required for an agent sandbox resource.'
       )
 
+  def InstallWorkload(self):
+    """Installs the controller and workload components."""
+    raise NotImplementedError()
 
-def GetAgentSandbox(spec, cluster) -> Optional[BaseAgentSandbox]:
-  """Returns an agent sandbox resource for the given spec, or None."""
-  if not spec:
-    return None
+
+def GetAgentSandbox(
+    spec: agent_sandbox_spec.BaseAgentSandboxConfigSpec,
+    cluster: Any,
+) -> BaseAgentSandbox:
+  """Returns an agent sandbox resource for the given spec."""
   agent_sandbox_class: type[BaseAgentSandbox] = pkb_resource.GetResourceClass(
       BaseAgentSandbox, SANDBOX_TYPE=spec.type
   )

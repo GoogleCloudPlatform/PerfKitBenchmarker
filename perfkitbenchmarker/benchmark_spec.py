@@ -64,6 +64,7 @@ from perfkitbenchmarker import vpn_service
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.configs import freeze_restore_spec
 from perfkitbenchmarker.configs import vm_group_decoders
+from perfkitbenchmarker.resources import agent_sandbox
 from perfkitbenchmarker.resources import ai_agent_service
 from perfkitbenchmarker.resources import base_job
 from perfkitbenchmarker.resources import example_resource
@@ -216,6 +217,7 @@ class BenchmarkSpec:
     self.memory_store = None
     self.data_discovery_service = None
     self.ai_agent_service = None
+    self.agent_sandbox: agent_sandbox.BaseAgentSandbox | None = None
     self.app_groups = {}
     self._zone_index = 0
     self.capacity_reservations = []
@@ -339,6 +341,7 @@ class BenchmarkSpec:
     # Put registry first, as it can be needed by cluster.
     self.ConstructContainerRegistry()
     self.ConstructContainerCluster()
+    self.ConstructAgentSandbox()
     # dpb service needs to go first, because it adds some vms.
     self.ConstructDpbService()
     self.ConstructCluster()
@@ -389,6 +392,15 @@ class BenchmarkSpec:
       self.container_cluster.SetContainerRegistry(self.container_registry)
 
     self.resources.append(self.container_cluster)
+
+  def ConstructAgentSandbox(self):
+    """Create the agent sandbox resource."""
+    if self.config.agent_sandbox is None:
+      return
+    self.agent_sandbox = agent_sandbox.GetAgentSandbox(
+        self.config.agent_sandbox, self.container_cluster
+    )
+    self.resources.append(self.agent_sandbox)
 
   def ConstructCluster(self):
     """Create the cluster."""
@@ -1093,6 +1105,8 @@ class BenchmarkSpec:
 
     if self.container_cluster:
       self.container_cluster.Create()
+    if self.agent_sandbox:
+      self.agent_sandbox.Create()
 
     # do after network setup but before VM created
     if self.nfs_service and self.nfs_service.CLOUD != nfs_service.UNMANAGED:
@@ -1314,6 +1328,9 @@ class BenchmarkSpec:
             'Got an exception disabling firewalls. '
             'Attempting to continue tearing down.'
         )
+
+    if self.agent_sandbox:
+      self.agent_sandbox.Delete()
 
     if self.container_cluster:
       self.container_cluster.DeleteServices()
@@ -1549,4 +1566,3 @@ class BenchmarkSpec:
       self.memory_store.CheckPrerequisites()
     if hasattr(self, 'ai_agent_service') and self.ai_agent_service:
       self.ai_agent_service.CheckPrerequisites()
-
