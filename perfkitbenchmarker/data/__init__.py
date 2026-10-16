@@ -23,13 +23,13 @@ Users can specify additional paths to search for required data files using the
 """
 
 import abc
+import importlib.resources
 import logging
 import os
 import shutil
 from absl import flags
 import perfkitbenchmarker
 from perfkitbenchmarker import temp_dir
-import pkg_resources
 import six
 
 FLAGS = flags.FLAGS
@@ -127,14 +127,19 @@ class PackageResourceLoader(ResourceLoader):
     return '<{0} package="{1}">'.format(type(self).__name__, self.package)
 
   def ResourceExists(self, name):
-    return pkg_resources.resource_exists(self.package, name)
+    try:
+      resource = importlib.resources.files(self.package).joinpath(name)
+    except ModuleNotFoundError:
+      return False
+    return resource.is_file() or resource.is_dir()
 
   def ResourcePath(self, name):
     if not self.ResourceExists(name):
       raise ResourceNotFound(name)
-    try:
-      path = pkg_resources.resource_filename(self.package, name)
-    except NotImplementedError:
+    resource = importlib.resources.files(self.package).joinpath(name)
+    if isinstance(resource, os.PathLike):
+      path = os.fspath(resource)
+    else:
       # This can happen if PerfKit Benchmarker is executed from a zip file.
       # Extract the resource to the version-specific temporary directory.
       path = os.path.join(temp_dir.GetVersionDirPath(), _RESOURCES, name)
@@ -145,10 +150,11 @@ class PackageResourceLoader(ResourceLoader):
         except OSError:
           if not os.path.isdir(dir_path):
             raise
-        with open(path, 'wb') as extracted_file:
-          shutil.copyfileobj(
-              pkg_resources.resource_stream(self.package, name), extracted_file
-          )
+        with (
+            resource.open('rb') as resource_stream,
+            open(path, 'wb') as extracted_file,
+        ):
+          shutil.copyfileobj(resource_stream, extracted_file)
     return path
 
 

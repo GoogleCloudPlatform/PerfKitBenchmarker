@@ -16,12 +16,13 @@
 
 from collections import deque
 import contextlib
+import importlib.metadata
 import unittest
 
 import mock
+from packaging import requirements as packaging_requirements
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import requirements
-import pkg_resources
 import six
 
 
@@ -107,9 +108,18 @@ class CheckRequirementsTestCase(unittest.TestCase):
     subfile1 = """
     package-6
     """
-    with self._MockOpen(top_file, subfile0, '', '', subfile1) as mocked_open:
-      with mock.patch.object(pkg_resources, 'require') as mocked_require:
-        requirements._CheckRequirements(_PATH)
+    with (
+        self._MockOpen(top_file, subfile0, '', '', subfile1) as mocked_open,
+        mock.patch.object(
+            packaging_requirements,
+            'Requirement',
+            wraps=packaging_requirements.Requirement,
+        ) as mocked_require,
+        mock.patch.object(
+            importlib.metadata, 'version', return_value='2.0'
+        ) as mocked_version,
+    ):
+      requirements._CheckRequirements(_PATH)
     mocked_open.assert_has_calls((
         mock.call('dir/file'),
         mock.call('dir/subfile0'),
@@ -127,6 +137,22 @@ class CheckRequirementsTestCase(unittest.TestCase):
                     'package-4',
                     'package-5',
                     'package-1>=2.0',
+                    'package-6',
+                    'package-2',
+                ),
+            )
+        )
+    )
+    mocked_version.assert_has_calls(
+        list(
+            map(
+                mock.call,
+                (
+                    'package-0',
+                    'package-3',
+                    'package-4',
+                    'package-5',
+                    'package-1',
                     'package-6',
                     'package-2',
                 ),

@@ -14,13 +14,30 @@
 """Functions for checking that required Python packages are installed."""
 
 from collections import deque
+import importlib.metadata
 import os
+from packaging import requirements as packaging_requirements
 from perfkitbenchmarker import errors
-import pkg_resources
-
 
 # Path of the root of the current git branch.
 _BRANCH_ROOT_DIR = os.path.dirname(os.path.dirname(__file__))
+
+
+def _CheckRequirement(line: str) -> None:
+  """Checks that a single package requirement line is met."""
+  line = line.split('#', 1)[0].strip()
+  if not line:
+    return
+  req = packaging_requirements.Requirement(line)
+  if req.marker and not req.marker.evaluate():
+    return
+  dist_version = importlib.metadata.version(req.name)
+  if req.specifier and not req.specifier.contains(
+      dist_version, prereleases=True
+  ):
+    raise ValueError(
+        f'Installed version {dist_version} of {req.name} does not satisfy {req}'
+    )
 
 
 def _CheckRequirements(requirements_file_path):
@@ -42,23 +59,19 @@ def _CheckRequirements(requirements_file_path):
           with open(file_path) as fp:
             lines = deque(fp.readlines())
         elif line:
-          assert pkg_resources.require is not None
-          pkg_resources.require(line)
+          _CheckRequirement(line)
   except (
-      pkg_resources.DistributionNotFound,
-      pkg_resources.VersionConflict,
+      importlib.metadata.PackageNotFoundError,
+      packaging_requirements.InvalidRequirement,
+      ValueError,
   ) as e:
-    # In newer versions of setuptools, these exception classes have a report
-    # method that provides a readable description of the error.
-    report = getattr(e, 'report', None)
-    err_msg = report() if report else str(e)
     raise errors.Setup.PythonPackageRequirementUnfulfilled(
         'A Python package requirement was not met while checking "{path}": '
         '{msg}{linesep}To install required packages, execute the following '
         'command:{linesep}pip install -r "{path}"{linesep}To bypass package '
         'requirement checks, run PerfKit Benchmarker with the '
         '--ignore_package_requirements flag.'.format(
-            linesep=os.linesep, msg=err_msg, path=requirements_file_path
+            linesep=os.linesep, msg=str(e), path=requirements_file_path
         )
     )
 

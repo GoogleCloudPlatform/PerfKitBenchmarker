@@ -14,10 +14,10 @@
 
 """PerfKitBenchmarker version."""
 
+import importlib.resources
 import os.path
 import subprocess
 import perfkitbenchmarker
-import pkg_resources
 
 
 _STATIC_VERSION_FILE = 'version.txt'
@@ -38,14 +38,15 @@ def _GetVersion():
     # Could not get the version from git. Resort to contents of the static
     # version file.
     try:
-      version = pkg_resources.resource_string(
-          perfkitbenchmarker.__name__,
-          _STATIC_VERSION_FILE,
+      version = (
+          importlib.resources.files(perfkitbenchmarker.__name__)
+          .joinpath(_STATIC_VERSION_FILE)
+          .read_text()
       )
     except OSError:
       # Could not determine version.
       return 'unknown'
-  return version.rstrip('\n')  # pyrefly: ignore[bad-argument-type]
+  return version.rstrip('\n')
 
 
 VERSION = _GetVersion()
