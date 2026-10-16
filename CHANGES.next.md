@@ -295,6 +295,8 @@
     plane API responsiveness.
 -   Add support for Clickhouse running on GKE.
 -   dpb_sparksql_benchmark now requires passing --dpb_sparksql_queries_url flag.
+-   Add dpb_tpcx_hs_benchmark, which runs the TPCx-HS kit's HSGen, HSSort and
+    HSValidate programs on a DPB cluster and reports HSph@SF.
 
 ### Enhancements:
 
