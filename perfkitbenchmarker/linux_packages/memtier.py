@@ -43,11 +43,11 @@ GIT_REPO = 'https://github.com/RedisLabs/memtier_benchmark'
 GIT_TAG = '2.1.3'
 MEMTIER_DIR = '%s/memtier_benchmark' % linux_packages.INSTALL_DIR
 APT_PACKAGES = (
-    'build-essential autoconf automake libpcre3-dev '
+    'build-essential autoconf automake '
     'libevent-dev pkg-config zlib1g-dev libssl-dev'
 )
 YUM_PACKAGES = (
-    'zlib-devel pcre-devel libmemcached-devel libevent-devel openssl-devel '
+    'zlib-devel libmemcached-devel libevent-devel openssl-devel '
     'gcc-c++ libtool autoconf automake'
 )
 MEMTIER_RESULTS = 'memtier_results'
@@ -352,6 +352,13 @@ def _Install(vm):
     vm.RemoteCommand(
         f'tar -C {MEMTIER_DIR} -xvzf {MEMTIER_DIR}/{_LARGE_CLUSTER_TAR}'
     )
+  # memtier_benchmark's configure.ac checks for legacy libpcre (pcre.h / -lpcre)
+  # which was removed in Ubuntu 26.04, even though memtier_benchmark never
+  # actually includes pcre.h or calls any PCRE functions in its source code.
+  vm.RemoteCommand(
+      f'cd {MEMTIER_DIR} && '
+      "sed -i 's/pcre.h //g; /pcre_compile/d' configure.ac"
+  )
   # autoreconf is segfaulting on some runs. so retry.
   vm_util.Retry(max_retries=10)(vm.RemoteCommand)(
       f'cd {MEMTIER_DIR} && autoreconf -ifvvvvvvvvv'
