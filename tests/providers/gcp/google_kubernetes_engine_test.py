@@ -1386,5 +1386,139 @@ class GoogleKubernetesEngineSwapConfigTestCase(PatchedObjectsTestCase):
     mock_cleanup.assert_called_once()
 
 
+class GoogleKubernetesEngineGclusterTestCase(PatchedObjectsTestCase):
+
+  @staticmethod
+  def create_kubernetes_engine_spec():
+    kubernetes_engine_spec = container_spec.ContainerClusterSpec(
+        'NAME',
+        **{
+            'cloud': 'GCP',
+            'vm_spec': {
+                'GCP': {
+                    'machine_type': 'fake-machine-type',
+                    'zone': 'us-central1-a',
+                    'project': 'fakeproject',
+                },
+            },
+            'vm_count': 2,
+        },
+    )
+    return kubernetes_engine_spec
+
+  def testCreate(self):
+    spec = self.create_kubernetes_engine_spec()
+    with self.patch_critical_objects(stdout='1.2.3.4') as issue_command:
+      with mock.patch('builtins.open', mock.mock_open(read_data='fake: yaml')):
+        cluster = google_kubernetes_engine.GkeGclusterCluster(spec)
+        cluster._Create()
+
+        self.assertIn('deploy', issue_command.all_commands)
+        self.assertIn('gcluster', issue_command.all_commands)
+        self.assertIn('patch_temp_file.yaml', issue_command.all_commands)
+        self.assertIn(
+            '--vars static_node_count=2',
+            issue_command.all_commands,
+        )
+        self.assertIn(
+            '--vars compute_nodepool_machine_type=fake-machine-type',
+            issue_command.all_commands,
+        )
+
+  def testCreateWithNodepoolsAndVars(self):
+    spec = container_spec.ContainerClusterSpec(
+        'NAME',
+        **{
+            'cloud': 'GCP',
+            'vm_spec': {
+                'GCP': {
+                    'machine_type': 'e2-standard-4',
+                    'zone': 'us-central1-a',
+                    'project': 'fakeproject',
+                },
+            },
+            'nodepools': {
+                'gpu_pool': {
+                    'vm_count': 4,
+                    'vm_spec': {
+                        'GCP': {
+                            'machine_type': 'a2-highgpu-1g',
+                            'gpu_type': 'k80',
+                            'gpu_count': 1,
+                        },
+                    },
+                },
+            },
+        },
+    )
+    FLAGS.gcluster_vars = ['custom_var=123', 'another_var=abc']
+    with self.patch_critical_objects(stdout='1.2.3.4') as issue_command:
+      with mock.patch('builtins.open', mock.mock_open(read_data='fake: yaml')):
+        cluster = google_kubernetes_engine.GkeGclusterCluster(spec)
+        cluster._Create()
+
+        self.assertIn('deploy', issue_command.all_commands)
+        self.assertIn(
+            '--vars gpupool_machine_type=a2-highgpu-1g',
+            issue_command.all_commands,
+        )
+        self.assertIn('--vars gpupool_node_count=4', issue_command.all_commands)
+        self.assertIn('--vars gpupool_gpu_count=1', issue_command.all_commands)
+        self.assertIn('--vars custom_var=123', issue_command.all_commands)
+        self.assertIn('--vars another_var=abc', issue_command.all_commands)
+
+  def testGetResourceMetadata(self):
+    spec = self.create_kubernetes_engine_spec()
+    FLAGS.gcluster_vars = ['var1=val1', 'var2=val2']
+    with self.patch_critical_objects():
+      cluster = google_kubernetes_engine.GkeGclusterCluster(spec)
+      metadata = cluster.GetResourceMetadata()
+      self.assertEqual(metadata['template'], 'cluster/gke/gke_default.yaml.j2')
+      self.assertEqual(metadata['gcluster_vars'], 'var1=val1,var2=val2')
+
+  def testDelete(self):
+    spec = self.create_kubernetes_engine_spec()
+    with self.patch_critical_objects() as issue_command:
+      with mock.patch('os.path.exists', return_value=True):
+        cluster = google_kubernetes_engine.GkeGclusterCluster(spec)
+        cluster._Delete()
+
+        self.assertIn('destroy', issue_command.all_commands)
+        self.assertIn('gcluster', issue_command.all_commands)
+
+  def testDeleteMissingDeployDir(self):
+    spec = self.create_kubernetes_engine_spec()
+    with self.patch_critical_objects() as issue_command:
+      with mock.patch('os.path.exists', return_value=False):
+        cluster = google_kubernetes_engine.GkeGclusterCluster(spec)
+        cluster._Delete()
+
+        self.assertNotIn('destroy', issue_command.all_commands)
+
+  def testCreateRegionalCluster(self):
+    spec = container_spec.ContainerClusterSpec(
+        'NAME',
+        **{
+            'cloud': 'GCP',
+            'vm_spec': {
+                'GCP': {
+                    'machine_type': 'fake-machine-type',
+                    'zone': 'us-central1',
+                    'project': 'fakeproject',
+                },
+            },
+            'vm_count': 2,
+        },
+    )
+    with self.patch_critical_objects(stdout='1.2.3.4') as issue_command:
+      with mock.patch('builtins.open', mock.mock_open(read_data='fake: yaml')):
+        cluster = google_kubernetes_engine.GkeGclusterCluster(spec)
+        cluster._Create()
+
+        get_creds_cmd = issue_command.GetCommandWithSubstring('get-credentials')
+        self.assertIn('--region us-central1', get_creds_cmd)
+        self.assertNotIn('--zone', get_creds_cmd)
+
+
 if __name__ == '__main__':
   unittest.main()

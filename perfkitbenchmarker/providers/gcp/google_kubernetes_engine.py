@@ -217,7 +217,11 @@ class BaseGkeCluster(kubernetes_cluster.KubernetesCluster):
 
   def _GcloudCommand(self, *args, **kwargs) -> util.GcloudCommand:
     """Creates a gcloud command."""
-    return util.GcloudCommand(self, *args, **kwargs)
+    cmd = util.GcloudCommand(self, *args, **kwargs)
+    if len(self.zones) != 1:
+      cmd.flags.pop('zone', None)
+      cmd.flags['region'] = self.region
+    return cmd
 
   def _RunClusterCreateCommand(self, cmd: util.GcloudCommand):
     """Adds flags to the cluster create command and runs it."""
@@ -452,14 +456,6 @@ class GkeCluster(BaseGkeCluster):
       self._swap_configs[nodepool_config.name] = swap_config.GetSwapConfigClass(
           self.CLOUD
       ).from_spec(nodepool_config.swap_config)
-
-  def _GcloudCommand(self, *args, **kwargs) -> util.GcloudCommand:
-    """Fix zone and region."""
-    cmd = super()._GcloudCommand(*args, **kwargs)
-    if len(self.zones) != 1:
-      del cmd.flags['zone']
-      cmd.flags['region'] = self.region
-    return cmd
 
   def GetNodeSelectors(self, machine_type: str | None = None) -> dict[str, str]:
     """Targets the default pool ComputeClass when custom classes are enabled."""
@@ -1105,8 +1101,7 @@ class GkeAutopilotCluster(BaseGkeCluster):
   def _GcloudCommand(self, *args, **kwargs) -> util.GcloudCommand:
     """Creates a gcloud command."""
     cmd = super()._GcloudCommand(*args, **kwargs)
-    if 'zone' in cmd.flags:
-      del cmd.flags['zone']
+    cmd.flags.pop('zone', None)
     cmd.flags['region'] = self.region
     return cmd
 
@@ -1176,3 +1171,133 @@ class GkeAutopilotCluster(BaseGkeCluster):
       self, new_size: int, node_pool: str = container_cluster.DEFAULT_NODEPOOL
   ):
     raise NotImplementedError('Autopilot clusters do not support resizing.')
+
+
+class GkeGclusterCluster(BaseGkeCluster):
+  """Class representing a GKE cluster provisioned via the Cluster Toolkit (gcluster).
+
+  Note: There's probably some eventual synergy between what we're doing here
+  and in gcp_cluster.py, but aligning these will take some negotiation.
+  """
+
+  CLOUD = 'GCP'
+  CLUSTER_TYPE = 'gcluster'
+
+  DEFAULT_TEMPLATE = 'cluster/gke/gke_default.yaml.j2'
+  TIMEOUT = ONE_HOUR
+
+  def __init__(self, spec: container_spec_lib.ContainerClusterSpec) -> None:
+    super().__init__(spec)
+    self.template = FLAGS.cluster_template_file or self.DEFAULT_TEMPLATE
+
+  def GetResourceMetadata(self) -> dict[str, Any]:
+    """Returns a dict containing metadata about the cluster."""
+    metadata = super().GetResourceMetadata()
+    metadata['template'] = self.template
+    if gcp_flags.GCLUSTER_VARS.value:
+      metadata['gcluster_vars'] = ','.join(gcp_flags.GCLUSTER_VARS.value)
+    return metadata
+
+  def _RenderClusterConfig(self) -> str:
+    """Render the config file that will be used to create the cluster."""
+    return vm_util.RenderTemplate(
+        self.template,
+        context={
+            'project': self.project,
+            'name': self.name,
+            'region': self.region,
+            'zone': self.zones[0] if self.zones else self.region,
+            'cluster_availability_type': 'ZONAL' if self.zones else 'REGIONAL',
+            'resource_path': data.ResourcePath,
+        },
+    )
+
+  def _Create(self) -> None:
+    """Create GCP cluster with cluster toolkit."""
+    config_path = self._RenderClusterConfig()
+
+    # Base variables
+    gcluster_vars = [
+        '--vars',
+        f'project_id={self.project}',
+        '--vars',
+        f'deployment_name={self.name}',
+        '--vars',
+        f'region={self.region}',
+        '--vars',
+        f'zone={self.zones[0] if self.zones else self.region}',
+        '--vars',
+        f'cluster_availability_type={"ZONAL" if self.zones else "REGIONAL"}',
+    ]
+
+    # Dynamically inject PKB's standard nodepool settings (like Node counts)
+    # to serve as escape valves for the Cluster Toolkit templates.
+    gcluster_vars.extend([
+        '--vars',
+        f'static_node_count={self.default_nodepool.num_nodes}',
+    ])
+    if self.default_nodepool.machine_type:
+      gcluster_vars.extend([
+          '--vars',
+          f'compute_nodepool_machine_type={self.default_nodepool.machine_type}',
+      ])
+    if self.default_nodepool.gpu_count:
+      gcluster_vars.extend([
+          '--vars',
+          f'guest_accelerator_count={self.default_nodepool.gpu_count}',
+      ])
+
+    for pool_name, pool in self.nodepools.items():
+      if pool.machine_type:
+        gcluster_vars.extend([
+            '--vars',
+            f'{pool_name}_machine_type={pool.machine_type}',
+        ])
+      gcluster_vars.extend([
+          '--vars',
+          f'{pool_name}_node_count={pool.num_nodes}',
+      ])
+      if pool.gpu_count:
+        gcluster_vars.extend([
+            '--vars',
+            f'{pool_name}_gpu_count={pool.gpu_count}',
+        ])
+
+    for var in gcp_flags.GCLUSTER_VARS.value:
+      gcluster_vars.extend(['--vars', var])
+
+    vm_util.IssueCommand(
+        [
+            gcp_flags.GCLUSTER_PATH.value,
+            'deploy',
+            config_path,
+            '--force',
+            '--auto-approve',
+            f'--out={vm_util.GetTempDir()}',
+            '-l',
+            'IGNORE',
+        ]
+        + gcluster_vars,
+        timeout=self.TIMEOUT,
+    )
+    self._GetKubeconfig()
+
+  def _Delete(self) -> None:
+    """Delete GCP cluster with cluster toolkit."""
+    deploy_dir = os.path.join(vm_util.GetTempDir(), self.name)
+    if not os.path.exists(deploy_dir):
+      logging.info(
+          'Skipping gcluster destroy as deployment directory %s does not'
+          ' exist.',
+          deploy_dir,
+      )
+      return
+    vm_util.IssueCommand(
+        [
+            gcp_flags.GCLUSTER_PATH.value,
+            'destroy',
+            deploy_dir,
+            '--auto-approve',
+        ],
+        timeout=self.TIMEOUT,
+    )
