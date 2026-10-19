@@ -1085,8 +1085,7 @@ def Install(vm: virtual_machine.BaseVirtualMachine):
       vm.RemoteCommand(InLocalDir(f'sudo ./{install_file}'))
 
     if db_engine == sql_engine_utils.MYSQL:
-      # Install specific mysql library for hammerdb
-      vm.Install('libmysqlclient21')
+      vm.InstallPackages('default-libmysqlclient-dev')
   if vm.cpu_arch == virtual_machine.CPUARCH_AARCH64:
     vm.RemoteCommand('export LD_LIBRARY_PATH=/usr/lib/aarch64-linux-gnu/')
   else:
