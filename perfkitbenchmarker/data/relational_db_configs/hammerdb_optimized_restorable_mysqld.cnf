@@ -10,7 +10,6 @@ transaction_isolation           = REPEATABLE-READ
 default_storage_engine          = InnoDB
 skip_external_locking
 skip_name_resolve
-default-authentication-plugin=mysql_native_password
 
 # InnoDB Settings
 innodb_buffer_pool_instances    = 64

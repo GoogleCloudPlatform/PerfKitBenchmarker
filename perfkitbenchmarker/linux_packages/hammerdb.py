@@ -1085,7 +1085,17 @@ def Install(vm: virtual_machine.BaseVirtualMachine):
       vm.RemoteCommand(InLocalDir(f'sudo ./{install_file}'))
 
     if db_engine == sql_engine_utils.MYSQL:
-      vm.InstallPackages('default-libmysqlclient-dev')
+      # HammerDB 4 bundles a precompiled libmysqltcl3.052.so linked against
+      # libmysqlclient.so.21, which is unavailable on Ubuntu 26+ (MySQL 8.4 /
+      # libmysqlclient.so.24). Install the distro's mysqltcl package (which
+      # pulls in the matching libmysqlclient) and replace HammerDB's bundled
+      # .so with the distro-compiled one.
+      vm.InstallPackages('mysqltcl')
+      vm.RemoteCommand(
+          'sudo cp /usr/lib/tcltk/$(uname -m)-linux-gnu/mysqltcl-3.052/'
+          f'libmysqltcl3.052.so {HAMMERDB_RUN_LOCATION}/lib/mysqltcl-3.052/'
+          'libmysqltcl3.052.so'
+      )
   if vm.cpu_arch == virtual_machine.CPUARCH_AARCH64:
     vm.RemoteCommand('export LD_LIBRARY_PATH=/usr/lib/aarch64-linux-gnu/')
   else:
