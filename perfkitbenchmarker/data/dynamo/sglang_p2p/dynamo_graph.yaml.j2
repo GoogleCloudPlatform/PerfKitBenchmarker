@@ -1,0 +1,110 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+apiVersion: nvidia.com/v1alpha1
+kind: DynamoGraphDeployment
+metadata:
+  name: {{ deployment_name }}
+  namespace: {{ namespace }}
+spec:
+  envs:
+    - name: HF_HOME
+      value: /data/model
+  services:
+    Frontend:
+      componentType: frontend
+      replicas: {{ frontend_replicas }}
+      extraPodSpec:
+        mainContainer:
+          image: {{ frontend_image }}
+          envFrom:
+            - secretRef:
+                name: hf-token-secret
+                optional: true
+    decode:
+      componentType: worker
+      subComponentType: decode
+      replicas: {{ decode_replicas }}
+      resources:
+        limits:
+          gpu: "{{ gpu_count }}"
+      extraPodSpec:
+        mainContainer:
+          image: {{ workload_image }}
+          workingDir: /workspace
+          command:
+            - python3
+            - -m
+            - dynamo.sglang
+          args:
+            - --model-path
+            - {{ dynamo_model_id }}
+            - --served-model-name
+            - {{ dynamo_model_id }}
+            - --tp
+            - "{{ gpu_count }}"
+            - --trust-remote-code
+            - --disaggregation-mode
+            - decode
+            - --disaggregation-bootstrap-port
+            - "30001"
+            - --host
+            - 0.0.0.0
+          envFrom:
+            - secretRef:
+                name: hf-token-secret
+                optional: true
+          env:
+{% for key, value in decode_env_vars.items() %}
+            - name: {{ key }}
+              value: "{{ value }}"
+{% endfor %}
+    prefill:
+      componentType: worker
+      subComponentType: prefill
+      replicas: {{ prefill_replicas }}
+      resources:
+        limits:
+          gpu: "{{ gpu_count }}"
+      extraPodSpec:
+        mainContainer:
+          image: {{ workload_image }}
+          workingDir: /workspace
+          command:
+            - python3
+            - -m
+            - dynamo.sglang
+          args:
+            - --model-path
+            - {{ dynamo_model_id }}
+            - --served-model-name
+            - {{ dynamo_model_id }}
+            - --tp
+            - "{{ gpu_count }}"
+            - --trust-remote-code
+            - --disaggregation-mode
+            - prefill
+            - --disaggregation-bootstrap-port
+            - "30001"
+            - --host
+            - 0.0.0.0
+          envFrom:
+            - secretRef:
+                name: hf-token-secret
+                optional: true
+          env:
+{% for key, value in prefill_env_vars.items() %}
+            - name: {{ key }}
+              value: "{{ value }}"
+{% endfor %}

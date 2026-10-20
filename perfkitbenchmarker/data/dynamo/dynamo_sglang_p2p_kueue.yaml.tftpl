@@ -1,0 +1,93 @@
+# Copyright 2026 PerfKitBenchmarker Authors. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+kind: ResourceFlavor
+apiVersion: kueue.x-k8s.io/v1beta1
+metadata:
+  name: "g4"
+spec:
+  nodeLabels:
+    cloud.google.com/gke-accelerator: ${accelerator_type}
+  tolerations:
+  - key: "nvidia.com/gpu"
+    operator: "Exists"
+    effect: NoSchedule
+---
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: ClusterQueue
+metadata:
+  name: "g4"
+spec:
+  namespaceSelector: {}
+  resourceGroups:
+  - coveredResources: ["nvidia.com/gpu", "cpu", "memory", "ephemeral-storage"]
+    flavors:
+    - name: "g4"
+      resources:
+      - name: "nvidia.com/gpu"
+        nominalQuota: ${num_gpus}
+      - name: "cpu"
+        nominalQuota: 1000
+      - name: "memory"
+        nominalQuota: 4000Gi
+      - name: "ephemeral-storage"
+        nominalQuota: 4000Gi
+---
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: LocalQueue
+metadata:
+  namespace: "default"
+  name: "g4"
+spec:
+  clusterQueue: "g4"
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: very-low
+value: 100
+globalDefault: false
+description: "Very Low"
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: low
+value: 250
+globalDefault: false
+description: "Low"
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: medium
+value: 500
+globalDefault: false
+description: "Medium"
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: high
+value: 750
+globalDefault: false
+description: "High"
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: very-high
+value: 1000
+globalDefault: false
+description: "Very High"

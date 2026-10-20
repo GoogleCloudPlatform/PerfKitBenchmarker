@@ -1,0 +1,270 @@
+# Copyright 2026 PerfKitBenchmarker Authors. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# This is a direct port of:
+# https://raw.githubusercontent.com/GoogleCloudPlatform/cluster-toolkit/refs/heads/main/examples/gke-a4x/gke-a4x.yaml
+# And is used in the blog post:
+# https://cloud.google.com/blog/products/compute/scaling-moe-inference-with-nvidia-dynamo-on-google-cloud-a4x
+# and the benchmark.
+# Note: This benchmark uses Jobset 0.11.1 (switched from 0.6.0 for OCI availability).
+
+blueprint_name: gke-a4x
+
+vars:
+
+  # The following variables should be over-written in the deployment.yaml file.
+  # Your GCP Project ID
+  project_id:
+
+  # This should be unique across all of your Cluster
+  # Toolkit Deployments.
+  deployment_name: gke-a4x
+
+  # The GCP Region used for this deployment.
+  region:
+
+  # The GCP Zone used for this deployment.
+  zone:
+
+  # The bucket used to mount persistent volumes for dynamo data.
+  dynamo_storage_bucket:
+
+  # Cidr block containing the IP of the machine calling terraform.
+  # To allow all (IAM restrictions still enforced), use 0.0.0.0/0
+  # To allow only your IP address, use <YOUR-IP-ADDRESS>/32
+  authorized_cidr:
+
+  # The number of nodes to be created
+  static_node_count:
+
+  # The number of node pools (num_slices) to be created
+  num_node_pools:
+
+  # The name of the compute engine reservation of A4X nodes in the form of
+  # <project>/<reservation-name>
+  # To target a BLOCK_NAME, the name of the extended reservation
+  # can be inputted as <reservation-name>/reservationBlocks/<reservation-block-name>
+  reservation:
+
+  accelerator_type: nvidia-gb200
+  version_prefix: "1.35."
+  system_node_pool_disk_size_gb: 200
+  a4x_node_pool_disk_size_gb: 100
+  k8s_service_account_name: workload-identity-k8s-sa
+  compute_nodepool_machine_type: a4x-highgpu-4g
+  system_nodepool_machine_type: e2-standard-16
+
+  # # To enable Managed-Lustre please uncomment this section and fill out the settings.
+  # # Additionally, please uncomment the private_service_access, lustre_firewall_rule, managed-lustre and lustre-pv modules.
+  # # Managed Lustre is only supported in specific regions and zones
+  # # Please refer https://cloud.google.com/managed-lustre/docs/locations
+
+  # # Managed-Lustre instance name. This should be unique for each deployment.
+  # lustre_instance_id: $(vars.deployment_name)
+
+  # # The values of size_gib and per_unit_storage_throughput are co-related
+  # # Please refer https://cloud.google.com/managed-lustre/docs/create-instance#performance-tiers
+  # # Storage capacity of the lustre instance in GiB
+  # lustre_size_gib: 36000
+
+  # # Maximum throughput of the lustre instance in MBps per TiB
+  # per_unit_storage_throughput: 500
+
+deployment_groups:
+- group: primary
+  modules:
+  - id: gke-a4x-net-0
+    source: modules/network/vpc
+    settings:
+      network_name: $(vars.deployment_name)-net-0
+      ips_per_nat: 6
+      subnetworks:
+      - subnet_name: $(vars.deployment_name)-sub-0
+        subnet_region: $(vars.region)
+        subnet_ip: 192.168.0.0/18
+      secondary_ranges_list:
+      - subnetwork_name: $(vars.deployment_name)-sub-0
+        ranges:
+        - range_name: pods
+          ip_cidr_range: 10.4.0.0/14
+        - range_name: services
+          ip_cidr_range: 10.0.32.0/20
+      firewall_rules:
+      - name: $(vars.deployment_name)-internal-0
+        ranges: [192.168.0.0/16]
+        allow:
+        - protocol: tcp
+          ports: ["0-65535"]
+        - protocol: udp
+          ports: ["0-65535"]
+        - protocol: icmp
+
+  - id: node_pool_service_account
+    source: modules/project/service-account
+    settings:
+      name: gke-np-sa
+      project_roles:
+      - logging.logWriter
+      - monitoring.metricWriter
+      - monitoring.viewer
+      - stackdriver.resourceMetadata.writer
+      - storage.objectViewer
+      - artifactregistry.reader
+
+  - id: workload_service_account
+    source: modules/project/service-account
+    settings:
+      name: gke-wl-sa
+      project_roles:
+      - logging.logWriter
+      - monitoring.metricWriter
+      - monitoring.viewer
+      - stackdriver.resourceMetadata.writer
+      - storage.objectAdmin
+      - artifactregistry.reader
+
+
+
+  - id: a4x-cluster
+    source: modules/scheduler/gke-cluster
+    use: [gke-a4x-net-0, workload_service_account]
+    settings:
+      system_node_pool_machine_type: $(vars.system_nodepool_machine_type)
+      system_node_pool_disk_size_gb: $(vars.system_node_pool_disk_size_gb)
+      system_node_pool_taints: []
+      enable_dcgm_monitoring: true
+      enable_gcsfuse_csi: true
+      enable_managed_lustre_csi: true # Enable Managed Lustre for the cluster
+      enable_dataplane_v2: true
+      enable_k8s_beta_apis:
+      - "resource.k8s.io/v1beta1/deviceclasses"
+      - "resource.k8s.io/v1beta1/resourceclaims"
+      - "resource.k8s.io/v1beta1/resourceclaimtemplates"
+      - "resource.k8s.io/v1beta1/resourceslices"
+      enable_private_endpoint: false  # Allows access from authorized public IPs
+      configure_workload_identity_sa: true
+      k8s_service_account_name: $(vars.k8s_service_account_name)
+      master_authorized_networks:
+      - cidr_block: $(vars.authorized_cidr)  # Allows your machine to run the kubectl command. Required for multi network setup.
+        display_name: "kubectl-access-network"
+      version_prefix: $(vars.version_prefix)
+      release_channel: REGULAR
+      maintenance_exclusions:
+      - name: no-minor-or-node-upgrades-indefinite
+        start_time: "2025-12-01T00:00:00Z"
+        exclusion_scope: NO_MINOR_OR_NODE_UPGRADES
+        exclusion_end_time_behavior: UNTIL_END_OF_SUPPORT
+    outputs: [instructions]
+
+  # # --- MANAGED LUSTRE ADDITIONS ---
+  # # Private Service Access (PSA) requires the compute.networkAdmin role which is
+  # # included in the Owner role, but not Editor.
+  # # PSA is required for all Managed Lustre functionality.
+  # # https://cloud.google.com/vpc/docs/configure-private-services-access#permissions
+  # - id: private_service_access
+  #   source: modules/network/private-service-access
+  #   use: [gke-a4x-net-0]
+  #   settings:
+  #     prefix_length: 22
+
+  # # Firewall to allow Managed Lustre connection
+  # - id: lustre_firewall_rule
+  #   source: modules/network/firewall-rules
+  #   use: [gke-a4x-net-0]
+  #   settings:
+  #     ingress_rules:
+  #     - name: $(vars.deployment_name)-allow-lustre-traffic
+  #       description: Allow Managed Lustre traffic
+  #       source_ranges:
+  #       - $(private_service_access.cidr_range)
+  #       allow:
+  #       - protocol: tcp
+  #       ports:
+  #       - "988"
+
+  # - id: managed-lustre
+  #   source: modules/file-system/managed-lustre
+  #   use: [gke-a4x-net-0, private_service_access]
+  #   settings:
+  #     name: $(vars.lustre_instance_id)
+  #     local_mount: /lustre
+  #     remote_mount: lustrefs
+  #     size_gib: $(vars.lustre_size_gib)
+  #     per_unit_storage_throughput: $(vars.per_unit_storage_throughput)
+
+  # - id: lustre-pv
+  #   source: modules/file-system/gke-persistent-volume
+  #   use: [managed-lustre, a4x-cluster]
+  #   settings:
+  #     capacity_gib: $(vars.lustre_size_gib)
+
+  - id: workload_policy
+    source: modules/compute/resource-policy
+    settings:
+      name: "a4x-workload-policy"
+      project_id: $(vars.project_id)
+      region: $(vars.region)
+      workload_policy:
+        accelerator_topology: "1x72"
+        type: "HIGH_THROUGHPUT"
+
+  - id: a4x-pool
+    source: modules/compute/gke-node-pool
+    use: [a4x-cluster, node_pool_service_account, workload_policy]
+    settings:
+      machine_type: $(vars.compute_nodepool_machine_type)
+      auto_upgrade: true
+      zones: [$(vars.zone)]
+      disk_size_gb: $(vars.a4x_node_pool_disk_size_gb)
+      static_node_count: $(vars.static_node_count)
+      disk_type: hyperdisk-balanced
+      guest_accelerator:
+      - type: nvidia-gb200
+        count: 4
+      reservation_affinity:
+        consume_reservation_type: SPECIFIC_RESERVATION
+        specific_reservations:
+        - name: $(vars.reservation)
+      enable_dranet: true
+      num_node_pools: $(vars.num_node_pools)
+    outputs: [instructions]
+
+  - id: dynamo-storage
+    source: modules/file-system/pre-existing-network-storage
+    settings:
+      remote_mount: $(vars.dynamo_storage_bucket)
+      local_mount: /dynamo
+      fs_type: gcsfuse
+      mount_options: "defaults,_netdev,implicit_dirs"
+
+  # When utilizing GCS Fuse Storage Profiles, you must ensure the GKE Service Agent
+  # possesses the 'gke.gcsfuse.profileUser' custom IAM role assigned out-of-band.
+  # Please refer to 'modules/file-system/gke-persistent-volume/README.md' for instructions.
+  # Persistent Volume for training data using GCS Fuse Storage Profile
+  - id: training-pv
+    source: modules/file-system/gke-persistent-volume
+    use: [a4x-cluster, dynamo-storage]
+    settings:
+      capacity_gib: 1000000
+      gcs_bucket_name: $(vars.dynamo_storage_bucket)
+      gcsfuse_storage_class_name: gcsfusecsi-training
+
+  # Persistent Volume for checkpoint data using GCS Fuse Storage Profile
+  - id: checkpointing-pv
+    source: modules/file-system/gke-persistent-volume
+    use: [a4x-cluster, dynamo-storage]
+    settings:
+      capacity_gib: 1000000
+      gcs_bucket_name: $(vars.dynamo_storage_bucket)
+      gcsfuse_storage_class_name: gcsfusecsi-checkpointing

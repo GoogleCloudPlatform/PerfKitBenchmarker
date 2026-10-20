@@ -1,0 +1,163 @@
+# Copyright 2026 PerfKitBenchmarker Authors. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+blueprint_name: gke-g4
+
+vars:
+  project_id:
+  deployment_name: gke-g4
+  region:
+  zone:
+  dynamo_storage_bucket:
+  authorized_cidr:
+  static_node_count: "2"
+  kueue_configuration_path: $(ghpc_stage("{{ resource_path('dynamo/dynamo_sglang_p2p_kueue.yaml.tftpl', False) }}"))
+  accelerator_type: nvidia-rtx-pro-6000
+  gpu_count: 4
+  compute_nodepool_machine_type: g4-standard-96
+  system_nodepool_machine_type: e2-standard-16
+  system_node_pool_disk_size_gb: 100
+  g4_node_pool_disk_size_gb: 100
+  version_prefix: "1.35."
+  k8s_service_account_name: workload-identity-k8s-sa
+
+deployment_groups:
+- group: primary
+  modules:
+  - id: gke-g4-net-0
+    source: modules/network/vpc
+    settings:
+      network_name: $(vars.deployment_name)-net-0
+      ips_per_nat: 6
+      subnetworks:
+      - subnet_name: $(vars.deployment_name)-sub-0
+        subnet_region: $(vars.region)
+        subnet_ip: 192.168.0.0/18
+      secondary_ranges_list:
+      - subnetwork_name: $(vars.deployment_name)-sub-0
+        ranges:
+        - range_name: pods
+          ip_cidr_range: 10.4.0.0/14
+        - range_name: services
+          ip_cidr_range: 10.0.32.0/20
+      firewall_rules:
+      - name: $(vars.deployment_name)-internal-0
+        ranges: [192.168.0.0/16]
+        allow:
+        - protocol: tcp
+          ports: ["0-65535"]
+        - protocol: udp
+          ports: ["0-65535"]
+        - protocol: icmp
+
+  - id: node_pool_service_account
+    source: modules/project/service-account
+    settings:
+      name: gke-np-sa
+      project_roles:
+      - logging.logWriter
+      - monitoring.metricWriter
+      - monitoring.viewer
+      - stackdriver.resourceMetadata.writer
+      - storage.objectViewer
+      - artifactregistry.reader
+
+  - id: workload_service_account
+    source: modules/project/service-account
+    settings:
+      name: gke-wl-sa
+      project_roles:
+      - logging.logWriter
+      - monitoring.metricWriter
+      - monitoring.viewer
+      - stackdriver.resourceMetadata.writer
+      - storage.objectAdmin
+      - artifactregistry.reader
+
+  - id: dynamo-storage
+    source: modules/file-system/pre-existing-network-storage
+    settings:
+      remote_mount: $(vars.dynamo_storage_bucket)
+      local_mount: /dynamo
+      fs_type: gcsfuse
+      mount_options: "defaults,_netdev,implicit_dirs"
+
+  - id: g4-cluster
+    source: modules/scheduler/gke-cluster
+    use: [gke-g4-net-0, workload_service_account]
+    settings:
+      cluster_reference_type: "NAME"
+      system_node_pool_machine_type: $(vars.system_nodepool_machine_type)
+      system_node_pool_disk_size_gb: $(vars.system_node_pool_disk_size_gb)
+      system_node_pool_taints: []
+      enable_dcgm_monitoring: true
+      enable_gcsfuse_csi: true
+      enable_private_endpoint: false
+      configure_workload_identity_sa: true
+      k8s_service_account_name: $(vars.k8s_service_account_name)
+      master_authorized_networks:
+      - cidr_block: $(vars.authorized_cidr)
+        display_name: "kubectl-access-network"
+      version_prefix: $(vars.version_prefix)
+      release_channel: REGULAR
+    outputs: [instructions]
+
+  - id: g4-pool
+    source: modules/compute/gke-node-pool
+    use: [g4-cluster, node_pool_service_account]
+    settings:
+      machine_type: $(vars.compute_nodepool_machine_type)
+      auto_upgrade: true
+      zones: [$(vars.zone)]
+      disk_size_gb: $(vars.g4_node_pool_disk_size_gb)
+      disk_type: pd-balanced
+      static_node_count: $(vars.static_node_count)
+      guest_accelerator:
+      - type: $(vars.accelerator_type)
+        count: $(vars.gpu_count)
+    outputs: [instructions]
+
+  - id: job-template
+    source: modules/compute/gke-job-template
+    use: [g4-pool]
+    settings:
+      image: nvidia/cuda:12.8.0-runtime-ubuntu24.04
+      command:
+      - nvidia-smi
+      node_count: $(vars.static_node_count)
+      name: run-nvidia-smi
+      k8s_service_account_name: $(vars.k8s_service_account_name)
+    outputs: [instructions]
+
+  - id: workload-manager-install
+    source: modules/management/kubectl-apply
+    use: [g4-cluster]
+    settings:
+      kueue:
+        install: true
+        version: "0.16.0"
+        config_path: $(vars.kueue_configuration_path)
+        config_template_vars:
+          num_gpus: $(g4-pool.static_gpu_count)
+          accelerator_type: $(vars.accelerator_type)
+      jobset:
+        install: true
+
+  - id: training-pv
+    source: modules/file-system/gke-persistent-volume
+    use: [g4-cluster, dynamo-storage]
+    settings:
+      capacity_gib: 1000000
+      gcs_bucket_name: $(vars.dynamo_storage_bucket)
+      gcsfuse_storage_class_name: gcsfusecsi-training

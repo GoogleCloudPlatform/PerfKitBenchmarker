@@ -1,0 +1,145 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+dynamo:
+  namespace: dynamo-cloud
+  releaseVersion: "0.7.0"
+  deploymentName: dynamo-disagg1p1d
+  frontend:
+    image: nvcr.io/nvidia/ai-dynamo/sglang-runtime:0.7.0
+    replicas: 1
+    livenessProbe:
+      initialDelaySeconds: 3000
+      periodSeconds: 60
+      timeoutSeconds: 150
+      failureThreshold: 100
+    readinessProbe:
+      initialDelaySeconds: 3000
+      periodSeconds: 60
+      timeoutSeconds: 300
+      failureThreshold: 100
+  decodeWorker:
+    nodeCount: 1
+    replicas: 1
+    envs:
+    - name: HF_TOKEN
+      valueFrom:
+        secretKeyRef:
+          name: hf-token-secret
+          key: HF_TOKEN
+    - name: HF_HUB_ENABLE_HF_TRANSFER
+      value: "1"
+    - name: GLOO_SOCKET_IFNAME
+      value: eth0
+    - name: TP_SOCKET_IFNAME
+      value: eth0
+    - name: PYTHONUNBUFFERED
+      value: "1"
+    - name: DYN_SKIP_SGLANG_LOG_FORMATTING
+      value: "1"
+    - name: SGLANG_DISAGGREGATION_HEARTBEAT_MAX_FAILURE
+      value: "100000"
+    - name: SGLANG_DISAGGREGATION_BOOTSTRAP_TIMEOUT
+      value: "100000"
+    - name: SGLANG_DISAGGREGATION_WAITING_TIMEOUT
+      value: "100000"
+    - name: SGLANG_DECODE_BOOTSTRAP_TIMEOUT
+      value: "1000"
+    livenessProbe:
+      initialDelaySeconds: 600
+      periodSeconds: 60
+      timeoutSeconds: 30
+      failureThreshold: 60
+    readinessProbe:
+      initialDelaySeconds: 60
+      periodSeconds: 60
+      timeoutSeconds: 30
+      failureThreshold: 60
+    startupProbe:
+      initialDelaySeconds: 3000
+      periodSeconds: 60
+      timeoutSeconds: 30
+      failureThreshold: 1800
+  prefillWorker:
+    nodeCount: 1
+    replicas: 1
+    envs:
+    - name: HF_TOKEN
+      valueFrom:
+        secretKeyRef:
+          name: hf-token-secret
+          key: HF_TOKEN
+    - name: HF_HUB_ENABLE_HF_TRANSFER
+      value: "1"
+    - name: GLOO_SOCKET_IFNAME
+      value: eth0
+    - name: TP_SOCKET_IFNAME
+      value: eth0
+    - name: PYTHONUNBUFFERED
+      value: "1"
+    - name: DYN_SKIP_SGLANG_LOG_FORMATTING
+      value: "1"
+    - name: SGLANG_DISAGGREGATION_HEARTBEAT_MAX_FAILURE
+      value: "100000"
+    - name: SGLANG_DISAGGREGATION_BOOTSTRAP_TIMEOUT
+      value: "100000"
+    - name: SGLANG_DISAGGREGATION_WAITING_TIMEOUT
+      value: "100000"
+    livenessProbe:
+      initialDelaySeconds: 3000
+      periodSeconds: 60
+      timeoutSeconds: 30
+      failureThreshold: 60
+    readinessProbe:
+      initialDelaySeconds: 3000
+      periodSeconds: 60
+      timeoutSeconds: 30
+      failureThreshold: 60
+    startupProbe:
+      initialDelaySeconds: 3000
+      periodSeconds: 60
+      timeoutSeconds: 30
+      failureThreshold: 1800
+
+secrets:
+  ngc:
+    secretName: nvcr-secret
+  huggingface:
+    secretName: hf-token-secret
+    secretData:
+      token: "hf_api_token"
+
+volumes:
+  useGcs: true
+  gcsfuse:
+    bucketName:
+  ssdMountPath: "/ssd"
+  gcsMounts:
+    mountPath: "/data/model"
+
+service:
+  type: ClusterIP
+  ports:
+    frontend: 8000
+    worker: 9090
+
+workload:
+  model: Qwen/Qwen2.5-32B-Instruct
+  image:
+  framework: sglang
+  configFile: serving-args.yaml
+  configPath: /workload/configs
+
+quantizations:
+  - "fp8"
