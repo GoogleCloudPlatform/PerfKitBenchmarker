@@ -45,7 +45,7 @@ class _UnitRegistry(pint.UnitRegistry):
     # '3 % 2' is a Python math expression for 3 mod 2.
     # Replace all instances of the percent symbol.
     # https://github.com/hgrecco/pint/issues/429#issuecomment-265287161
-    fixed_input_string = input_string.replace('%', '[percent]')
+    fixed_input_string = input_string.replace('%', ' percent')
     return super().parse_expression(fixed_input_string, *args, **kwargs)
 
 
