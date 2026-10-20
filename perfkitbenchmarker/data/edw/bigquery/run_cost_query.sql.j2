@@ -1,6 +1,9 @@
 WITH
   job_times AS (
-    SELECT MIN(start_time) AS start_time, MAX(end_time) AS end_time
+    SELECT
+      MIN(start_time) AS start_time,
+      MAX(end_time) AS end_time,
+      ANY_VALUE(reservation_id) AS run_reservation_id
     FROM `{{project_dot_region}}`.INFORMATION_SCHEMA.JOBS
     WHERE
       EXISTS(
@@ -11,31 +14,58 @@ WITH
   ),
   per_second_times AS (
     SELECT * FROM UNNEST(
-      GENERATE_TIMESTAMP_ARRAY(
-        TIMESTAMP_TRUNC(
-          (SELECT start_time FROM job_times), SECOND),
-        TIMESTAMP_TRUNC(
-          (SELECT end_time FROM job_times), SECOND),
-        INTERVAL 1 SECOND))
-      AS period_start
-  ),
-  res_empty_timeline AS (
-    SELECT
-      IFNULL(rc.change_timestamp, per_second_times.period_start) AS period_start_sec,
-      per_second_times.period_start,
-      autoscale
-    FROM per_second_times
-    LEFT JOIN
-      `{{project_dot_region}}`.INFORMATION_SCHEMA.RESERVATION_CHANGES rc
-      ON per_second_times.period_start = TIMESTAMP_TRUNC(rc.change_timestamp, SECOND)
+      IF(
+        (SELECT start_time FROM job_times) IS NOT NULL,
+        GENERATE_TIMESTAMP_ARRAY(
+          TIMESTAMP_TRUNC(
+            (SELECT start_time FROM job_times), SECOND),
+          TIMESTAMP_TRUNC(
+            (SELECT end_time FROM job_times), SECOND),
+          INTERVAL 1 SECOND),
+        []
+      )
+    )
+    AS period_start
   ),
   res_timeline AS (
     SELECT
-      period_start,
-      period_start_sec,
-      LAST_VALUE(autoscale.current_slots IGNORE NULLS)
-        OVER (ORDER BY period_start_sec ASC ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)
-        AS autoscale_current_slots
-    FROM res_empty_timeline
+      sec.period_start,
+      sec.autoscale_slots
+    FROM
+      `{{reservation_project_dot_region}}`.INFORMATION_SCHEMA.RESERVATIONS_TIMELINE res,
+      UNNEST(
+        IF(
+          ARRAY_LENGTH(res.per_second_details) > 0,
+          ARRAY(
+            SELECT AS STRUCT
+              psd.start_time AS period_start,
+              psd.autoscale_current_slots AS autoscale_slots
+            FROM UNNEST(res.per_second_details) AS psd
+          ),
+          ARRAY(
+            SELECT AS STRUCT
+              sec_ts AS period_start,
+              res.autoscale.current_slots AS autoscale_slots
+            FROM UNNEST(
+              GENERATE_TIMESTAMP_ARRAY(
+                res.period_start,
+                TIMESTAMP_ADD(res.period_start, INTERVAL 59 SECOND),
+                INTERVAL 1 SECOND
+              )
+            ) AS sec_ts
+          )
+        )
+      ) AS sec
+    WHERE
+      res.period_start BETWEEN TIMESTAMP_TRUNC((SELECT start_time FROM job_times), MINUTE)
+      AND TIMESTAMP_TRUNC((SELECT end_time FROM job_times), MINUTE)
+      {% if reservation_id %}
+      AND res.reservation_id = '{{reservation_id}}'
+      {% else %}
+      AND res.reservation_id = (SELECT run_reservation_id FROM job_times)
+      {% endif %}
   )
-SELECT SUM(autoscale_current_slots) AS billed_slot_seconds FROM res_timeline r
+SELECT COALESCE(SUM(r.autoscale_slots), 0) AS billed_slot_seconds
+FROM per_second_times p
+JOIN res_timeline r
+  ON p.period_start = r.period_start

@@ -823,6 +823,14 @@ class ClaudeConversationalAnalyticsClientInterface(
     return cmd
 
 
+def _NormalizeReservationLocation(location: str) -> str:
+  if not location:
+    return location
+  if location.lower() in ('us', 'eu'):
+    return location.upper()
+  return location
+
+
 class Bigquery(edw_service.EdwService):
   """Object representing a Bigquery cluster.
 
@@ -1086,6 +1094,62 @@ class Bigquery(edw_service.EdwService):
     cmd = ['bq', 'cp', source, dest]
     vm_util.IssueCommand(cmd)
 
+  def FormatReservationId(self) -> str:
+    """Formats EDW_BQ_RESERVATION as project_id:location.reservation_name."""
+    val = edw_service.EDW_BQ_RESERVATION.value
+    if not val:
+      return ''
+    if val.startswith('projects/'):
+      parts = val.split('/')
+      if (
+          len(parts) >= 6
+          and parts[0] == 'projects'
+          and parts[2] == 'locations'
+          and parts[4] == 'reservations'
+      ):
+        location = _NormalizeReservationLocation(parts[3])
+        return f'{parts[1]}:{location}.{parts[5]}'
+    if ':' in val and '.' in val:
+      project_part, rest = val.split(':', 1)
+      if '.' in rest:
+        location_part, reservation_part = rest.split('.', 1)
+        location = _NormalizeReservationLocation(location_part)
+        return f'{project_part}:{location}.{reservation_part}'
+      return val
+    region = _NormalizeReservationLocation(self.GetDatasetRegion())
+    return f'{self.client_interface.project_id}:{region}.{val}'
+
+  def GetReservationProjectDotRegion(self) -> str:
+    """Gets project.region for the reservation's INFORMATION_SCHEMA table.
+
+    Example output string: 'p3rf-bq-llht.region-us-central1' or
+    'p3rf-bq-llht.region-us'.
+
+    Returns:
+      The project and region of the reservation in the format
+      'project.region'.
+    """
+    val = edw_service.EDW_BQ_RESERVATION.value
+    fallback = (
+        f'{self.client_interface.project_id}.region-{self.GetDatasetRegion()}'
+    )
+    if not val:
+      return fallback
+    if val.startswith('projects/'):
+      parts = val.split('/')
+      if (
+          len(parts) >= 6
+          and parts[0] == 'projects'
+          and parts[2] == 'locations'
+          and parts[4] == 'reservations'
+      ):
+        return f'{parts[1]}.region-{parts[3].lower()}'
+    if ':' in val and '.' in val:
+      project_part, rest = val.split(':', 1)
+      location_part = rest.split('.', 1)[0].lower()
+      return f'{project_part}.region-{location_part}'
+    return fallback
+
   def GetAutoscaleSlotSeconds(self, run_iter_id: str) -> int:
     query_file_name = f'cost_query_{run_iter_id}'
     context = {
@@ -1093,6 +1157,8 @@ class Bigquery(edw_service.EdwService):
         'project_dot_region': (
             f'{self.client_interface.project_id}.region-{self.GetDatasetRegion()}'
         ),
+        'reservation_project_dot_region': self.GetReservationProjectDotRegion(),
+        'reservation_id': self.FormatReservationId(),
     }
     self.client_interface.client_vm.RenderTemplate(  # pyrefly: ignore[missing-attribute]
         data.ResourcePath(self.RUN_COST_QUERY_TEMPLATE),
@@ -1103,7 +1169,7 @@ class Bigquery(edw_service.EdwService):
         self.client_interface.RunQueryWithResults(query_file_name)
     )
     run_cost = output['details']['query_results']['billed_slot_seconds'][0]
-    return run_cost
+    return int(run_cost or 0)
 
   @override
   def GetIterationAuxiliaryMetrics(self, iter_run_key: str) -> dict[str, Any]:

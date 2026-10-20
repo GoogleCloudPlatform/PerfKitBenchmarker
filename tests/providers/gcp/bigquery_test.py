@@ -464,7 +464,16 @@ class BigqueryTestCase(pkb_common_test_case.PkbCommonTestCase):
       self, bq_show_json
   ):
     interface = bigquery.GetBigQueryClientInterface(PROJECT_ID, DATASET_ID)
-    self.MockIssueCommand({'bq show': [(json.dumps(bq_show_json), '', 0)]})
+    self.MockIssueCommand(
+        {
+            'bq show': [
+                (json.dumps({}), '', 0),
+            ]
+        }
+    )
+    mock_vm = mock.MagicMock()
+    bm_spec = FakeBenchmarkSpec(mock_vm)
+    interface.SetProvisionedAttributes(bm_spec)
 
     with self.assertRaises(ValueError):
       interface.GetTableStats('hits')
@@ -809,6 +818,143 @@ class BigqueryTestCase(pkb_common_test_case.PkbCommonTestCase):
 
     with self.assertRaises(errors.Benchmarks.RunError):
       interface.ExecuteQuery(QUERY_NAME)
+
+  @parameterized.named_parameters(
+      (
+          'full_resource_path',
+          'projects/other-project/locations/us-central1/reservations/test-res',
+          'other-project:us-central1.test-res',
+          'other-project.region-us-central1',
+          1234,
+          1234,
+      ),
+      (
+          'full_resource_path_multi_region_us',
+          'projects/other-project/locations/us/reservations/test-res',
+          'other-project:US.test-res',
+          'other-project.region-us',
+          1234,
+          1234,
+      ),
+      (
+          'full_resource_path_multi_region_eu',
+          'projects/other-project/locations/eu/reservations/test-res',
+          'other-project:EU.test-res',
+          'other-project.region-eu',
+          1234,
+          1234,
+      ),
+      (
+          'colon_dot_path',
+          'other-project:us-central1.test-res',
+          'other-project:us-central1.test-res',
+          'other-project.region-us-central1',
+          '5678',
+          5678,
+      ),
+      (
+          'colon_dot_path_multi_region_us',
+          'other-project:us.test-res',
+          'other-project:US.test-res',
+          'other-project.region-us',
+          5678,
+          5678,
+      ),
+      (
+          'colon_dot_path_multi_region_eu',
+          'other-project:eu.test-res',
+          'other-project:EU.test-res',
+          'other-project.region-eu',
+          5678,
+          5678,
+      ),
+      (
+          'colon_dot_path_already_uppercase',
+          'other-project:US.test-res',
+          'other-project:US.test-res',
+          'other-project.region-us',
+          5678,
+          5678,
+      ),
+      (
+          'short_name',
+          'test-res',
+          'mybqfederated:US.test-res',
+          'mybqfederated.region-us',
+          9012,
+          9012,
+      ),
+      (
+          'reservation_not_set',
+          None,
+          '',
+          'mybqfederated.region-us',
+          1234,
+          1234,
+      ),
+      (
+          'none_query_result',
+          None,
+          '',
+          'mybqfederated.region-us',
+          None,
+          0,
+      ),
+  )
+  def testGetAutoscaleSlotSeconds(
+      self,
+      flag_value,
+      expected_reservation_id,
+      expected_res_proj_region,
+      query_result_val,
+      expected_cost,
+  ):
+    bq = bigquery.Bigquery(EDW_SERVICE_SPEC)
+    bq.client_interface.client_vm = mock.MagicMock()
+    with (
+        mock.patch.object(bq, 'GetDatasetRegion', return_value='us'),
+        mock.patch.object(
+            bigquery.edw_service,
+            'EDW_BQ_RESERVATION',
+            mock.MagicMock(value=flag_value),
+        ),
+        mock.patch.object(
+            bq.client_interface,
+            'RunQueryWithResults',
+            return_value=json.dumps({
+                'details': {
+                    'query_results': {'billed_slot_seconds': [query_result_val]}
+                }
+            }),
+        ),
+    ):
+      cost = bq.GetAutoscaleSlotSeconds('test_run_123')
+
+    self.assertEqual(cost, expected_cost)
+    bq.client_interface.client_vm.RenderTemplate.assert_called_once_with(
+        bigquery.data.ResourcePath('edw/bigquery/run_cost_query.sql.j2'),
+        'cost_query_test_run_123',
+        {
+            'run_identifier': 'test_run_123',
+            'project_dot_region': f'{bq.client_interface.project_id}.region-us',
+            'reservation_project_dot_region': expected_res_proj_region,
+            'reservation_id': expected_reservation_id,
+        },
+    )
+
+  @parameterized.named_parameters(
+      ('us_lowercase', 'us', 'US'),
+      ('us_uppercase', 'US', 'US'),
+      ('eu_lowercase', 'eu', 'EU'),
+      ('eu_uppercase', 'EU', 'EU'),
+      ('regional', 'us-central1', 'us-central1'),
+      ('empty', '', ''),
+      ('none', None, None),
+  )
+  def testNormalizeReservationLocation(self, location, expected):
+    self.assertEqual(
+        bigquery._NormalizeReservationLocation(location), expected
+    )
 
   @flagsaver.flagsaver((gcp_flags.BQ_CLIENT_INTERFACE, 'PYTHON'))
   def testGetBigQueryClientInterfacePython(self):
