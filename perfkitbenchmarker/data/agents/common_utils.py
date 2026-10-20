@@ -2,6 +2,7 @@
 
 import abc
 import collections.abc
+import dataclasses
 import json
 import os
 from typing import Any, Self
@@ -74,6 +75,14 @@ class BaseEndpoint(abc.ABC):
     """
 
 
+@dataclasses.dataclass
+class ExecutionResult:
+  """Results from executing an agent on a prompt."""
+
+  response_text: str
+  token_metrics: dict[str, int] = dataclasses.field(default_factory=dict)
+
+
 class BaseAgentHandler(abc.ABC):
   """Generic glue interface for an agent to be deployed and run."""
 
@@ -98,8 +107,8 @@ class BaseAgentHandler(abc.ABC):
   @abc.abstractmethod
   async def execute(
       self, endpoint: BaseEndpoint, prompt_config: PromptConfig[Any]
-  ) -> str:
-    """Invokes the agent pipeline and returns the response.
+  ) -> ExecutionResult:
+    """Invokes the agent pipeline and returns the execution result.
 
     Endpoint will always implement `stream_execute`.
 

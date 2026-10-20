@@ -40,9 +40,7 @@ def calculate_generic_metrics(
   tool_latency = 0.0
 
   for span in spans:
-    attributes = getattr(span, "attributes", None) or getattr(
-        span, "labels", {}
-    )
+    attributes = span.attributes or {}
     op_name = attributes.get("gen_ai.operation.name")
 
     start = span.start_time
@@ -76,12 +74,15 @@ async def run_local_agent[AgentConfigT](
   agent_app = handler.get_local_agent(config.agent_config, config.run_uri)
   endpoint = handler.create_endpoint(agent_app)
 
-  response_text: Any = await handler.execute(endpoint, config)
+  execution_result = await handler.execute(endpoint, config)
 
   spans = span_exporter.get_finished_spans()
   generic_metrics = calculate_generic_metrics(spans)
+  generic_metrics.update(execution_result.token_metrics)
 
-  handler.export_results(config.output_dir, response_text, generic_metrics)
+  handler.export_results(
+      config.output_dir, execution_result.response_text, generic_metrics
+  )
 
 
 def main() -> None:

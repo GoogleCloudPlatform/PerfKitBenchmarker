@@ -36,7 +36,7 @@ class AgentHandler(adk_utils.AdkAgentHandler):
       self,
       endpoint: common_utils.BaseEndpoint,
       prompt_config: common_utils.PromptConfig,
-  ) -> str:
+  ) -> common_utils.ExecutionResult:
     # Data science specific env vars
     os.environ["GOOGLE_API_USE_MTLS_ENDPOINT"] = "never"
     os.environ["GOOGLE_API_USE_CLIENT_CERTIFICATE"] = "false"

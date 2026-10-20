@@ -57,11 +57,14 @@ async def run_remote_agent[AgentConfigT](
   handler_class: Any = module.AgentHandler
   handler = handler_class()
   endpoint = handler.create_endpoint(deployed_ref)
-  response_text: Any = await handler.execute(endpoint, config)
+  execution_result = await handler.execute(endpoint, config)
 
-  # Export results (empty metrics for now as it's remote execution)
+  # Export results including token metrics collected from execution
+  token_metrics = dict(execution_result.token_metrics)
   if config.output_dir:
-    handler.export_results(config.output_dir, response_text, {})
+    handler.export_results(
+        config.output_dir, execution_result.response_text, token_metrics
+    )
   else:
     raise ValueError("output_dir must be set for remote execution.")
 

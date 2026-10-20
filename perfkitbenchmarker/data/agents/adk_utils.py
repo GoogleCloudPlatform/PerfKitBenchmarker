@@ -1,6 +1,7 @@
 """Common utilities and base classes for ADK-based agents."""
 
 import abc
+import collections
 from typing import Any, override
 
 from absl import logging
@@ -8,6 +9,7 @@ import common_utils
 from google.adk.events import event as adk_event
 from google.adk.sessions import sqlite_session_service
 from google.genai import errors
+from google.genai import types
 from vertexai import agent_engines
 
 
@@ -87,11 +89,23 @@ class AdkAgentHandler(common_utils.BaseAgentHandler):
   ) -> None:
     """Exports the results and metrics."""
 
+  def _extract_usage_tokens(
+      self, usage: types.GenerateContentResponseUsageMetadata
+  ) -> dict[str, int]:
+    """Extracts input and output token counts from usage metadata."""
+    output_tokens = (usage.candidates_token_count or 0) + (
+        usage.thoughts_token_count or 0
+    )
+    return {
+        "input_tokens": usage.prompt_token_count or 0,
+        "output_tokens": output_tokens,
+    }
+
   async def execute(
       self,
       endpoint: common_utils.BaseEndpoint,
       prompt_config: common_utils.PromptConfig,
-  ) -> str:
+  ) -> common_utils.ExecutionResult:
     """Prompts the agent and streams the response.
 
     Args:
@@ -99,7 +113,7 @@ class AdkAgentHandler(common_utils.BaseAgentHandler):
       prompt_config: The prompt and session configuration.
 
     Returns:
-      The combined response text.
+      ExecutionResult containing the combined response text and token metrics.
 
     Raises:
       common_utils.ApiError: If the ADK returns an API error event.
@@ -107,31 +121,50 @@ class AdkAgentHandler(common_utils.BaseAgentHandler):
     logging.info("=== Starting Pipeline ===")
 
     raw_output = []
-    async for event in endpoint.stream_execute(prompt_config=prompt_config):
-      if isinstance(event, dict):
+    token_totals: dict[str, int] = collections.defaultdict(int)
+
+    async for raw_event in endpoint.stream_execute(prompt_config=prompt_config):
+      if isinstance(raw_event, dict):
         # Generic check for API errors in events
-        if "code" in event and "message" in event:
+        if "code" in raw_event and "message" in raw_event:
           raise common_utils.ApiError(
-              f"API Error (code {event['code']}): {event['message']}"
+              f"API Error (code {raw_event['code']}): {raw_event['message']}"
           )
-        event = adk_event.Event.model_validate(event)
-      self._print_event(event)
+        event = adk_event.Event.model_validate(raw_event)
+      else:
+        event = raw_event
+      usage_tokens = None
+      if event.usage_metadata:
+        usage_tokens = self._extract_usage_tokens(event.usage_metadata)
+        for token_metric, count in usage_tokens.items():
+          token_totals[token_metric] += count
+
+      self._print_event(event, usage_tokens=usage_tokens)
 
       # Collect response text for results.json
-      content = getattr(event, "content", None)
-      if not content:
+      if not event.content or not event.content.parts:
         continue
 
-      for part in getattr(content, "parts", []):
-        text = getattr(part, "text", None)
-        if text:
-          raw_output.append(text)
+      for part in event.content.parts:
+        if part.text:
+          raw_output.append(part.text)
 
     response_text = "".join(raw_output)
-    return response_text
+    return common_utils.ExecutionResult(
+        response_text=response_text,
+        token_metrics=dict(token_totals),
+    )
 
-  def _print_event(self, event: adk_event.Event):
+  def _print_event(
+      self,
+      event: adk_event.Event,
+      usage_tokens: dict[str, int] | None = None,
+  ) -> None:
     """Logs an ADK event."""
+    if usage_tokens:
+      usage_str = ", ".join(f"{k}: {v}" for k, v in usage_tokens.items())
+      logging.info("%s > [Usage: %s]", event.author or "model", usage_str)
+
     if not event.content or not event.content.parts:
       return
 

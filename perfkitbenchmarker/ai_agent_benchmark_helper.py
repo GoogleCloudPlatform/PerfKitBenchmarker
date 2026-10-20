@@ -94,6 +94,11 @@ def _FetchOutputFromObjectStorage(
 class BaseAgent(abc.ABC):
   """Base class for agents."""
 
+  TOKEN_METRICS: tuple[str, ...] = (
+      'input_tokens',
+      'output_tokens',
+  )
+
   @classmethod
   def GetOrCreateFromSpec(cls, spec: benchmark_spec.BenchmarkSpec) -> Self:
     # This is ugly, but allows us to save state across stages.
@@ -281,6 +286,16 @@ class BaseAgent(abc.ABC):
               metadata,
           )
       )
+    for token_metric in self.TOKEN_METRICS:
+      if prompt_results.metrics.get(token_metric) is not None:
+        samples.append(
+            sample.Sample(
+                token_metric,
+                prompt_results.metrics[token_metric],
+                'count',
+                metadata,
+            )
+        )
     return prompt_results, samples
 
   def _GetScratchDir(self, prompt: Prompt) -> str:
