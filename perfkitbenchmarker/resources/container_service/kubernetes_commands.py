@@ -11,7 +11,7 @@ import multiprocessing
 import queue as py_queue
 import re
 import time
-from typing import Any, Dict, Iterable, Iterator, Optional, Sequence
+from typing import Any, Callable, Dict, Iterable, Iterator, Optional, Sequence
 from absl import flags
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
@@ -710,10 +710,14 @@ def GetPodIps(resource_name) -> list[str]:
 
 def GetPodNames(
     name_log_limit: int | None = None,
+    namespace: str | None = None,
 ) -> set[str]:
-  """Returns all pod names in the cluster."""
+  """Returns all pod names in the cluster (or in the given namespace)."""
   return GetAllNamesForResourceType(
-      'pods', name_log_limit=name_log_limit, stack_level=2
+      'pods',
+      name_log_limit=name_log_limit,
+      namespace=namespace,
+      stack_level=2,
   )
 
 
@@ -729,6 +733,7 @@ def GetNodeNames(
 def GetAllNamesForResourceType(
     resource_type: str,
     name_log_limit: int | None = None,
+    namespace: str | None = None,
     **kwargs: Any,
 ) -> set[str]:
   """Get all names for the specified resource. Type should be plural."""
@@ -736,6 +741,8 @@ def GetAllNamesForResourceType(
   kwargs['should_pre_log'] = False
   kwargs['suppress_logging'] = True
   cmd = ['get', resource_type, '-o', 'jsonpath={.items[*].metadata.name}']
+  if namespace:
+    cmd.extend(['-n', namespace])
   stdout, _, _ = kubectl.RunKubectlCommand(
       cmd,
       **kwargs,
@@ -994,3 +1001,85 @@ def GetTotalCpuMillicores(label_selector: str | None = None) -> float | None:
     logging.debug('[startup/cpu] Parse error: %s', e)
     return None
 
+
+def FindPodByNameSubstring(namespace: str, substring: str) -> str:
+  """Returns the first pod name in `namespace` containing `substring`.
+
+  Args:
+    namespace: The namespace to search in.
+    substring: A substring to match against pod names, e.g. 'frontend'.
+
+  Raises:
+    RuntimeError: If no matching pod is found.
+  """
+  for pod_name in sorted(GetPodNames(namespace=namespace)):
+    if substring in pod_name:
+      return pod_name
+  raise RuntimeError(
+      f"Could not find a pod matching '{substring}' in namespace {namespace}"
+  )
+
+
+_POD_CREATION_POLL_INTERVAL_SECONDS = 5
+
+
+def WaitForPodsReady(namespace: str, timeout: int = 900) -> None:
+  """Waits for pods to be created in `namespace`, then waits until ready.
+
+  Args:
+    namespace: The namespace to wait in.
+    timeout: Seconds to wait for pods to first appear. The same value is also
+      used as the timeout for the subsequent readiness wait.
+
+  Raises:
+    vm_util.TimeoutExceededRetryError: If no pods appear in `namespace` within
+      `timeout` seconds.
+  """
+  logging.info('Waiting for pods to be created in %s...', namespace)
+
+  @vm_util.Retry(
+      poll_interval=_POD_CREATION_POLL_INTERVAL_SECONDS,
+      fuzz=0,
+      timeout=timeout,
+      retryable_exceptions=(errors.Resource.RetryableCreationError,),
+  )
+  def _WaitForPodsCreated() -> None:
+    if not GetPodNames(namespace=namespace):
+      raise errors.Resource.RetryableCreationError(
+          f'No pods created yet in {namespace}'
+      )
+
+  _WaitForPodsCreated()
+
+  logging.info('Waiting for pods to be ready in %s...', namespace)
+  WaitForResource(
+      'pod', 'ready', namespace=namespace, timeout=timeout, wait_for_all=True
+  )
+
+
+def ExecAndParseResult(
+    pod_selector: str,
+    command: list[str],
+    parse_fn: Callable[[str], Any],
+    namespace: str = 'default',
+    timeout: int | None = None,
+) -> Any:
+  """Runs `command` inside a pod matched by `pod_selector` and parses stdout.
+
+  Args:
+    pod_selector: A substring used to find the target pod's name (see
+      FindPodByNameSubstring).
+    command: The command (and args) to execute inside the pod.
+    parse_fn: Called with the command's stdout; its return value is returned to
+      the caller.
+    namespace: The namespace the pod lives in.
+    timeout: Optional timeout (seconds) for the exec call.
+
+  Returns:
+    The parsed result of the command execution.
+  """
+  pod_name = FindPodByNameSubstring(namespace, pod_selector)
+  exec_command = ['exec', pod_name, '-n', namespace, '--'] + command
+  kwargs: dict[str, Any] = {'timeout': timeout} if timeout else {}
+  stdout, _, _ = kubectl.RunKubectlCommand(exec_command, **kwargs)
+  return parse_fn(stdout)
