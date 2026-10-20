@@ -28,6 +28,7 @@ from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import hpc_util
+from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
@@ -105,6 +106,22 @@ SUMMARY_REGEX = (r'\[SCORE \] Bandwidth ([\d\.]*) ([\w\/]*) : '
 RESULT_REGEX = r'\[RESULT\]\s+([\w\-]*)\s+([\d\.]+) ([\w\/]+) : time ([\d\.]+)'
 IO500_OUTPUT = 'data'
 BENCHMARK_DIR = '/opt/pkb'
+# resultdir in the INI templates; io500 creates a timestamped subdir per run.
+IO500_RESULT_DIR = f'{linux_packages.INSTALL_DIR}/results'
+# Files from the io500 result dir to preserve. The Artemis runner only uploads
+# top-level files in the PKB run dir ending in .log, so they are pulled with a
+# .log suffix.
+IO500_RESULT_FILES = [
+    'result.txt',
+    'result_summary.txt',
+    'config.ini',
+    'ior-easy-write.txt',
+    'ior-easy-write.csv',
+    'ior-easy-read.txt',
+    'ior-easy-read.csv',
+    'ior-hard-write.txt',
+    'ior-hard-read.txt',
+]
 # default ior-easy transfersize is 2MiB by default in io500.
 # https://github.com/IO500/io500/blob/main/config-sample-all.ini
 DEFAULT_IOR_EASY_TRANSFER_SIZE = 2 * 1024 * 1024  # 2 MiB
@@ -219,6 +236,41 @@ def Prepare(benchmark_spec):
     background_tasks.RunThreaded(DistributeBinary, vms[1:])
 
 
+def _PullResultFiles(headnode, ranks, ppn, num_clients):
+  """Copies io500's per-run result files into the PKB run dir.
+
+  io500 writes result.txt, result_summary.txt (which contains
+  throughput-stonewall), and per-phase IOR output/CSV files into a timestamped
+  directory under IO500_RESULT_DIR. Only the [RESULT] lines are parsed into
+  samples, so these files are pulled to vm_util.GetTempDir() where the Artemis
+  runner uploads *.log files to Sponge undeclared outputs.
+
+  Args:
+    headnode: VirtualMachine object that ran io500.
+    ranks: Total ranks used for the run.
+    ppn: Process per node.
+    num_clients: Number of clients.
+  """
+  result_dir, _ = headnode.RemoteCommand(
+      f'ls -td {IO500_RESULT_DIR}/*/ | head -n 1', ignore_failure=True
+  )
+  result_dir = result_dir.strip()
+  if not result_dir:
+    logging.warning(
+        'No io500 result directory found under %s', IO500_RESULT_DIR
+    )
+    return
+  prefix = f'io500_ranks{ranks}_ppn{ppn}_clients{num_clients}'
+  for filename in IO500_RESULT_FILES:
+    remote_path = os.path.join(result_dir, filename)
+    local_path = os.path.join(vm_util.GetTempDir(), f'{prefix}_{filename}.log')
+    try:
+      headnode.PullFile(local_path, remote_path)
+    except errors.VirtualMachine.RemoteCommandError:
+      # Phases that are disabled in the INI do not produce their files.
+      logging.info('io500 result file %s not present, skipping', remote_path)
+
+
 def _Run(headnode, ranks, ppn, num_clients):
   """Runs io500 with specified number of ranks.
 
@@ -244,6 +296,7 @@ def _Run(headnode, ranks, ppn, num_clients):
       'mpirun --hostfile ~/MACHINEFILE -oversubscribe '
       f'-n {ranks} -npernode {ppn} '
       f'io500/io500 {_IO500_INI_FILE.value}.ini')
+  _PullResultFiles(headnode, ranks, ppn, num_clients)
   for line in stdout.splitlines():
     invalid = '[INVALID]' in line
     if invalid:
