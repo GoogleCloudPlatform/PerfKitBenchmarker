@@ -522,7 +522,6 @@ class SetUpObjectStorageStrategy(AWSSetupDiskStrategy):
       '--file-mode=777',
       # Sets part size to 64MiB. Max upload 64000MiB.
       '--write-part-size=67108864',
-      '--incremental-upload',
       '--allow-overwrite',
       '--allow-delete',
   ]
@@ -554,9 +553,11 @@ class SetUpObjectStorageStrategy(AWSSetupDiskStrategy):
     self.vm.scratch_disks.append(s3_client)
 
     if FLAGS.object_storage_use_fuse:
-      self._MountS3(bucket_name, target)
+      self._MountS3(bucket_name, target, is_s3_express=is_s3_express)
 
-  def _MountS3(self, bucket_name: str, target: str) -> None:
+  def _MountS3(
+      self, bucket_name: str, target: str, is_s3_express: bool = False
+  ) -> None:
     """Installs and mounts Mountpoint for Amazon S3 on the VM."""
     self.vm.Install('mountpoint')
     self.vm.RemoteCommand(f'sudo mkdir -p {target} && sudo chmod a+w {target}')
@@ -572,6 +573,8 @@ class SetUpObjectStorageStrategy(AWSSetupDiskStrategy):
         + FLAGS.mount_options
         + logging_options
     )
+    if is_s3_express:
+      all_mount_options += ['--incremental-upload']
     if not FLAGS.aws_s3_mount_enable_metadata_cache:
       all_mount_options += ['--metadata-ttl=0']
 
