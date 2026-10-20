@@ -1207,38 +1207,43 @@ class EksKarpenterCluster(BaseEksCluster):
       controller_cpu, controller_memory = 2, '8Gi'
     else:
       controller_cpu, controller_memory = 1, '1Gi'
-    vm_util.IssueCommand([
-        'helm',
-        'upgrade',
-        '--install',
-        'karpenter',
-        'oci://public.ecr.aws/karpenter/karpenter',
-        '--version',
-        str(_KARPENTER_VERSION),
-        '--namespace',
-        _KARPENTER_NAMESPACE,
-        '--kubeconfig',
-        FLAGS.kubeconfig,
-        '--create-namespace',
-        '--set',
-        f'settings.clusterName={self.name}',
-        '--set',
-        f'settings.interruptionQueue={self.name}',
-        # Not always needed but enable the feature.
-        '--set',
-        'settings.featureGates.staticCapacity=true',
-        '--set',
-        f'controller.resources.requests.cpu={controller_cpu}',
-        '--set',
-        f'controller.resources.requests.memory={controller_memory}',
-        '--set',
-        f'controller.resources.limits.cpu={controller_cpu}',
-        '--set',
-        f'controller.resources.limits.memory={controller_memory}',
-        '--set',
-        'logLevel=debug',
-        '--wait',
-    ])
+    vm_util.IssueCommand(
+        [
+            'helm',
+            'upgrade',
+            '--install',
+            'karpenter',
+            'oci://public.ecr.aws/karpenter/karpenter',
+            '--version',
+            str(_KARPENTER_VERSION),
+            '--namespace',
+            _KARPENTER_NAMESPACE,
+            '--kubeconfig',
+            FLAGS.kubeconfig,
+            '--create-namespace',
+            '--set',
+            f'settings.clusterName={self.name}',
+            '--set',
+            f'settings.interruptionQueue={self.name}',
+            # Not always needed but enable the feature.
+            '--set',
+            'settings.featureGates.staticCapacity=true',
+            '--set',
+            f'controller.resources.requests.cpu={controller_cpu}',
+            '--set',
+            f'controller.resources.requests.memory={controller_memory}',
+            '--set',
+            f'controller.resources.limits.cpu={controller_cpu}',
+            '--set',
+            f'controller.resources.limits.memory={controller_memory}',
+            '--set',
+            'logLevel=debug',
+            '--wait',
+            '--timeout',
+            '30m0s',
+        ],
+        timeout=1800,
+    )
     # Ensure ALB ingress support: installs AWS Load Balancer Controller.
     if FLAGS.eks_install_alb_controller:
       self._InstallAwsLoadBalancerController()
@@ -1257,10 +1262,17 @@ class EksKarpenterCluster(BaseEksCluster):
       )
       vm_util.IssueCommand(['helm', 'repo', 'update', 'nvdp'])
       # Allow node discovery pod to schedule even over NoSchedule taint.
-      tolerations_string = (
-          'tolerations=[{"key":"nvidia.com/gpu","operator":'
-          + '"Exists","effect":"NoSchedule"}]'
-      )
+      if FLAGS.eks_nvdp_tolerate_pkb_nodepool_taint:
+        tolerations_string = (
+            'tolerations=[{"key":"nvidia.com/gpu","operator":'
+            '"Exists","effect":"NoSchedule"},'
+            '{"key":"pkb_nodepool","operator":"Exists","effect":"NoSchedule"}]'
+        )
+      else:
+        tolerations_string = (
+            'tolerations=[{"key":"nvidia.com/gpu","operator":'
+            + '"Exists","effect":"NoSchedule"}]'
+        )
       vm_util.IssueCommand([
           'helm',
           'upgrade',

@@ -281,6 +281,13 @@ flags.DEFINE_boolean(
     'Required when scaling to thousands of nodes to prevent subnet IP '
     'exhaustion. Enable when running kubernetes_node_scale at large scale.',
 )
+flags.DEFINE_boolean(
+    'eks_nvdp_tolerate_pkb_nodepool_taint',
+    False,
+    'When True, adds a NoSchedule toleration for the pkb_nodepool taint to '
+    'the NVIDIA device plugin and node feature discovery worker DaemonSets '
+    'in EKS Karpenter clusters.',
+)
 AWS_CAPACITY_BLOCK_RESERVATION_ID = flags.DEFINE_string(
     'aws_capacity_block_reservation_id',
     None,
