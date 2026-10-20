@@ -726,3 +726,5 @@
     `MEMPOOL_CACHE_SIZE` constant in `app/l2p.h`).
 -   Replace deprecated `pkg_resources` usages with `importlib.resources`,
     `importlib.metadata`, and `packaging.requirements`.
+-   Fix percent parsing in `units.py` so `Quantity('25%')` works with
+    pint >= 0.26.2.

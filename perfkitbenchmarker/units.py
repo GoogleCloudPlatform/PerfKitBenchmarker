@@ -43,9 +43,11 @@ class _UnitRegistry(pint.UnitRegistry):
   def parse_expression(self, input_string, *args, **kwargs):
     # pint cannot parse percent, because it wants to be able to do python math.
     # '3 % 2' is a Python math expression for 3 mod 2.
-    # Replace all instances of the percent symbol.
+    # Replace all instances of the percent symbol with the 'percent' unit
+    # defined above. The dimension form '[percent]' is rejected by pint >=
+    # 0.26.2's tokenizer ("unknown operator '['").
     # https://github.com/hgrecco/pint/issues/429#issuecomment-265287161
-    fixed_input_string = input_string.replace('%', '[percent]')
+    fixed_input_string = input_string.replace('%', ' percent')
     return super().parse_expression(fixed_input_string, *args, **kwargs)
 
 
