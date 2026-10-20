@@ -116,7 +116,7 @@ class ThroughputLoadDriverTest(
     orig_fail_latency = throughput_load_driver._FAIL_LATENCY
     orig_queue_wait_time = throughput_load_driver._QUEUE_WAIT_TIME
     throughput_load_driver._FAIL_LATENCY = 2  # pyrefly: ignore[bad-assignment]
-    throughput_load_driver._QUEUE_WAIT_TIME = 4
+    throughput_load_driver._QUEUE_WAIT_TIME = 4  # pyrefly: ignore[bad-assignment]
     try:
 
       def _run_command_mock(command: str):
@@ -145,7 +145,7 @@ class ThroughputLoadDriverTest(
     orig_fail_latency = throughput_load_driver._FAIL_LATENCY
     orig_queue_wait_time = throughput_load_driver._QUEUE_WAIT_TIME
     throughput_load_driver._FAIL_LATENCY = 2  # pyrefly: ignore[bad-assignment]
-    throughput_load_driver._QUEUE_WAIT_TIME = 4
+    throughput_load_driver._QUEUE_WAIT_TIME = 4  # pyrefly: ignore[bad-assignment]
     try:
 
       def _run_command_mock(command: str):
