@@ -325,7 +325,7 @@ class AzLustreSetupDiskStrategy(disk_strategies.SetUpLustreDiskStrategy):
     )
     vm.RemoteCommand(cmd)
 
-    kernel_version = vm.kernel_release
+    kernel_version = str(vm.kernel_release)
     target_kernel, _ = vm.RemoteCommand(
         'apt list -a "amlfs-lustre-client*" 2>/dev/null |'
         ' awk \'{print $2}\' | grep -E \'^[0-9]+.*-azure$\' |'
@@ -336,16 +336,20 @@ class AzLustreSetupDiskStrategy(disk_strategies.SetUpLustreDiskStrategy):
       raise errors.Benchmarks.UnsupportedConfigError(
           'Could not determine latest supported kernel version from AMLFS repo.'
       )
-    vm.InstallPackages(
-        f'linux-image-{target_kernel} linux-headers-{target_kernel}'
-    )
-    vm.RemoteCommand('sudo apt remove -y linux-image-azure')
-    # Override linux-check-removal so dpkg does not throw the abort prompt/error
-    vm.RemoteCommand(
-        'sudo rm -f /usr/bin/linux-check-removal && sudo ln -s /bin/true'
-        ' /usr/bin/linux-check-removal && sudo DEBIAN_FRONTEND=noninteractive'
-        f' apt remove -y linux-image-{kernel_version}'
-    )
+    if kernel_version != target_kernel:
+      vm.InstallPackages(
+          f'linux-image-{target_kernel} linux-headers-{target_kernel}'
+      )
+      vm.RemoteCommand('sudo apt remove -y linux-image-azure')
+      # Override linux-check-removal so dpkg does not throw the abort
+      # prompt/error.
+      vm.RemoteCommand(
+          'sudo rm -f /usr/bin/linux-check-removal && sudo ln -s /bin/true'
+          ' /usr/bin/linux-check-removal && sudo DEBIAN_FRONTEND=noninteractive'
+          f' apt remove -y linux-image-{kernel_version}'
+      )
+      vm.Reboot()
+      kernel_version = str(vm.kernel_release)
 
     package_name, _ = vm.RemoteCommand(
         'apt list -a "amlfs-lustre-client*" 2>/dev/null |'
