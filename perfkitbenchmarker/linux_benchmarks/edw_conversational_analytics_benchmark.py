@@ -27,6 +27,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import bigquery
 from perfkitbenchmarker.providers.gcp import looker
+from perfkitbenchmarker.providers.snowflake import snowflake
 
 BENCHMARK_NAME = 'edw_conversational_analytics_benchmark'
 
@@ -250,8 +251,8 @@ class _BenchmarkPerformanceSuite:
       benchmark_metadata['agent'] = bigquery.BQ_CA_DATA_AGENT.value
     if looker.LOOKER_CA_DATA_AGENT.value:
       benchmark_metadata['agent'] = looker.LOOKER_CA_DATA_AGENT.value
-    if FLAGS.snowflake_ca_semantic_view:
-      benchmark_metadata['agent'] = FLAGS.snowflake_ca_semantic_view
+    if snowflake.SNOWFLAKE_CA_AGENT.value:
+      benchmark_metadata['agent'] = snowflake.SNOWFLAKE_CA_AGENT.value
     benchmark_metadata.update(self.edw_service_instance.GetMetadata())
     benchmark_metadata.update(self.ca_client.GetMetadata())
 
@@ -335,8 +336,8 @@ def CheckPrerequisites(benchmark_config):
       if not flag.value:
         missing_flags.append(f'--{flag.name}')
   elif edw_service_type.startswith('snowflake'):
-    if not FLAGS.snowflake_ca_semantic_view:
-      missing_flags.append('--snowflake_ca_semantic_view')
+    if not snowflake.SNOWFLAKE_CA_AGENT.value:
+      missing_flags.append(f'--{snowflake.SNOWFLAKE_CA_AGENT.name}')
 
   if missing_flags:
     raise errors.Config.InvalidValue(

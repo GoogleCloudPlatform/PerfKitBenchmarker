@@ -42,11 +42,11 @@ JdbcClientDict = {
 SNOWFLAKE_PYTHON_CLIENT_FILE = 'sf_python_driver.py'
 SNOWFLAKE_PYTHON_CLIENT_DIR = 'edw/snowflake/clients/python'
 
-SNOWFLAKE_CA_SEMANTIC_VIEW = flags.DEFINE_string(
-    'snowflake_ca_semantic_view',
-    None,
-    'Fully qualified name of the pre-created Snowflake Cortex Analyst semantic'
-    ' view.',
+SNOWFLAKE_CA_AGENT = flags.DEFINE_string(
+    'snowflake_ca_agent',
+    '',
+    'Fully qualified name (DATABASE.SCHEMA.NAME) of the pre-created Snowflake'
+    ' Cortex Agent object.',
 )
 
 
@@ -200,10 +200,14 @@ class PythonClientInterface(SnowflakeClientInterface):
     # Push the private key to the working directory on client vm
     if FLAGS.snowflake_jdbc_key_file:
       self.client_vm.PushFile(FLAGS.snowflake_jdbc_key_file)  # pyrefly: ignore[missing-attribute]
+      key_file = os.path.basename(FLAGS.snowflake_jdbc_key_file)
     else:
       self.client_vm.InstallPreprovisionedPackageData(  # pyrefly: ignore[missing-attribute]
           package_name, ['snowflake_keyfile.p8'], ''
       )
+      key_file = 'snowflake_keyfile.p8'
+    # snowflake-connector-python rejects key files writable by group/others.
+    self.client_vm.RemoteCommand(f'chmod 600 {key_file}')  # pyrefly: ignore[missing-attribute]
 
     # Install dependencies for driver
     self.client_vm.Install('pip')  # pyrefly: ignore[missing-attribute]
@@ -291,11 +295,11 @@ class ConversationalAnalyticsClientInterface(
 
   @property
   def fetches_results_immediately(self) -> bool:
-    return False
+    return True
 
   @property
   def ca_client_name(self) -> str:
-    return 'snowflake_cortex_analyst'
+    return 'snowflake_cortex_agent'
 
   def Prepare(self, package_name: str) -> None:
     """Prepares the client vm by installing packages and driver."""
@@ -326,10 +330,14 @@ class ConversationalAnalyticsClientInterface(
     # Push the private key to the working directory on client vm
     if FLAGS.snowflake_jdbc_key_file:
       self.client_vm.PushFile(FLAGS.snowflake_jdbc_key_file)
+      key_file = os.path.basename(FLAGS.snowflake_jdbc_key_file)
     else:
       self.client_vm.InstallPreprovisionedPackageData(
           package_name, ['snowflake_keyfile.p8'], ''
       )
+      key_file = 'snowflake_keyfile.p8'
+    # Restrict key file permissions to owner read/write.
+    self.client_vm.RemoteCommand(f'chmod 600 {key_file}')
 
   @override
   def _GetConversationalAnalyticsCommand(self, remote_query_file: str) -> str:
@@ -343,7 +351,7 @@ class ConversationalAnalyticsClientInterface(
         f'--snowflake_account={FLAGS.snowflake_account} '
         f'--snowflake_user={FLAGS.snowflake_user} '
         f'--credentials_file={key_file} '
-        f'--semantic_view={SNOWFLAKE_CA_SEMANTIC_VIEW.value} '
+        f'--agent={SNOWFLAKE_CA_AGENT.value} '
         f'--print_results --query_file={remote_query_file}'
     )
 
@@ -356,7 +364,7 @@ class ConversationalAnalyticsClientInterface(
     )
     details = results.get('details', {})
     query_results = details.get('query_results', {})
-    metadata['model_names'] = query_results.get('model_names', [])
+    metadata['tokens_consumed'] = query_results['tokens_consumed']
     return execution_time, metadata
 
 

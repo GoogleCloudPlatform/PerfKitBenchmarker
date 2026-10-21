@@ -24,6 +24,7 @@ from perfkitbenchmarker import edw_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker.linux_benchmarks import edw_conversational_analytics_benchmark
 from perfkitbenchmarker.providers.gcp import bigquery
+from perfkitbenchmarker.providers.snowflake import snowflake
 from tests import pkb_common_test_case
 
 FLAGS = flags.FLAGS
@@ -155,15 +156,13 @@ class EdwConversationalAnalyticsBenchmarkTest(
     ):
       edw_conversational_analytics_benchmark.CheckPrerequisites(mock_config)
 
-  @flagsaver.flagsaver(
-      snowflake_ca_semantic_view='',
-  )
+  @flagsaver.flagsaver((snowflake.SNOWFLAKE_CA_AGENT, ''))
   def testCheckPrerequisitesRaisesValueErrorWhenSnowflakeFlagsMissing(self):
     mock_config = mock.Mock()
     mock_config.edw_service.type = 'snowflake_aws'
     with self.assertRaisesRegex(
         errors.Config.InvalidValue,
-        'Missing required flags: --snowflake_ca_semantic_view',
+        'Missing required flags: --snowflake_ca_agent',
     ):
       edw_conversational_analytics_benchmark.CheckPrerequisites(mock_config)
 
@@ -878,7 +877,7 @@ class EdwConversationalAnalyticsBenchmarkTest(
     self.assertEqual(predict_perf.id, '1')
 
   @flagsaver.flagsaver(
-      snowflake_ca_semantic_view='my-snowflake-semantic-view',
+      (snowflake.SNOWFLAKE_CA_AGENT, 'MY_DB.MY_SCHEMA.MY_AGENT'),
       edw_suite_iterations=2,
       ca_dataset='call_center',
   )
@@ -987,7 +986,7 @@ class EdwConversationalAnalyticsBenchmarkTest(
     self.assertEqual(metrics.count('edw_aggregated_geomean'), 3)
     for sample in samples:
       self.assertEqual(
-          sample.metadata.get('agent'), 'my-snowflake-semantic-view'
+          sample.metadata.get('agent'), 'MY_DB.MY_SCHEMA.MY_AGENT'
       )
       self.assertEqual(sample.metadata.get('client'), 'Snowflake')
 
