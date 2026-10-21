@@ -105,23 +105,21 @@ class DpdkBenchmarkTestCase(parameterized.TestCase, unittest.TestCase):
       dpdk_pktgen_tx_rx_lcores_list=['[8:1];[1:8]'],
   )
   def testClientServerStdout(self):
-    self.bm_spec.vms[0].RemoteCommand.side_effect = (
-        [
-            ('6', ''),
-            ('', ''),
-            ('', ''),
-            (self.sender_stdout, ''),
-        ]
-        + [
-            (670441705, ''),
-            (11, ''),
-            ('', ''),
-        ]
-        * 25
-    )
+    self.bm_spec.vms[0].RemoteCommand.side_effect = [
+        ('6', ''),
+        ('', ''),
+        ('', ''),
+        (self.sender_stdout, ''),
+    ] + [
+        (670441705, ''),
+        (11, ''),
+        ('4096\n', ''),  # Effective TX descriptors.
+        ('', ''),
+    ] * 25
     self.bm_spec.vms[1].RemoteCommand.side_effect = [
         (self.receiver_stdout, ''),
         (670421930, ''),
+        ('4096\n', ''),  # Effective RX descriptors.
     ] * 25
     output_samples = dpdk_pktgen_benchmark.Run(self.bm_spec)
 
@@ -138,6 +136,12 @@ class DpdkBenchmarkTestCase(parameterized.TestCase, unittest.TestCase):
           output_sample.value,
           expected_output_sample.value,
       )
+    self.assertEqual(
+        output_samples[0].metadata['dpdk_pktgen_rxd_effective'], 4096
+    )
+    self.assertEqual(
+        output_samples[0].metadata['dpdk_pktgen_txd_effective'], 4096
+    )
 
   @parameterized.named_parameters(
       dict(

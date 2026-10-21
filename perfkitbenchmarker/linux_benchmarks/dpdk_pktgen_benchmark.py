@@ -45,6 +45,10 @@ class PktgenStats:
   sender_rx_pkts: int | None = None
   receiver_rx_pkts: int | None = None
   packet_loss_rate: float | None = None
+  # Ring depths actually granted by the NIC: rte_eth_dev_adjust_nb_rx_tx_desc
+  # silently clamps --rxd/--txd to the device limit.
+  sender_txd: int | None = None
+  receiver_rxd: int | None = None
 
   def GetPacketLossRate(self) -> float:
     """Calculates packet loss rate from sender and receiver stats."""
@@ -489,10 +493,24 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
       total_receiver_rx_pkts = int(total_receiver_rx_pkts) + int(
           total_receiver_rx_pkts_2
       )
+    # Pktgen logs "Updated descriptors RX: <rxd>, TX: <txd>" per port after
+    # the device clamps the requested sizes; take the last match.
+    descriptors_log = (
+        f'cat {dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR}/{_STDOUT_LOG_FILE} |'
+        r' grep -oP "Updated descriptors RX:\s*'
+    )
+    receiver_rxd, _ = receiver_vm.RemoteCommand(
+        descriptors_log + r'\K[0-9]+" | tail -1'
+    )
+    sender_txd, _ = sender_vm.RemoteCommand(
+        descriptors_log + r'[0-9]+, TX:\s*\K[0-9]+" | tail -1'
+    )
     return PktgenStats(
         sender_tx_pkts=total_sender_tx_pkts,  # pyrefly: ignore[bad-argument-type]
         sender_rx_pkts=total_sender_rx_pkts,  # pyrefly: ignore[bad-argument-type]
         receiver_rx_pkts=total_receiver_rx_pkts,  # pyrefly: ignore[bad-argument-type]
+        sender_txd=int(sender_txd) if str(sender_txd).strip() else None,
+        receiver_rxd=int(receiver_rxd) if str(receiver_rxd).strip() else None,
     )
 
   def UpdatePpsAndRecompile(
@@ -684,6 +702,8 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
             'dpdk_pktgen_tx_cores': tx_cores,
             'dpdk_pktgen_rx_cores': rx_cores,
             'ip_type': FLAGS.ip_addresses,
+            'dpdk_pktgen_rxd_effective': stats.receiver_rxd,
+            'dpdk_pktgen_txd_effective': stats.sender_txd,
         })
         best_run_results = {
             'valid_total_sender_tx_pkts': s_tx,
