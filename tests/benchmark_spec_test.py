@@ -190,6 +190,16 @@ class PrintExistingResourcesTestCase(_BenchmarkSpecTestCase):
         'The following resources are still active:\n%s', expected_output
     )
 
+  @mock.patch.object(logging, 'info')
+  def testPrintExistingResources_failedVm(self, mock_logging_info):
+    spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml()
+    vm_failed = _FakeVm('FailedVm', 'failed vm connect msg')
+    vm_failed.created = False
+
+    spec.vms = [vm_failed]  # pyrefly: ignore[read-only]
+    spec.PrintExistingResources()
+    mock_logging_info.assert_not_called()
+
 
 class ConstructEdwServiceTestCase(_BenchmarkSpecTestCase):
 

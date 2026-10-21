@@ -1374,10 +1374,13 @@ class BenchmarkSpec:
     for vm in self.vms:
       if vm not in all_resources:
         all_resources.append(vm)
-    if not all_resources:
+    all_successful_resources = [
+        resource for resource in all_resources if resource.created
+    ]
+    if not all_successful_resources:
       return
     resources_str = '\n'.join(
-        self._FormatResource(resource) for resource in all_resources
+        self._FormatResource(resource) for resource in all_successful_resources
     )
     logging.info('The following resources are still active:\n%s', resources_str)
 
