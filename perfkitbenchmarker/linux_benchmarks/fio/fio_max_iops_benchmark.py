@@ -115,19 +115,12 @@ def Run(spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
   )
   test_samples = utils.RunTest(vm, constants.FIO_PATH, job_file_str)
   samples.extend(test_samples)
-  max_iops_sample = _GetMaxIOPSSample(test_samples)
-  samples.append(
-      sample.Sample(
-          metric='max_iops',
-          value=max_iops_sample.value,
-          unit=max_iops_sample.unit,
-          metadata=max_iops_sample.metadata,
-      )
-  )
+  max_iops_samples = _GetMaxIOPSSamples(test_samples)
+  samples.extend(max_iops_samples)
   return samples
 
 
-def _GetMaxIOPSSample(samples) -> sample.Sample:
+def _GetMaxIOPSSamples(samples: list[sample.Sample]) -> list[sample.Sample]:
   """Returns Max IOPS sample from the list of samples of fio run."""
   sorted_iops_samples = sorted(
       list(filter(lambda x: x.metric.endswith(':iops'), samples)),
@@ -138,14 +131,71 @@ def _GetMaxIOPSSample(samples) -> sample.Sample:
     raise errors.Benchmarks.RunError(
         'Max IOPS not found, please check the fio output in logs.'
     )
-  if int(sorted_iops_samples[0].metadata['numjobs']) == sorted(NUMJOBS)[
-      -1
-  ] and (
-      (
-          abs(sorted_iops_samples[0].value - sorted_iops_samples[1].value)
-          / sorted_iops_samples[1].value
-      )
-      > 0.02
+  if fio_flags.FIO_OPERATION_TYPE.value != constants.OPERATION_READWRITE:
+    # if operation type is read only or write only, the first sample is the
+    # max iops.
+    max_iops_sample = sorted_iops_samples[0]
+    _ValidateMaxIOPSReached(
+        max_iops_sample.metadata['numjobs'],
+        sorted_iops_samples[0].value,
+        sorted_iops_samples[1].value,
+    )
+    return [
+        sample.Sample(
+            metric='max_iops',
+            value=max_iops_sample.value,
+            unit=max_iops_sample.unit,
+            metadata=max_iops_sample.metadata.copy(),
+        )
+    ]
+  else:
+    # If operation type is readwrite, find the (iodepth, numjobs) with the
+    # highest combined read + write IOPS and report its read and write IOPS.
+    paired_samples = {}
+    for s in sorted_iops_samples:
+      key = (s.metadata['iodepth'], s.metadata['numjobs'])
+      paired_samples.setdefault(key, []).append(s)
+    sorted_paired_samples = sorted(
+        paired_samples.values(),
+        key=lambda sample_list: sum(s.value for s in sample_list),
+        reverse=True,
+    )
+    max_iops_samples_by_iodepth_and_numjobs = sorted_paired_samples[0]
+    _ValidateMaxIOPSReached(
+        max_iops_samples_by_iodepth_and_numjobs[0].metadata['numjobs'],
+        sum(s.value for s in sorted_paired_samples[0]),
+        sum(s.value for s in sorted_paired_samples[1]),
+    )
+    result_samples = []
+    for s in max_iops_samples_by_iodepth_and_numjobs:
+      if s.metric.endswith(':read:iops'):
+        result_samples.append(
+            sample.Sample(
+                metric='max_read_iops',
+                value=s.value,
+                unit=s.unit,
+                metadata=s.metadata.copy(),
+            )
+        )
+      elif s.metric.endswith(':write:iops'):
+        result_samples.append(
+            sample.Sample(
+                metric='max_write_iops',
+                value=s.value,
+                unit=s.unit,
+                metadata=s.metadata.copy(),
+            )
+        )
+    return result_samples
+
+
+def _ValidateMaxIOPSReached(
+    numjobs: str | int, max_iops: float, second_max_iops: float
+) -> None:
+  """Checks that max IOPS has plateaued if reached at the largest numjobs."""
+  if (
+      int(numjobs) == sorted(NUMJOBS)[-1]
+      and (abs(max_iops - second_max_iops) / second_max_iops) > 0.02
   ):
     # The current numjobs might not be reaching max IOPS since the difference
     # between the max two iops is more than 2 percent.
@@ -153,7 +203,6 @@ def _GetMaxIOPSSample(samples) -> sample.Sample:
         'Max IOPS found with the largest numjobs, possibility of not'
         ' reaching the max.'
     )
-  return sorted_iops_samples[0]
 
 
 def Cleanup(_):
