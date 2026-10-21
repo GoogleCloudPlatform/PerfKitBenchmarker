@@ -27,6 +27,7 @@ from perfkitbenchmarker import os_types
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import gce_disk
+from perfkitbenchmarker.providers.gcp import gce_disk_strategies
 from perfkitbenchmarker.providers.gcp import gce_nfs_service
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 from perfkitbenchmarker.providers.gcp import gce_windows_virtual_machine
@@ -379,6 +380,158 @@ class GCEPDDiskTest(GCEDiskTest):
           self.linux_vm.scratch_disks[0].GetDevicePath(),
           '/dev/disk/by-id/google-test_vm-data-0-0',
       )
+
+  def testCustomDeviceNameAndPhysicalBlockSizeAndBootDiskDeviceName(self):
+    self.linux_vm.boot_disk_device_name = 'boot'
+    boot_disk = gce_disk.GceBootDisk(
+        self.linux_vm, self.linux_vm.vm_spec.boot_disk_spec
+    )
+    self.assertEqual(
+        boot_disk.GetCreationCommand()['boot-disk-device-name'],
+        'boot',
+    )
+
+    spec = gce_disk.GceDiskSpec(
+        _COMPONENT,
+        disk_type=gce_disk.HYPERDISK_BALANCED,
+        disk_size=250,
+        mount_point='/mnt/disks/mysql',
+        device_name='mysql-data',
+        physical_block_size=16384,
+        create_with_vm=False,
+    )
+    data_disk = gce_disk.GceDisk(
+        spec,
+        'test_vm-data-0-0',
+        'us-central1-a',
+        'test',
+    )
+    self.assertEqual(data_disk.device_name, 'mysql-data')
+    self.assertEqual(data_disk.physical_block_size, 16384)
+    self.assertEqual(
+        data_disk.GetDevicePath(),
+        '/dev/disk/by-id/google-mysql-data',
+    )
+    self.assertIn('device-name=mysql-data', data_disk.GetCreateFlags())
+
+    fake_rets = [
+        ('stdout', 'stderr', 0),
+        ('', '', 0),
+        ('', '', 0),
+    ]
+    with PatchCriticalObjects(fake_rets) as issue_command:
+      data_disk._Create()
+      data_disk._Attach(self.linux_vm)
+      data_disk._Detach()
+      expected_commands = [
+          [
+              'gcloud',
+              'compute',
+              'disks',
+              'create',
+              'test_vm-data-0-0',
+              '--physical-block-size',
+              '16384',
+              '--size',
+              '250',
+              '--type',
+              'hyperdisk-balanced',
+          ],
+          [
+              'gcloud',
+              'compute',
+              'instances',
+              'attach-disk',
+              'test_vm',
+              '--device-name',
+              'mysql-data',
+              '--disk',
+              'test_vm-data-0-0',
+          ],
+          [
+              'gcloud',
+              'compute',
+              'instances',
+              'detach-disk',
+              'test_vm',
+              '--device-name',
+              'mysql-data',
+          ],
+      ]
+      self.CompareCallArgs(expected_commands, issue_command.call_args_list)
+
+  def testRegionalHyperdiskBalancedHaAndNvmeMachineFamilies(self):
+    self.linux_vm.machine_type = 'c4-highmem-32'
+    self.assertTrue(gce_disk.PdDriveIsNvme(self.linux_vm))
+    self.linux_vm.machine_type = 'z4d-highmem-32-standardlssd'
+    self.assertTrue(gce_disk.PdDriveIsNvme(self.linux_vm))
+
+    spec = gce_disk.GceDiskSpec(
+        _COMPONENT,
+        disk_type=gce_disk.HYPERDISK_BALANCED_HA,
+        disk_size=500,
+        mount_point='/mnt/disks/pgsql',
+        device_name='pgsql-data',
+        physical_block_size=4096,
+        replica_zones=['us-central1-a', 'us-central1-b'],
+    )
+    strategy = gce_disk_strategies.GetCreateDiskStrategy(self.linux_vm, spec, 1)
+    self.assertFalse(strategy.DiskCreatedOnVMCreation())
+    self.assertEqual(strategy.GetCreationCommand(), {})
+    data_disk = strategy.remote_disk_groups[0][0]
+    self.assertEqual(data_disk.interface, gce_disk.NVME)
+    self.assertEqual(
+        data_disk.GetDevicePath(),
+        '/dev/disk/by-id/google-pgsql-data',
+    )
+
+  def testHybridPdAndLssdDiskStrategyVariableAndFixedShapes(self):
+    self.linux_vm.machine_type = 'n2-highmem-16'
+    self.linux_vm.max_local_disks = 0
+    spec = gce_disk.GceDiskSpec(
+        _COMPONENT,
+        disk_type=gce_disk.PD_SSD,
+        disk_size=250,
+        mount_point='/mnt/disks/mysql',
+        device_name='mysql-data',
+        num_local_ssds=2,
+        create_with_vm=True,
+    )
+    strategy = gce_disk_strategies.GetCreateDiskStrategy(self.linux_vm, spec, 1)
+    self.assertIsInstance(
+        strategy, gce_disk_strategies.CreateHybridPdAndLssdDiskStrategy
+    )
+    self.assertEqual(self.linux_vm.max_local_disks, 2)
+    self.assertEqual(self.linux_vm.ssd_interface, gce_disk.NVME)
+    creation_cmd = strategy.GetCreationCommand()
+    self.assertIn('create-disk', creation_cmd)
+    self.assertIn('device-name=mysql-data', creation_cmd['create-disk'][0])
+    self.assertEqual(
+        creation_cmd['local-ssd'],
+        ['interface=NVME', 'interface=NVME'],
+    )
+
+    # Fixed LSSD shape should not pass --local-ssd flag in GetCreationCommand
+    self.linux_vm.machine_type = 'c4-highmem-32-lssd'
+    self.linux_vm.max_local_disks = 0
+    fixed_spec = gce_disk.GceDiskSpec(
+        _COMPONENT,
+        disk_type=gce_disk.HYPERDISK_BALANCED,
+        disk_size=500,
+        mount_point='/mnt/disks/mysql',
+        device_name='mysql-data',
+        create_with_vm=True,
+    )
+    fixed_strategy = gce_disk_strategies.GetCreateDiskStrategy(
+        self.linux_vm, fixed_spec, 1
+    )
+    self.assertIsInstance(
+        fixed_strategy, gce_disk_strategies.CreateHybridPdAndLssdDiskStrategy
+    )
+    self.assertEqual(self.linux_vm.max_local_disks, 5)
+    fixed_cmd = fixed_strategy.GetCreationCommand()
+    self.assertIn('create-disk', fixed_cmd)
+    self.assertNotIn('local-ssd', fixed_cmd)
 
 
 class GCENFSDiskTest(GCEDiskTest):
