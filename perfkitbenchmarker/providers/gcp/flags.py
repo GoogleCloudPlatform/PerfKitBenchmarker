@@ -109,6 +109,18 @@ GCE_SUBNET_NAMES = flags.DEFINE_list(
     'The name of an already created '
     'subnet to use instead of creating a new one.',
 )
+GCE_ENABLE_PRIVATE_IPV6_ACCESS = flags.DEFINE_boolean(
+    'gce_enable_private_ipv6_access',
+    False,
+    'If True, enables Private Google Access and bidirectional Private IPv6 '
+    'Google Access on created GCE subnets.',
+)
+GCE_SUBNET_ENABLE_PRIVATE_IPV6 = flags.DEFINE_boolean(
+    'gce_subnet_enable_private_ipv6',
+    False,
+    'Alias for --gce_enable_private_ipv6_access to enable bidirectional '
+    'Private IPv6 Google Access on GCE subnets.',
+)
 flags.DEFINE_string(
     'gce_subnet_region',
     None,
