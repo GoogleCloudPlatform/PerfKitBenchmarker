@@ -768,6 +768,14 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
           not self.assign_external_ip or idx > 0
       ):
         no_address_arg = ['no-address']
+      extra_ni_options = list(
+          gcp_flags.GCE_EXTRA_NETWORK_INTERFACE_OPTIONS.value
+      )
+      stack_type_arg = []
+      if gcp_flags.GCE_ENABLE_PRIVATE_IPV6_ACCESS.value and not any(
+          opt.startswith('stack-type=') for opt in extra_ni_options
+      ):
+        stack_type_arg = ['stack-type=IPV4_IPV6']
       cmd.additional_flags += [
           '--network-interface',
           ','.join(
@@ -778,7 +786,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
               ]
               + gce_nic_queue_count_arg
               + no_address_arg
-              + gcp_flags.GCE_EXTRA_NETWORK_INTERFACE_OPTIONS.value
+              + stack_type_arg
+              + extra_ni_options
           ),
       ]
 
@@ -1374,6 +1383,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     if gcp_flags.GCE_PROVISIONING_MODEL.value:
       result['provisioning_model'] = gcp_flags.GCE_PROVISIONING_MODEL.value
+    if gcp_flags.GCE_ENABLE_PRIVATE_IPV6_ACCESS.value:
+      result['gce_enable_private_ipv6_access'] = True
 
     return result
 
