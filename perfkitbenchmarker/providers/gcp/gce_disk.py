@@ -213,7 +213,18 @@ FIXED_SSD_MACHINE_TYPES = {
     'c4d-highmem-384-lssd': 32,
 }
 
-NVME_PD_MACHINE_FAMILIES = ['m3']
+NVME_PD_MACHINE_FAMILIES = [
+    'm3',
+    'c3',
+    'c3a',
+    'c3d',
+    'c4',
+    'c4a',
+    'c4d',
+    'z3',
+    'z4d',
+    'z4m',
+]
 
 
 class GceServiceUnavailableError(Exception):
@@ -265,6 +276,8 @@ class GceDiskSpec(disk.BaseDiskSpec):
   num_local_ssds: int
   create_with_vm: bool
   replica_zones: list[str]
+  device_name: str | None
+  physical_block_size: int | None
 
   CLOUD = provider_info.GCP
 
@@ -335,6 +348,14 @@ class GceDiskSpec(disk.BaseDiskSpec):
                 'default': None,
             },
         ),
+        'device_name': (
+            option_decoders.StringDecoder,
+            {'default': None},
+        ),
+        'physical_block_size': (
+            option_decoders.IntDecoder,
+            {'default': None},
+        ),
     })
     return result
 
@@ -350,6 +371,9 @@ class GceBootDisk(boot_disk.BootDisk):
     self.vm = vm
     self.boot_disk_size = boot_disk_spec.boot_disk_size
     self.boot_disk_type = boot_disk_spec.boot_disk_type
+    self.boot_disk_device_name = getattr(
+        boot_disk_spec, 'boot_disk_device_name', None
+    ) or getattr(vm, 'boot_disk_device_name', None)
     self.boot_disk_iops = None
     self.boot_disk_throughput = None
     if self.boot_disk_type in GCE_DYNAMIC_IOPS_DISK_TYPE_DEFAULTS.keys():
@@ -359,6 +383,8 @@ class GceBootDisk(boot_disk.BootDisk):
 
   def GetCreationCommand(self):
     dic = {'boot-disk-auto-delete': True}
+    if self.boot_disk_device_name:
+      dic['boot-disk-device-name'] = self.boot_disk_device_name
     if self.boot_disk_size:
       dic['boot-disk-size'] = self.boot_disk_size
     if self.boot_disk_type:
@@ -421,6 +447,8 @@ class GceDisk(disk.BaseDisk):
       image=None,
       image_project=None,
       replica_zones=None,
+      device_name=None,
+      physical_block_size=None,
   ):
     super().__init__(disk_spec)
     self.interface = disk_spec.interface
@@ -428,6 +456,12 @@ class GceDisk(disk.BaseDisk):
     self.image = image
     self.image_project = image_project
     self.name = name
+    self.device_name = (
+        device_name or getattr(disk_spec, 'device_name', None) or name
+    )
+    self.physical_block_size = physical_block_size or getattr(
+        disk_spec, 'physical_block_size', None
+    )
     self.zone = zone
     self.project = project
     self.replica_zones = replica_zones
@@ -477,6 +511,8 @@ class GceDisk(disk.BaseDisk):
 
     if self.mode:
       cmd.flags['access-mode'] = self.mode
+    if self.physical_block_size:
+      cmd.flags['physical-block-size'] = self.physical_block_size
     if self.spec.snapshot_name:
       cmd.flags['source-snapshot'] = self.spec.snapshot_name
     self.create_disk_start_time = time.time()
@@ -554,7 +590,7 @@ class GceDisk(disk.BaseDisk):
     cmd = util.GcloudCommand(
         self, 'compute', 'instances', 'attach-disk', self.attached_vm_name
     )
-    cmd.flags['device-name'] = self.name
+    cmd.flags['device-name'] = self.device_name
     cmd.flags['disk'] = self.name
 
     if self.replica_zones:
@@ -602,7 +638,7 @@ class GceDisk(disk.BaseDisk):
     name = self.name
     pd_args = [
         f'name={name}',
-        f'device-name={name}',
+        f'device-name={self.device_name}',
         f'size={self.spec.disk_size}',
         f'type={self.spec.disk_type}',
         'auto-delete=yes',
@@ -620,7 +656,7 @@ class GceDisk(disk.BaseDisk):
     cmd = util.GcloudCommand(
         self, 'compute', 'instances', 'detach-disk', self.attached_vm_name
     )
-    cmd.flags['device-name'] = self.name
+    cmd.flags['device-name'] = self.device_name
 
     if self.replica_zones:
       cmd.flags['disk-scope'] = REGIONAL_DISK_SCOPE
@@ -632,7 +668,7 @@ class GceDisk(disk.BaseDisk):
   # The path is not updated for Windows machines.
   def GetDevicePath(self):
     """Returns the path to the device inside the VM."""
-    return f'/dev/disk/by-id/google-{self.name}'
+    return f'/dev/disk/by-id/google-{self.device_name}'
 
   def IsNvme(self):
     return self.interface == NVME
