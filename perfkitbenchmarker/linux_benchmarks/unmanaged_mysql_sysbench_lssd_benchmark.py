@@ -49,25 +49,37 @@ def GetConfig(user_config):
   )
 
 
-def PrepareSystem(benchmark_spec):
-  """Prepares the system for the benchmark.
+def Prepare(benchmark_spec):
+  """Prepares the system, installs packages and starts services.
 
-  This includes calling the base PrepareSystem.
+  This benchmark deliberately implements a single Prepare instead of the
+  split PrepareSystem / InstallPackages / StartServices phases, so it does
+  NOT support building a reusable VM or container image from the prepare
+  stage. The local SSDs must be preconditioned with FIO and reformatted
+  before the mysql package is installed: the package creates its data
+  directory on the scratch disk at install time and
+  mysql80.ConfigureAndStartServer does not re-initialize the default datadir,
+  so preconditioning afterwards wipes it and mysqld fails to start. A
+  prebuilt image cannot guarantee that the disk it later runs on has been
+  preconditioned, so the whole sequence has to run in one prepare phase on
+  the VM under test.
 
   Args:
     benchmark_spec: The benchmark specification.
   """
-  # Call base PrepareSystem first, which applies settings and reboots the VM.
-  base_benchmark.PrepareSystem(benchmark_spec)
-
-
-def InstallPackages(benchmark_spec):
-  """Install packages for the benchmark run."""
-  base_benchmark.InstallPackages(benchmark_spec)
   server = benchmark_spec.vm_groups['server'][0]
+
+  # Apply system settings (and reboot the VM) first.
+  base_benchmark.PrepareSystem(benchmark_spec)
   if lssd_workloads_util.LSSD_WORKLOAD_PRECONDITION_DISK.value:
     server.InstallPackages('fio')
+    lssd_workloads_util.PreconditionDisk(server)
+    lssd_workloads_util.CreateFileSystemAndMount(
+        server, fs_type=FLAGS.disk_fs_type
+    )
 
+  # Install mysql on the final filesystem and point its tmpdirs at the LSSD.
+  base_benchmark.InstallPackages(benchmark_spec)
   config_path = mysql80.GetOSDependentDefaults(server.OS_TYPE)[
       mysql80.MYSQL_CONFIG_PATH
   ]
@@ -78,17 +90,7 @@ def InstallPackages(benchmark_spec):
       f" = {MYSQL_DATA_DIR}/tmp|' {config_path}"
   )
 
-
-def StartServices(benchmark_spec):
-  """Start services for the benchmark run."""
-  server = benchmark_spec.vm_groups['server'][0]
-  if lssd_workloads_util.LSSD_WORKLOAD_PRECONDITION_DISK.value:
-    lssd_workloads_util.PreconditionDisk(server)
-    lssd_workloads_util.CreateFileSystemAndMount(
-        server, fs_type=FLAGS.disk_fs_type
-    )
-
-  # Call base StartServices to load DB data and start services
+  # Start mysqld and load the sysbench data.
   base_benchmark.StartServices(benchmark_spec)
   logging.info('Checking disk space after database load...')
   stdout, _ = server.RemoteCommand(f'df -h {MYSQL_DATA_DIR}')

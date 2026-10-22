@@ -34,6 +34,7 @@ def PreconditionDisk(
   """
 
   disk = vm.scratch_disks[0]
+  device_path = disk.GetDevicePath()
 
   logging.info('Prefilling disk with FIO...')
 
@@ -42,17 +43,15 @@ def PreconditionDisk(
   # Striped disk mounted at both DATA_DIR and /mnt/md0
   logging.info('Unmounting disk for raw FIO prefill...')
   vm.RemoteCommand(f'sudo umount -l {disk.mount_point}', ignore_failure=True)
-  vm.RemoteCommand(
-      f'sudo umount -l {disk.device_path}', ignore_failure=True
-  )
+  vm.RemoteCommand(f'sudo umount -l {device_path}', ignore_failure=True)
 
-  logging.info('Discarding blocks on disk %s...', disk.GetDevicePath())
-  vm.RemoteCommand(f'sudo blkdiscard -f {disk.device_path}')
+  logging.info('Discarding blocks on disk %s...', device_path)
+  vm.RemoteCommand(f'sudo blkdiscard -f {device_path}')
 
   fio_cmd = (
       'sudo fio --ioengine=libaio --direct=1 --rw=write --bs=1M '
       '--iodepth=64 --size=100% --group_reporting '
-      f'--name=precondition --filename={disk.device_path}'
+      f'--name=precondition --filename={device_path}'
   )
   logging.info('Running FIO command: %s', fio_cmd)
   stdout, stderr = vm.RobustRemoteCommand(fio_cmd)
@@ -72,26 +71,25 @@ def CreateFileSystemAndMount(
     fs_type: The filesystem type (e.g. 'xfs' or 'ext4').
   """
   disk = vm.scratch_disks[0]
+  device_path = disk.GetDevicePath()
 
   logging.info(
       'Formatting disk %s with filesystem type %s with nodiscard',
-      disk.device_path,
+      device_path,
       fs_type,
   )
   if fs_type == 'xfs':
     # -K in mkfs.xfs means do not discard blocks at mkfs time
-    vm.RemoteCommand(f'sudo mkfs.xfs -f -K {disk.device_path}')
+    vm.RemoteCommand(f'sudo mkfs.xfs -f -K {device_path}')
   elif fs_type == 'ext4':
     # nodiscard in mke2fs is done via -E nodiscard
     vm.RemoteCommand(
         'sudo mke2fs -F -E lazy_itable_init=0,nodiscard -O '
-        f'^has_journal -t ext4 -b 4096 {disk.device_path}'
+        f'^has_journal -t ext4 -b 4096 {device_path}'
     )
   else:
     raise ValueError(f'Unsupported filesystem type: {fs_type}')
 
   logging.info('Remounting disk')
-  vm.MountDisk(
-      disk.device_path, disk.mount_point
-  )
+  vm.MountDisk(device_path, disk.mount_point)
 
