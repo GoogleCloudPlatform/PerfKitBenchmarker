@@ -16,7 +16,6 @@
 
 """Classes to collect and publish performance samples to various sinks."""
 
-
 import abc
 import collections
 import copy
@@ -168,7 +167,7 @@ flags.DEFINE_string(
 )
 
 flags.DEFINE_boolean(
-    'record_log_publisher', True, 'Whether to use the log publisher or not.'
+    'record_log_publisher', False, 'Whether to use the log publisher or not.'
 )
 
 DEFAULT_CREDENTIALS_JSON = 'credentials.json'

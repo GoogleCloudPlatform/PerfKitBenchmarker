@@ -1425,7 +1425,7 @@ def RunBenchmarkTask(
   # Useful format string for debugging.
   benchmark_info = (
       f'{spec.sequence_number}/{spec.total_benchmarks} '
-      f'{spec.name} (UID: {spec.uid})'
+      f'{spec.name} (UID: {spec.uid}, UUID: {spec.uuid}, Owner: {FLAGS.owner})'
   )
 
   result_specs = []

@@ -134,6 +134,7 @@
     default (now it might require to explicitly pass
     --aws_emr_applications=Spark,Hadoop,Hive to get some older benchmarks
     working).
+-   Set --record_log_publisher=False by default.
 
 ### New features:
 
