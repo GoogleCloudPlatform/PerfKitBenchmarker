@@ -191,6 +191,40 @@ class HammerdbcliBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(vm_groups['servers_replicas']['vm_count'], 1)
     self.assertEqual(vm_groups['servers']['vm_count'], 1)
 
+  def testPrepareAzureSqlServerCreatesDatabase(self):
+    FLAGS.cloud = 'Azure'
+    FLAGS.use_managed_db = True
+    FLAGS.hammerdbcli_script = 'tpc_h'
+
+    benchmark_spec = mock.Mock()
+    db = mock.Mock()
+    benchmark_spec.relational_db = db
+    db.spec.high_availability = False
+    db.client_vm = mock.Mock()
+    db.client_vm_query_tools = mock.Mock()
+
+    self.enter_context(
+        mock.patch.object(
+            linux_hammerdb_benchmark, 'GetNumCpus', return_value=4
+        )
+    )
+    self.enter_context(mock.patch.object(linux_hammerdb, 'SetDefaultConfig'))
+    self.enter_context(mock.patch.object(hammerdb, 'SetupConfig'))
+
+    hammerdbcli_benchmark.Prepare(benchmark_spec)
+
+    db.client_vm_query_tools.IssueSqlCommand.assert_has_calls([
+        mock.call(
+            """IF EXISTS (SELECT name from sys.databases WHERE (name = N'tpch'))
+          BEGIN
+              ALTER DATABASE [tpch] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+              DROP DATABASE [tpch];
+          END;""",
+            timeout=1200,
+        ),
+        mock.call('CREATE DATABASE [tpch];'),
+    ])
+
 
 if __name__ == '__main__':
   unittest.main()

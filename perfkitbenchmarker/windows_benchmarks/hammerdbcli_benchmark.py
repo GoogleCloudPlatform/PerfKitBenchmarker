@@ -171,12 +171,15 @@ def Prepare(benchmark_spec):
   max_retries = 3
   for tries in range(max_retries):
     try:
-      # Close all existing connections to tpcc database, roll back their
-      # transactions and drop tpcc database if it exists for retry
-      drop_sql = """IF EXISTS (SELECT name from sys.databases WHERE (name = N'tpcc'))
+      # Close all existing connections to tpcc or tpch database, roll back their
+      # transactions and drop database if it exists for retry
+      db_name = linux_hammerdb.MAP_SCRIPT_TO_DATABASE_NAME[
+          linux_hammerdb.HAMMERDB_SCRIPT.value
+      ]
+      drop_sql = f"""IF EXISTS (SELECT name from sys.databases WHERE (name = N'{db_name}'))
           BEGIN
-              ALTER DATABASE tpcc SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
-              DROP DATABASE tpcc;
+              ALTER DATABASE [{db_name}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+              DROP DATABASE [{db_name}];
           END;"""
       db.client_vm_query_tools.IssueSqlCommand(drop_sql, timeout=60 * 20)
 
@@ -185,16 +188,17 @@ def Prepare(benchmark_spec):
           benchmark_spec.relational_db.spec.high_availability
           and benchmark_spec.relational_db.spec.high_availability_type == 'AOAG'
       ):
-        db_name = linux_hammerdb.MAP_SCRIPT_TO_DATABASE_NAME[
-            linux_hammerdb.HAMMERDB_SCRIPT.value
-        ]
         db.client_vm_query_tools.IssueSqlCommand("""CREATE DATABASE [{0}];
             BACKUP DATABASE [{0}] TO DISK = 'F:\\Backup\\{0}.bak';
             ALTER AVAILABILITY GROUP [{1}] ADD DATABASE [{0}];
             """.format(db_name, sql_engine_utils.SQLSERVER_AOAG_NAME))
-      elif is_azure and hammerdb.HAMMERDB_SCRIPT.value == 'tpc_c':
+      elif is_azure and (
+          hammerdb.HAMMERDB_SCRIPT.value in ('tpc_c', 'tpc_h')
+      ):
         # Create the database first only Azure requires creating the database.
-        db.client_vm_query_tools.IssueSqlCommand('CREATE DATABASE tpcc;')
+        db.client_vm_query_tools.IssueSqlCommand(
+            f'CREATE DATABASE [{db_name}];'
+        )
 
       hammerdb.SetupConfig(
           vm,
