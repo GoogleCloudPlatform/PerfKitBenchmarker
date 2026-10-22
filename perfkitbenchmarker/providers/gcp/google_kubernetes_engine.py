@@ -34,6 +34,7 @@ from perfkitbenchmarker.providers.gcp import gce_disk
 from perfkitbenchmarker.providers.gcp import gce_network
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 from perfkitbenchmarker.providers.gcp import util
+from perfkitbenchmarker.providers.gcp.gke_capacity_buffer import GkeCapacityBuffer
 from perfkitbenchmarker.resources.container_service import container
 from perfkitbenchmarker.resources.container_service import container_cluster
 from perfkitbenchmarker.resources.container_service import container_registry
@@ -97,7 +98,7 @@ class GoogleArtifactRegistry(container_registry.BaseContainerRegistry):
     """Configures docker to be able to push to remote repo."""
     util.GcloudCommand(self, 'auth', 'configure-docker', self.endpoint).Issue()
 
-  def _Create(self):
+  def _Create(self) -> None:
     self.Login()
     util.GcloudCommand(
         self,
@@ -109,7 +110,7 @@ class GoogleArtifactRegistry(container_registry.BaseContainerRegistry):
         f'--location={self.region}',
     ).Issue()
 
-  def _Delete(self):
+  def _Delete(self) -> None:
     util.GcloudCommand(
         self,
         'artifacts',
@@ -193,6 +194,7 @@ class BaseGkeCluster(kubernetes_cluster.KubernetesCluster):
       ]
       self.tpu_topology = nodepool_config.tpu_topology
       self.tpu_count = nodepool_config.tpu_count
+    self.capacity_buffer = None
 
   def GetResourceMetadata(self) -> dict[str, Any]:
     """Returns a dict containing metadata about the cluster.
@@ -201,6 +203,9 @@ class BaseGkeCluster(kubernetes_cluster.KubernetesCluster):
       dict mapping string property key to value.
     """
     metadata = super().GetResourceMetadata()
+    if FLAGS.gke_enable_capacity_buffer:
+      metadata['capacity_buffer_strategy'] = FLAGS.gke_capacity_buffer_strategy
+      metadata['capacity_buffer_cpu'] = FLAGS.gke_capacity_buffer_cpu
     metadata['project'] = self.project
     if self.release_channel:
       metadata['release_channel'] = self.release_channel
@@ -214,6 +219,12 @@ class BaseGkeCluster(kubernetes_cluster.KubernetesCluster):
       metadata['gpu_type'] = self.tpu_type
       metadata['gpu_count'] = self.tpu_count
     return metadata
+
+  def _PostCreate(self):
+    super()._PostCreate()
+    if FLAGS.gke_enable_capacity_buffer:
+      self.capacity_buffer = GkeCapacityBuffer(self.cluster_spec)
+      self.capacity_buffer.Create()
 
   def _GcloudCommand(self, *args, **kwargs) -> util.GcloudCommand:
     """Creates a gcloud command."""
@@ -309,8 +320,10 @@ class BaseGkeCluster(kubernetes_cluster.KubernetesCluster):
     stdout, _, _ = cmd.Issue(raise_on_failure=False)
     return True if stdout else False
 
-  def _Delete(self):
+  def _Delete(self) -> None:
     """Deletes the cluster."""
+    if self.capacity_buffer:
+      self.capacity_buffer.Delete()
     super()._Delete()
     cmd = self._GcloudCommand('container', 'clusters', 'delete', self.name)
     cmd.args.append('--async')
@@ -321,7 +334,7 @@ class BaseGkeCluster(kubernetes_cluster.KubernetesCluster):
       # Cluster is running incompatible operation operation-id.
       raise errors.Resource.RetryableDeletionError(err)
 
-  def _Exists(self):
+  def _Exists(self) -> bool:
     """Returns True if the cluster exits."""
     cmd = self._GcloudCommand('container', 'clusters', 'describe', self.name)
     _, _, retcode = cmd.Issue(raise_on_failure=False)
@@ -530,7 +543,7 @@ class GkeCluster(BaseGkeCluster):
     result.update(self._cached_nodepool_vm_ids)
     return result
 
-  def _Create(self):
+  def _Create(self) -> None:
     """Creates the cluster."""
     cmd = self._GcloudCommand('container', 'clusters', 'create', self.name)
     if gcp_flags.GKE_ENABLE_SHIELDED_NODES.value:
@@ -1105,7 +1118,7 @@ class GkeAutopilotCluster(BaseGkeCluster):
     cmd.flags['region'] = self.region
     return cmd
 
-  def _Create(self):
+  def _Create(self) -> None:
     """Creates the cluster."""
     cmd = self._GcloudCommand(
         'container',
@@ -1301,3 +1314,4 @@ class GkeGclusterCluster(BaseGkeCluster):
         ],
         timeout=self.TIMEOUT,
     )
+

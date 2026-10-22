@@ -19,6 +19,22 @@ from perfkitbenchmarker import dpb_constants
 # Sentinel value for unspecified platform.
 GCP_MIN_CPU_PLATFORM_NONE = 'none'
 
+flags.DEFINE_boolean(
+    'gke_enable_capacity_buffer', False, 'Enable Capacity Buffer'
+)
+flags.DEFINE_string(
+    'gke_capacity_buffer_strategy',
+    'Standby',
+    'Standby or Active',
+)
+flags.DEFINE_string('gke_capacity_buffer_cpu', '10', 'CPU reservation')
+flags.DEFINE_string(
+    'gke_capacity_buffer_compute_class',
+    None,
+    'Compute class for the capacity buffer (e.g. Performance). '
+    'Required for GKE Autopilot node-based billing.',
+)
+
 flags.DEFINE_string('gcloud_path', 'gcloud', 'The path for the gcloud utility.')
 flags.DEFINE_list(
     'additional_gcloud_flags', [], 'Additional flags to pass to gcloud.'

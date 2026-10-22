@@ -1,0 +1,22 @@
+kubernetes_hpa:
+  # Define the cluster environment for a full benchmarking run
+  container_cluster:
+    cloud: GCP
+    type: Kubernetes
+    min_vm_count: 1
+    max_vm_count: 50
+    vm_spec:
+      GCP:
+        # Define the specific CPU type requested
+        machine_type: n4-standard-4
+        zone: us-central1-a,us-central1-b,us-central1-c
+  flags:
+    # Capacity Buffer setup
+    gke_enable_capacity_buffer: True
+    gke_capacity_buffer_strategy: Active
+    gke_capacity_buffer_cpu: "20"
+
+    # Load Generation / QPS
+    # Note: The actual QPS (150 RPS peak) is hardcoded in the locust python script.
+    # We point the benchmark to the ramp-up script to generate the load.
+    locust_path: locust/rampup.py

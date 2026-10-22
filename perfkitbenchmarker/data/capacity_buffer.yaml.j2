@@ -1,0 +1,34 @@
+apiVersion: v1
+kind: PodTemplate
+metadata:
+  name: buffer-unit-template
+template:
+  metadata:
+    labels:
+      app: buffer-unit
+  spec:
+{% if compute_class %}
+    nodeSelector:
+      cloud.google.com/compute-class: "{{ compute_class }}"
+{% endif %}
+    containers:
+    - name: buffer-container
+      image: registry.k8s.io/pause:3.9
+      resources:
+        requests:
+          cpu: "{{ unit_cpu | default('1') }}"
+          memory: "{{ unit_memory | default('1Gi') }}"
+---
+apiVersion: autoscaling.x-k8s.io/v1beta1
+kind: CapacityBuffer
+metadata:
+  name: {{ buffer_name }}
+{% if provisioning_strategy == "buffer.gke.io/standby-capacity" %}
+  annotations:
+    buffer.gke.io/standby-capacity-init-time: "2m"
+{% endif %}
+spec:
+  podTemplateRef:
+    name: buffer-unit-template
+  replicas: {{ (cpu | int) // (unit_cpu | default('1') | int) }}
+  provisioningStrategy: "{{ provisioning_strategy }}"
