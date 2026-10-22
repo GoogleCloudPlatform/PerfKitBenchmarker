@@ -1,0 +1,94 @@
+# OpenSearch single-node StatefulSet + headless Service (clusterIP: None)
+# Rendered by kubernetes_opensearch_esrally_benchmark.py Prepare().
+#
+# Template variables:
+#   k8s_namespace      - Kubernetes namespace (default: 'default')
+#   opensearch_version - OpenSearch image tag, e.g. 2.13.0
+#   opensearch_port    - HTTP port, e.g. 9200
+#
+# Nodes in the 'servers' nodepool are selected via the pkb_nodepool label
+# which PKB sets automatically during nodepool creation.
+# An initContainer sets vm.max_map_count=262144 which OpenSearch requires.
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: opensearch
+  namespace: {{ k8s_namespace | default('default') }}
+  labels:
+    app: opensearch
+    pkb: "true"
+spec:
+  selector:
+    app: opensearch
+  ports:
+  - name: http
+    port: {{ opensearch_port }}
+    targetPort: {{ opensearch_port }}
+  clusterIP: None
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: opensearch
+  namespace: {{ k8s_namespace | default('default') }}
+  labels:
+    app: opensearch
+    pkb: "true"
+spec:
+  # No volumeClaimTemplates: OpenSearch data lives on ephemeral pod
+  # storage, giving each PKB run a clean index (intentional).
+  serviceName: opensearch
+  replicas: 1
+  selector:
+    matchLabels:
+      app: opensearch
+  template:
+    metadata:
+      labels:
+        app: opensearch
+        pkb: "true"
+    spec:
+      nodeSelector:
+        pkb_nodepool: servers
+      tolerations:
+      - operator: Exists
+      initContainers:
+      - name: sysctl
+        image: busybox:1.36
+        command:
+        - sysctl
+        - -w
+        - vm.max_map_count=262144
+        securityContext:
+          privileged: true
+      containers:
+      - name: opensearch
+        image: opensearchproject/opensearch:{{ opensearch_version }}
+        ports:
+        - name: http
+          containerPort: {{ opensearch_port }}
+        env:
+        - name: discovery.type
+          value: single-node
+        - name: DISABLE_SECURITY_PLUGIN
+          value: "true"
+        - name: OPENSEARCH_JAVA_OPTS
+          value: "-Xms4g -Xmx4g"
+        - name: bootstrap.memory_lock
+          value: "false"
+        resources:
+          requests:
+            memory: "8Gi"
+            cpu: "2"
+          limits:
+            memory: "16Gi"
+            cpu: "4"
+        readinessProbe:
+          httpGet:
+            path: /_cluster/health
+            port: {{ opensearch_port }}
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 12
