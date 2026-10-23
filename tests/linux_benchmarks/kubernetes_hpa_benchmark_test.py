@@ -47,6 +47,45 @@ class KubernetesMetricsCollectorTest(pkb_common_test_case.PkbCommonTestCase):
     with self.assertRaises(AssertionError):
       self.kmc._Observe(sampler.get_sample)
 
+  def testParsePodScaleOutLatency(self):
+    with mock.patch.object(
+        kubernetes_hpa_benchmark.kubernetes_commands.kubectl,
+        'RunKubectlCommand',
+        return_value=('{"items": []}', '', 0)
+    ):
+      with mock.patch.object(
+          kubernetes_hpa_benchmark,
+          '_ParsePodReadyLatencies',
+          return_value=[5.0, 8.0]
+      ):
+        latencies = self.kmc._ParsePodScaleOutLatency('namespace', 'label')
+        self.assertEqual(latencies, [5.0, 8.0])
+
+  def testEmitMetrics(self):
+    with mock.patch.object(
+        self.kmc,
+        '_ParsePodScaleOutLatency',
+        return_value=[
+            1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0
+        ]
+    ):
+      self.kmc.EmitMetrics('namespace', 'label', {'meta': 'data'})
+
+      metrics_by_name = {s.metric: s.value for s in self.samples}
+      self.assertEqual(
+          metrics_by_name['time_to_ready_pod_scale_out_seconds_p50'], 6.0)
+      self.assertEqual(
+          metrics_by_name['time_to_ready_pod_scale_out_seconds_p90'], 10.0)
+      self.assertEqual(
+          metrics_by_name['time_to_ready_pod_scale_out_seconds_p99'], 10.0)
+      self.assertEqual(
+          metrics_by_name['time_to_ready_pod_scale_out_seconds_max'], 10.0)
+      self.assertEqual(
+          metrics_by_name['time_to_ready_pod_scale_out_seconds_average'], 5.5)
+
+      for s in self.samples:
+        self.assertEqual(s.metadata, {'meta': 'data'})
+
 
 class Sampler:
 
@@ -116,6 +155,31 @@ class HpaBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertIn('image: ubuntu:latest', full_logs)
     self.assertNotIn('template: {}', full_logs)
 
+
+class KubernetesHpaBenchmarkCustomTest(pkb_common_test_case.PkbCommonTestCase):
+
+  def testParsePodReadyLatencies(self):
+    mock_stdout = (
+        '{"items": [{"metadata": {"creationTimestamp": "2026-08-14T05:00:00Z"},'
+        ' "status": {"conditions": [{"type": "Ready", "status": "True", '
+        '"lastTransitionTime": "2026-08-14T05:00:05Z"}]}}, '
+        '{"metadata": {"creationTimestamp": "2026-08-14T05:00:00Z"}, '
+        '"status": {"conditions": [{"type": "Ready", "status": "True", '
+        '"lastTransitionTime": "2026-08-14T05:00:08Z"}]}}]}'
+    )
+    latencies = kubernetes_hpa_benchmark._ParsePodReadyLatencies(mock_stdout)
+    self.assertEqual(latencies, [5.0, 8.0])
+
+  def testParsePodReadyLatencies_NotReady(self):
+    mock_stdout = (
+        '{"items": [{"metadata": {"creationTimestamp": "2026-08-14T05:00:00Z"},'
+        ' "status": {"conditions": [{"type": "Ready", "status": "False", '
+        '"lastTransitionTime": "2026-08-14T05:00:05Z"}]}}]}'
+    )
+    with self.assertRaises(errors.Resource.RetryableGetError) as context:
+      kubernetes_hpa_benchmark._ParsePodReadyLatencies(mock_stdout)
+    self.assertIn('Not all bursting pods are ready yet.',
+                  str(context.exception))
 
 if __name__ == '__main__':
   unittest.main()

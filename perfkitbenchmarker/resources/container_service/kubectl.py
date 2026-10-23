@@ -106,8 +106,6 @@ def RunKubectlCommand(
     # Else, revert to user supplied kwargs values.
     if orig_suppress_failure is not None:
       return orig_suppress_failure(stdout, stderr, retcode)
-    if 'raise_on_failure' in kwargs:
-      return not kwargs['raise_on_failure']
     return False
 
   kwargs['suppress_failure'] = _DetectTimeoutViaSuppressFailure

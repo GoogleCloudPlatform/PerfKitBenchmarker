@@ -12,9 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Runs a locust based hpa benchmark on a k8s cluster."""
-
 from collections.abc import Callable
+import datetime
 import functools
+import json
 import logging
 import threading
 import typing
@@ -161,6 +162,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[Sample]:
       ],
       max_concurrent_threads=3,
   )
+  kmc.EmitMetrics('fib', 'app=fib', cluster.GetResourceMetadata())
 
   return samples
 
@@ -176,6 +178,46 @@ def PollServer(vm: virtual_machine.BaseVirtualMachine, addr: str) -> None:
     raise errors.Resource.RetryableGetError(
         'Failed to contact server; got failing response: %s' % response
     )
+
+
+def _ParsePodReadyLatencies(stdout: str) -> List[float]:
+  """Parses kubectl get pods JSON output to compute scale-out latencies."""
+  data = json.loads(stdout)
+  if not data.get('items'):
+    raise errors.Resource.RetryableGetError('No pods found yet.')
+
+  latencies = []
+  all_ready = True
+
+  for pod in data.get('items', []):
+    creation_ts = pod.get('metadata', {}).get('creationTimestamp')
+    if not creation_ts:
+      continue
+
+    ready_condition = next(
+        (c for c in pod.get('status', {}).get('conditions', [])
+         if c.get('type') == 'Ready'), None)
+    if not ready_condition or ready_condition.get('status') != 'True':
+      all_ready = False
+      break
+
+    ready_ts = ready_condition.get('lastTransitionTime')
+    if not ready_ts:
+      continue
+
+    create_dt = datetime.datetime.fromisoformat(
+        creation_ts.replace('Z', '+00:00'))
+    ready_dt = datetime.datetime.fromisoformat(
+        ready_ts.replace('Z', '+00:00'))
+
+    latency = (ready_dt - create_dt).total_seconds()
+    latencies.append(latency)
+
+  if not all_ready:
+    raise errors.Resource.RetryableGetError(
+        'Not all bursting pods are ready yet.')
+
+  return latencies
 
 
 class KubernetesMetricsCollector:
@@ -263,6 +305,69 @@ class KubernetesMetricsCollector:
           )
         assert success_count / (success_count + failure_count) >= 0.90
         return
+
+  @vm_util.Retry(
+      poll_interval=10,
+      max_retries=30,
+      retryable_exceptions=(errors.Resource.RetryableGetError,),
+  )
+  def _ParsePodScaleOutLatency(
+      self, namespace: str, label_selector: str) -> List[float]:
+    """Extracts burst pod startup latencies from Kubernetes event streams.
+
+    To accurately capture the real-world latency impact of bypassing cold VM
+    provisioning delays during traffic spikes, we extract the precise delta
+    between PodCreated and PodReady events for the newly scaled replicas.
+
+    Args:
+      namespace: The strict namespace to query.
+      label_selector: The label selector to filter events for bursting pods.
+
+    Returns:
+      A list of all latencies observed for pod readiness.
+    """
+    cmd = [
+        'get', 'pods', '-n', namespace, '-l', label_selector,
+        '-o', 'json'
+    ]
+    try:
+      stdout, _, _ = kubernetes_commands.kubectl.RunKubectlCommand(
+          cmd, raise_on_failure=True)
+    except errors.VmUtil.IssueCommandError as e:
+      raise errors.Resource.RetryableGetError(f'kubectl failed: {e}')
+
+    return _ParsePodReadyLatencies(stdout)
+
+  def EmitMetrics(
+      self, namespace: str, label_selector: str,
+      base_metadata: dict[str, typing.Any]) -> None:
+    """Emits performance metrics."""
+    latencies = self._ParsePodScaleOutLatency(namespace, label_selector)
+    if not latencies:
+      return
+
+    logging.info('Collected ready latency metrics for %d pods', len(latencies))
+
+    latencies_sorted = sorted(latencies)
+    count = len(latencies_sorted)
+
+    metrics = {
+        'p50': latencies_sorted[int(count * 0.50)],
+        'p90': latencies_sorted[int(count * 0.90)],
+        'p99': latencies_sorted[int(count * 0.99)],
+        'max': latencies_sorted[-1],
+        'average': sum(latencies_sorted) / count,
+    }
+
+    for suffix, val in metrics.items():
+      self._samples.append(
+          Sample(
+              f'time_to_ready_pod_scale_out_seconds_{suffix}',
+              val,
+              'seconds',
+              base_metadata,
+          )
+      )
 
 
 def Cleanup(benchmark_spec):
