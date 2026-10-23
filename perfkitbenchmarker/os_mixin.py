@@ -280,7 +280,8 @@ class BaseOsMixin(command_interface.CommandInterface, metaclass=abc.ABCMeta):
       if vm_bootable_time != self.VMLastBootTime():
         break
     reboot_duration_sec = time.time() - before_reboot_timestamp
-    self._AfterReboot()
+    if not FLAGS.skip_vm_preparation:
+      self._AfterReboot()
     return reboot_duration_sec
 
   def _BeforeSuspend(self):
