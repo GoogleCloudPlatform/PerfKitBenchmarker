@@ -37,8 +37,9 @@ fio_managed_lustre:
     data_disk_type: lustre
     scratch_dir: lustre_dir
     fio_target_mode: against_file_with_fill
-    fio_generate_scenarios: rand_4k_read_100GB_iodepth-1_numjobs-1,rand_4k_write_100GB_iodepth-1_numjobs-1
-    fio_fill_size: 100G
+    fio_generate_scenarios: rand_4k_read_1000000MB_iodepth-1_numjobs-1,rand_4k_write_1000000MB_iodepth-1_numjobs-1
+    fio_fill_size: 1000000M
+    fio_fill_block_size: 2M
     fio_ioengine: sync
     fio_ramptime: 0
     fio_runtime: 900
