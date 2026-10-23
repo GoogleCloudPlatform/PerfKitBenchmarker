@@ -301,6 +301,9 @@
 -   Add dpb_tpcx_bb_benchmark, which runs the TPCx-BB (BigBench) kit with its
     spark_sql engine on Spark on YARN on an unmanaged Hadoop cluster and reports
     BBQpm@SF.
+-   Add Oracle Cloud Infrastructure (OCI) as a new provider, supporting VMs
+    (Ubuntu 22.04/24.04, Oracle Linux 8/9), VCN networking with firewall rules,
+    and block volume scratch disks. (GH-7174 from @gadgilrajeev)
 
 ### Enhancements:
 
