@@ -297,7 +297,9 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
     else:
       raise NotImplementedError(
           "Invalid database engine version: {}. "
-          "Only 2019 and 2022 are supported.".format(self.spec.engine_version)
+          "Only 2019, 2022 and 2025 are supported.".format(
+              self.spec.engine_version
+          )
       )
 
     if self.server_vm.OS_TYPE == os_types.UBUNTU2404:
@@ -883,12 +885,13 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
     return_value: str = None  # pyrefly: ignore[bad-assignment]
     sql_srv_version_prefix = "sqlserver_"
     sql_srv_supported_versions = [
+        "2025",
         "2022",
         "2019",
         "2017",
         "2016",
         "2014",
-        "2012"
+        "2012",
     ]
 
     for version in sql_srv_supported_versions:

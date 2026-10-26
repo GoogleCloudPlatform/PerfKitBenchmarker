@@ -182,6 +182,23 @@ def Prepare(benchmark_spec):
               DROP DATABASE [{db_name}];
           END;"""
       db.client_vm_query_tools.IssueSqlCommand(drop_sql, timeout=60 * 20)
+      if db.engine_type == sql_engine_utils.SQLSERVER and (
+          '2025' in (db.spec.engine_version or '')
+          or (
+              hasattr(db, 'server_vm')
+              and db.GetSQLServerVersion(db.server_vm) == '2025'
+          )
+      ):
+        # Enable trace flag 4671 to disable PBKDF2 hashing for SQL Server 2025.
+        # Reset password to use SQL 2022 hashing algorithm.
+        db.client_vm_query_tools.IssueSqlCommand(
+            'DBCC TRACEON (4671, -1);', timeout=60 * 20
+        )
+        db.client_vm_query_tools.IssueSqlCommand(
+            f'ALTER LOGIN {db.spec.database_username} WITH PASSWORD ='
+            f" '{db.spec.database_password}' ;",
+            timeout=60 * 20,
+        )
 
       is_azure = FLAGS.cloud == 'Azure' and FLAGS.use_managed_db
       if (
