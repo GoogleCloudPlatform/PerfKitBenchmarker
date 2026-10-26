@@ -16,7 +16,10 @@
 
 import unittest
 
+import mock
 from perfkitbenchmarker import beam_pipeline_options
+from perfkitbenchmarker import errors
+from perfkitbenchmarker.resources.container_service import kubernetes_commands
 
 
 class BeamArgsOptionsTestCase(unittest.TestCase):
@@ -93,6 +96,42 @@ class BeamArgsOptionsTestCase(unittest.TestCase):
 
   def dynamicPipelineOptions(self):
     beam_pipeline_options.EvaluateDynamicPipelineOptions()
+
+
+class DynamicPipelineOptionFailureTestCase(unittest.TestCase):
+  """Tests dynamic pipeline options whose values cannot be resolved."""
+
+  # pylint: disable=invalid-name
+
+  @mock.patch.object(
+      kubernetes_commands, "GetWithWaitForContents", return_value=""
+  )
+  def testNodePortIpNotFound(self, _):
+    """Raises a config error when no pod IP address is available."""
+    dynamic_options = [
+        {"name": "node_port", "type": "NodePortIp", "podLabel": "app=test"}
+    ]
+
+    with self.assertRaises(errors.Config.InvalidValue) as raised:
+      beam_pipeline_options.EvaluateDynamicPipelineOptions(dynamic_options)
+
+    self.assertIn("NodePort IP address", str(raised.exception))
+
+  @mock.patch.object(
+      kubernetes_commands, "GetWithWaitForContents", return_value=""
+  )
+  def testLoadBalancerIpNotFound(self, _):
+    """Raises a config error when no load balancer IP address is available."""
+    dynamic_options = [{
+        "name": "load_balancer",
+        "type": "LoadBalancerIp",
+        "serviceName": "test-service",
+    }]
+
+    with self.assertRaises(errors.Config.InvalidValue) as raised:
+      beam_pipeline_options.EvaluateDynamicPipelineOptions(dynamic_options)
+
+    self.assertIn("LoadBalancer IP address", str(raised.exception))
 
 
 if __name__ == "__main__":
