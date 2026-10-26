@@ -29,6 +29,37 @@ node   0   1
   1:  20  10
 """
 
+# Two sockets with NPS=2, i.e. two NUMA nodes per socket: nodes 0-1 are near
+# each other and far from nodes 2-3.
+FOUR_NUMA_NODES = """
+available: 4 nodes (0-3)
+node 0 cpus: 0 1 2 3
+node 0 size: 120889 MB
+node 0 free: 120312 MB
+node 1 cpus: 4 5 6 7
+node 1 size: 120889 MB
+node 1 free: 120312 MB
+node 2 cpus: 8 9 10 11
+node 2 size: 120889 MB
+node 2 free: 120312 MB
+node 3 cpus: 12 13 14 15
+node 3 size: 120889 MB
+node 3 free: 120312 MB
+node distances:
+node   0   1   2   3
+  0:  10  12  32  32
+  1:  12  10  32  32
+  2:  32  32  10  12
+  3:  32  32  12  10
+"""
+
+NO_DISTANCE_MATRIX = """
+available: 1 nodes (0)
+node 0 cpus: 0 1 2 3 4 5 6 7
+node 0 size: 32116 MB
+node 0 free: 13798 MB
+"""
+
 
 def MockVm(
     run_cmd_response: dict[str, str], allowed_cpus_arg: set[int] | None = None
@@ -179,6 +210,52 @@ class NumactlTest(parameterized.TestCase):
       responses['cat /sys/fs/cgroup/cpuset.cpus.effective'] = cpus_allowed_list
     actual_mems = numactl.GetNumaMemory(MockVm(responses, cpu_allowed_set))
     self.assertEqual(mems, actual_mems)
+
+  @parameterized.named_parameters(
+      ('singlenode', SINGLE_NUMA_NODE, {0: {0: 10}}),
+      (
+          'twonode',
+          TWO_NUMA_NODES,
+          {0: {0: 10, 1: 20}, 1: {0: 20, 1: 10}},
+      ),
+      (
+          'four_nodes_two_sockets',
+          FOUR_NUMA_NODES,
+          {
+              0: {0: 10, 1: 12, 2: 32, 3: 32},
+              1: {0: 12, 1: 10, 2: 32, 3: 32},
+              2: {0: 32, 1: 32, 2: 10, 3: 12},
+              3: {0: 32, 1: 32, 2: 12, 3: 10},
+          },
+      ),
+      ('no_distance_matrix', NO_DISTANCE_MATRIX, {}),
+  )
+  def testGetNumaDistances(self, numactl_text, expected_distances):
+    mock_vm = MockVm({'numactl --hardware': numactl_text})
+    self.assertEqual(expected_distances, numactl.GetNumaDistances(mock_vm))
+
+  @parameterized.named_parameters(
+      ('empty', {}, ''),
+      ('singlenode', {0: 10}, '10:[0]'),
+      ('twonode', {0: 10, 1: 20}, '10:[0], 20:[1]'),
+      (
+          'four_nodes_two_sockets',
+          {0: 10, 1: 12, 2: 32, 3: 32},
+          '10:[0], 12:[1], 32:[2-3]',
+      ),
+      (
+          'sixteen_nodes_four_sockets',
+          {0: 10, 1: 12, 2: 12, 3: 12, **{n: 32 for n in range(4, 16)}},
+          '10:[0], 12:[1-3], 32:[4-15]',
+      ),
+      (
+          'non_contiguous',
+          {0: 32, 1: 10, 2: 12, 3: 32},
+          '10:[1], 12:[2], 32:[0,3]',
+      ),
+  )
+  def testFormatNumaDistances(self, node_distances, expected):
+    self.assertEqual(expected, numactl.FormatNumaDistances(node_distances))
 
 
 if __name__ == '__main__':

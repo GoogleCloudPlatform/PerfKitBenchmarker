@@ -71,7 +71,7 @@ AZURE_REPLICATION_MAP = {
     # and (RA)GRS, because those are asynchronously replicated.
 }
 
-LOCAL_SSD_PREFIXES = {'Standard_D', 'Standard_G', 'Standard_L'}
+LOCAL_SSD_PREFIXES = {'Standard_D', 'Standard_G', 'Standard_HB', 'Standard_L'}
 
 AZURE_NVME_TYPES = [
     r'(Standard_L[0-9]+s_v2)',
@@ -80,6 +80,8 @@ AZURE_NVME_TYPES = [
     r'(Standard_L[0-9]+aos_v4)',
     r'(Standard_D[0-9]+[ap]?ds_v6)',
     r'(Standard_D[0-9]+[ap]?ds_v7)',
+    r'(Standard_HB[0-9]+(-[0-9]+)?rs_v4)',
+    r'(Standard_HB[0-9]+(-[0-9]+)?rs_v5)',
 ]
 
 # https://docs.microsoft.com/en-us/azure/virtual-machines/azure-vms-no-temp-disk
