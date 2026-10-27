@@ -49,16 +49,28 @@ class K8sAgentSandboxSpecTest(pkb_common_test_case.PkbCommonTestCase):
   def testFlagsOverrideConfig(self):
     FLAGS['agent_sandbox_manifest_ref'].parse('deadbeef')
     FLAGS['agent_sandbox_runtime_class'].parse('gvisor')
+    FLAGS['agent_sandbox_cpu_request'].parse('50m')
+    FLAGS['agent_sandbox_cpu_limit'].parse('500m')
     FLAGS['agent_sandbox_warmpool_replicas'].parse(7)
     FLAGS['agent_sandbox_controller_claim_workers'].parse(12)
+    FLAGS['agent_sandbox_controller_sandbox_workers'].parse(300)
+    FLAGS['agent_sandbox_controller_warmpool_workers'].parse(40)
+    FLAGS['agent_sandbox_controller_api_connections'].parse(8)
+    FLAGS['agent_sandbox_tune_apf_workload_low'].parse(True)
     spec = self._Decode()
     self.assertEqual(spec.manifest_ref, 'deadbeef')
+    self.assertTrue(spec.tune_apf_workload_low)
     assert spec.sandbox_template is not None
     self.assertEqual(spec.sandbox_template.runtime_class, 'gvisor')
+    self.assertEqual(spec.sandbox_template.cpu_request, '50m')
+    self.assertEqual(spec.sandbox_template.cpu_limit, '500m')
     assert spec.sandbox_warmpool is not None
     self.assertEqual(spec.sandbox_warmpool.replicas, 7)
     assert spec.controller is not None
     self.assertEqual(spec.controller.claim_workers, 12)
+    self.assertEqual(spec.controller.sandbox_workers, 300)
+    self.assertEqual(spec.controller.warmpool_workers, 40)
+    self.assertEqual(spec.controller.api_connections, 8)
 
   def testExplicitNoneSubSpecsFallBackToDefaults(self):
     spec = self._Decode(
@@ -69,6 +81,18 @@ class K8sAgentSandboxSpecTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertIsNotNone(spec.controller)
     self.assertIsNotNone(spec.sandbox_template)
     self.assertIsNotNone(spec.sandbox_warmpool)
+
+  def testControllerSpecExplicitNoneFields(self):
+    ctrl_spec = k8s_agent_sandbox_spec.ControllerSpec(
+        'test.controller',
+        flag_values=FLAGS,
+        claim_workers=None,
+        sandbox_workers=None,
+        kube_api_qps=None,
+    )
+    self.assertIsNone(ctrl_spec.claim_workers)
+    self.assertIsNone(ctrl_spec.sandbox_workers)
+    self.assertIsNone(ctrl_spec.kube_api_qps)
 
 
 class K8sAgentSandboxTest(pkb_common_test_case.PkbCommonTestCase):
@@ -113,12 +137,14 @@ class K8sAgentSandboxTest(pkb_common_test_case.PkbCommonTestCase):
 
   @mock.patch.object(k8s_agent_sandbox.kubernetes_commands, 'ApplyYaml')
   def testApplySandboxTemplateSchedulingAndRuntimeClass(self, mock_apply_yaml):
-    template_spec = mock.Mock()
-    template_spec.runtime_class = 'runsc'
-    template_spec.image = 'img:latest'
-    template_spec.cpu_request = '500m'
-    template_spec.memory_request = '256Mi'
-    template_spec.labels = {'sandbox': 'python-sandbox-bench'}
+    template_spec = k8s_agent_sandbox_spec.SandboxTemplateSpec(
+        'test.sandbox_template',
+        runtime_class='runsc',
+        image='img:latest',
+        cpu_request='500m',
+        memory_request='256Mi',
+        labels={'sandbox': 'python-sandbox-bench'},
+    )
     sandbox = _CreateSandbox()
     sandbox.spec.namespace = 'custom-ns'
     node_selector, tolerations = sandbox._SandboxSchedulingInternal(
@@ -202,7 +228,7 @@ class K8sAgentSandboxTest(pkb_common_test_case.PkbCommonTestCase):
   def testGetResourceMetadata(self):
     sandbox = _CreateSandbox()
     metadata = sandbox.GetResourceMetadata()
-    self.assertEqual(metadata['agent_sandbox_manifest_ref'], 'v1.0.4')
+    self.assertEqual(metadata['agent_sandbox_manifest_ref'], 'v1.0.8')
     self.assertEqual(metadata['agent_sandbox_namespace'], 'default')
     self.assertEqual(metadata['agent_sandbox_nodepool'], 'sandbox')
     self.assertEqual(
@@ -210,9 +236,13 @@ class K8sAgentSandboxTest(pkb_common_test_case.PkbCommonTestCase):
         'sandbox.gke.io/runtime=runsc:NoSchedule',
     )
     self.assertIn('agent_sandbox_controller_image', metadata)
-    self.assertEqual(metadata['agent_sandbox_controller_claim_workers'], 100)
+    self.assertEqual(metadata['agent_sandbox_controller_claim_workers'], 150)
+    self.assertEqual(metadata['agent_sandbox_controller_sandbox_workers'], 200)
+    self.assertEqual(metadata['agent_sandbox_controller_replicas'], 2)
+    self.assertEqual(metadata['agent_sandbox_controller_api_connections'], 4)
     self.assertEqual(metadata['agent_sandbox_runtime_class'], 'runsc')
     self.assertEqual(metadata['agent_sandbox_warmpool_replicas'], 150)
+    self.assertEqual(metadata['agent_sandbox_warmpool_shards'], 1)
 
   def testSandboxSchedulingUsesSpecTaint(self):
     sandbox = _CreateSandbox()
@@ -323,6 +353,258 @@ class K8sAgentSandboxDeleteTest(pkb_common_test_case.PkbCommonTestCase):
             'value': 'runsc',
             'effect': 'NoSchedule',
         }],
+    )
+
+  def testManifestRefSyncsDefaultControllerAndTemplateImages(self):
+    spec = k8s_agent_sandbox_spec.K8sAgentSandboxConfigSpec(
+        'test', manifest_ref='v1.0.9-rc1'
+    )
+    self.assertEqual(spec.manifest_ref, 'v1.0.9-rc1')
+    assert spec.controller is not None
+    self.assertEqual(
+        spec.controller.image,
+        'registry.k8s.io/agent-sandbox/agent-sandbox-controller:v1.0.9-rc1',
+    )
+    assert spec.sandbox_template is not None
+    self.assertEqual(
+        spec.sandbox_template.image,
+        'registry.k8s.io/agent-sandbox/python-runtime-sandbox:v1.0.9-rc1',
+    )
+
+  def testSkipGvisorInstallWhenRuntimeClassIsNotRunsc(self):
+    sandbox = _CreateSandbox()
+    sandbox.spec.sandbox_template.runtime_class = 'runc'
+    with (
+        mock.patch.object(sandbox, '_InstallGvisor') as mock_gvisor,
+        mock.patch.object(sandbox, '_InstallCrdsAndRbac') as mock_crds,
+    ):
+      sandbox._Create()
+      mock_gvisor.assert_not_called()
+      mock_crds.assert_called_once()
+
+  def testGetWarmpoolNamesSharded(self):
+    sandbox = _CreateSandbox()
+    sandbox.spec.sandbox_warmpool.shards = 3
+    self.assertEqual(
+        sandbox.GetWarmpoolNames(),
+        ['agent-sandbox-0', 'agent-sandbox-1', 'agent-sandbox-2'],
+    )
+
+  def testScrapeControllerMetricsSelectsActiveLeaderPod(self):
+    sandbox = _CreateSandbox()
+    standby_prom = (
+        'controller_runtime_reconcile_total{controller="sandboxclaim",result="success"}'
+        ' 0\n'
+    )
+    leader_prom = (
+        'controller_runtime_reconcile_total{controller="sandboxclaim",result="success"}'
+        ' 600\n'
+    )
+    with mock.patch.object(
+        k8s_agent_sandbox.kubectl,
+        'RunKubectlCommand',
+        side_effect=[
+            ('pod-standby pod-leader', '', 0),
+            (standby_prom, '', 0),
+            (leader_prom, '', 0),
+        ],
+    ):
+      self.assertEqual(sandbox.ScrapeControllerMetrics(), leader_prom)
+
+  def testScrapeControlPlaneMetricsParsesSeatsAndThreads(self):
+    sandbox = _CreateSandbox()
+    raw_metrics = (
+        'go_sched_gomaxprocs_threads 4\nprocess_start_time_seconds'
+        ' 1792864543.83\nprocess_resident_memory_bytes'
+        ' 104857600\napiserver_flowcontrol_nominal_limit_seats{priority_level="workload-low"}'
+        ' 21\napiserver_flowcontrol_nominal_limit_seats{priority_level="global-default"}'
+        ' 17\napiserver_flowcontrol_rejected_requests_total{flow_schema="service-accounts",priority_level="workload-low",reason="queue-full"}'
+        ' 14\n'
+    )
+    with mock.patch.object(
+        k8s_agent_sandbox.kubectl,
+        'RunKubectlCommand',
+        return_value=(raw_metrics, '', 0),
+    ):
+      cp = sandbox.ScrapeControlPlaneMetrics()
+    self.assertEqual(cp['gomaxprocs'], 4.0)
+    self.assertEqual(cp['process_start_time'], 1792864543.83)
+    self.assertEqual(cp['rss_mb'], 100.0)
+    self.assertEqual(cp['workload_low_seats'], 21.0)
+    self.assertEqual(cp['global_default_seats'], 17.0)
+    self.assertEqual(cp['nominal_limit_seats'], 38.0)
+    self.assertEqual(cp['workload_low_rejected_requests'], 14.0)
+
+  @mock.patch.object(k8s_agent_sandbox.kubernetes_commands, 'ApplyYaml')
+  def testConfigureApfWorkloadLowLocksAutoupdateSpec(self, mock_apply_yaml):
+    sandbox = _CreateSandbox()
+    sandbox._ConfigureApfWorkloadLow()
+    manifest = mock_apply_yaml.call_args.args[0][0]
+    self.assertEqual(manifest['kind'], 'PriorityLevelConfiguration')
+    self.assertEqual(manifest['metadata']['name'], 'workload-low')
+    self.assertEqual(
+        manifest['metadata']['annotations'][
+            'apf.kubernetes.io/autoupdate-spec'
+        ],
+        'false',
+    )
+    self.assertEqual(
+        manifest['spec']['limited']['nominalConcurrencyShares'], 130
+    )
+    self.assertEqual(manifest['spec']['limited']['lendablePercent'], 0)
+    self.assertEqual(
+        manifest['spec']['limited']['limitResponse']['queuing'][
+            'queueLengthLimit'
+        ],
+        2000,
+    )
+
+  @mock.patch.object(k8s_agent_sandbox.kubernetes_commands, 'ApplyYaml')
+  def testApplySandboxTemplateTerminationGracePeriod(self, mock_apply_yaml):
+    sandbox = _CreateSandbox()
+    sandbox.spec.sandbox_template.termination_grace_period_seconds = 1
+    node_selector, tolerations = sandbox._SandboxSchedulingInternal(
+        'sandbox', None
+    )
+    sandbox._ApplySandboxTemplateImpl(
+        sandbox.spec.sandbox_template, node_selector, tolerations
+    )
+    manifest = mock_apply_yaml.call_args.args[0][0]
+    pod_spec = manifest['spec']['podTemplate']['spec']
+    self.assertEqual(pod_spec['terminationGracePeriodSeconds'], 1)
+
+  @mock.patch.object(k8s_agent_sandbox.kubectl, 'RunKubectlCommand')
+  def testEnsureSandboxNodeTaintsAppliesTaint(self, mock_kubectl):
+    sandbox = _CreateSandbox()
+    sandbox._EnsureSandboxNodeTaints()
+    mock_kubectl.assert_called_once_with([
+        'taint',
+        'nodes',
+        '-l',
+        'pkb_nodepool=sandbox',
+        'sandbox.gke.io/runtime=runsc:NoSchedule',
+        '--overwrite',
+    ])
+
+  @mock.patch.object(k8s_agent_sandbox.kubernetes_commands, 'ApplyYaml')
+  def testApplySandboxTemplateOmitsNoneCpuAndMemoryLimits(
+      self, mock_apply_yaml
+  ):
+    template_spec = k8s_agent_sandbox_spec.SandboxTemplateSpec(
+        'test.sandbox_template',
+        runtime_class='runsc',
+        image='img:latest',
+        cpu_request='50m',
+        memory_request='256Mi',
+        cpu_limit='none',
+        memory_limit='none',
+    )
+    sandbox = _CreateSandbox()
+    node_selector, tolerations = sandbox._SandboxSchedulingInternal(
+        'sandbox', None
+    )
+    sandbox._ApplySandboxTemplateImpl(template_spec, node_selector, tolerations)
+    manifest = mock_apply_yaml.call_args.args[0][0]
+    resources = manifest['spec']['podTemplate']['spec']['containers'][0][
+        'resources'
+    ]
+    self.assertEqual(
+        resources['limits'],
+        {'ephemeral-storage': '256Mi'},
+    )
+
+  def testConfigureControllerManifestReplicasAndNoneLimits(self):
+    sandbox = _CreateSandbox()
+    manifest = {
+        'spec': {
+            'template': {
+                'spec': {
+                    'containers': [{
+                        'resources': {
+                            'requests': {'cpu': '100m', 'memory': '128Mi'},
+                            'limits': {'cpu': '500m', 'memory': '512Mi'},
+                        },
+                    }],
+                },
+            },
+        },
+    }
+    controller_spec = k8s_agent_sandbox_spec.ControllerSpec(
+        'test.controller',
+        replicas=3,
+        cpu_request='200m',
+        memory_request='256Mi',
+        cpu_limit='none',
+        memory_limit='none',
+    )
+
+    mutated = sandbox._ConfigureControllerManifest(manifest, controller_spec)
+    self.assertEqual(mutated['spec']['replicas'], 3)
+    container = mutated['spec']['template']['spec']['containers'][0]
+    self.assertEqual(
+        container['resources']['requests'],
+        {'cpu': '200m', 'memory': '256Mi'},
+    )
+    self.assertNotIn('limits', container['resources'])
+
+  def testInstallWorkloadCallsConfigureApfWhenEnabled(self):
+    sandbox = _CreateSandbox()
+    sandbox.spec.tune_apf_workload_low = True
+    with (
+        mock.patch.object(
+            sandbox, '_ConfigureApfWorkloadLow'
+        ) as mock_config_apf,
+        mock.patch.object(sandbox, '_EnsureSandboxNodeTaints'),
+        mock.patch.object(sandbox, '_InstallController'),
+        mock.patch.object(sandbox, '_ApplySandboxTemplate'),
+        mock.patch.object(sandbox, '_InstallWarmpool'),
+    ):
+      sandbox.InstallWorkload()
+      mock_config_apf.assert_called_once()
+
+  def testConfigureControllerManifestCustomAndFallbackLimits(self):
+    sandbox = _CreateSandbox()
+    manifest = {
+        'spec': {
+            'template': {
+                'spec': {
+                    'containers': [{'resources': {}}],
+                },
+            },
+        },
+    }
+    controller_spec = k8s_agent_sandbox_spec.ControllerSpec(
+        'test',
+        cpu_request='200m',
+        memory_request='256Mi',
+        cpu_limit='4',
+        memory_limit='8Gi',
+        claim_workers=None,
+        sandbox_workers=None,
+        kube_api_qps=None,
+    )
+    self.assertIsNone(controller_spec.claim_workers)
+    self.assertIsNone(controller_spec.sandbox_workers)
+    self.assertIsNone(controller_spec.kube_api_qps)
+
+    mutated = sandbox._ConfigureControllerManifest(manifest, controller_spec)
+    container = mutated['spec']['template']['spec']['containers'][0]
+    self.assertEqual(
+        container['resources']['limits'],
+        {'cpu': '4', 'memory': '8Gi'},
+    )
+
+    controller_spec.cpu_limit = None
+    controller_spec.memory_limit = None
+    mutated_fallback = sandbox._ConfigureControllerManifest(
+        manifest, controller_spec
+    )
+    container_fallback = mutated_fallback['spec']['template']['spec'][
+        'containers'
+    ][0]
+    self.assertEqual(
+        container_fallback['resources']['limits'],
+        {'cpu': '200m', 'memory': '256Mi'},
     )
 
 

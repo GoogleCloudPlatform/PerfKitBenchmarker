@@ -26,11 +26,10 @@ and either:
 * place it in a PKB data directory (e.g. perfkitbenchmarker/data/ or a path
   passed via --data_search_paths), or
 * upload it to the preprovisioned data bucket of your cloud provider (see
-  --gcp_preprovisioned_data_bucket and friends) as
-  tpcx_bb/TPCX-BB-Tool.zip.
+  --gcp_preprovisioned_data_bucket and friends) under the folder given by
+  --tpcx_bb_kit_bucket_dir (default tpcx_bb/) as TPCX-BB-Tool.zip.
 
-The kit is installed with vm.InstallPreprovisionedPackageData, which verifies
-the sha256 of the stock v1.7.0 kit (PREPROVISIONED_DATA) unless
+The kit's sha256 (stock v1.7.0 kit, PREPROVISIONED_DATA) is verified unless
 --preprovision_ignore_checksum is passed.
 
 Besides the kit, this module installs the engine stack the kit's `spark_sql`
@@ -62,6 +61,7 @@ import shlex
 
 from absl import flags
 from perfkitbenchmarker import background_tasks
+from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import vm_util
@@ -72,8 +72,16 @@ FLAGS = flags.FLAGS
 PACKAGE_NAME = 'tpcx_bb'
 
 # File name of the TPCx-BB kit zip, in a PKB data directory or in the
-# preprovisioned data bucket under PACKAGE_NAME/.
+# preprovisioned data bucket under --tpcx_bb_kit_bucket_dir.
 KIT_FILE = 'TPCX-BB-Tool.zip'
+KIT_BUCKET_DIR = flags.DEFINE_string(
+    'tpcx_bb_kit_bucket_dir',
+    PACKAGE_NAME,
+    'Folder of the preprovisioned data bucket holding the TPCx-BB kit zip, '
+    'i.e. the kit is downloaded from <bucket>/<tpcx_bb_kit_bucket_dir>/'
+    f'{KIT_FILE}. Lets the kit be staged in a shared folder with other TPC '
+    'kits.',
+)
 SPARK_VERSION = flags.DEFINE_string(
     'tpcx_bb_spark_version',
     '3.1.3',
@@ -182,12 +190,46 @@ YARN_NODE_WAIT_SECONDS = 300
 _YARN_NODE_POLL_SECONDS = 10
 
 
+def _FetchKit(vm) -> None:
+  """Places the kit zip in TPCX_BB_DIR on the VM.
+
+  Looks for the kit in a local PKB data directory first and pushes it if found.
+  Otherwise downloads it from <preprovisioned bucket>/<kit bucket dir>/<file>
+  and verifies its sha256 (unless --preprovision_ignore_checksum). This
+  mirrors vm.InstallPreprovisionedPackageData, which cannot be used directly
+  because it hardcodes the bucket folder to the package name.
+
+  Args:
+    vm: VM to install the kit on.
+
+  Raises:
+    errors.Setup.BadPreprovisionedDataError: If the kit is neither available
+      locally nor in the preprovisioned bucket, or its checksum does not match.
+  """
+  if data.ResourceExists(KIT_FILE):
+    vm.PushFile(data.ResourcePath(KIT_FILE), TPCX_BB_DIR)
+    return
+  bucket_dir = KIT_BUCKET_DIR.value
+  if not vm.ShouldDownloadPreprovisionedData(bucket_dir, KIT_FILE):
+    raise errors.Setup.BadPreprovisionedDataError(
+        f'TPCx-BB kit {KIT_FILE!r} was not found in a PKB data directory nor '
+        f'under {bucket_dir}/ in the preprovisioned data bucket. Download it '
+        'from https://www.tpc.org/tpcx-bb/ and stage it; see '
+        'linux_packages/tpcx_bb.py.'
+    )
+  vm.DownloadPreprovisionedData(TPCX_BB_DIR, bucket_dir, KIT_FILE)
+  if not FLAGS.preprovision_ignore_checksum:
+    vm.CheckPreprovisionedData(
+        TPCX_BB_DIR, bucket_dir, KIT_FILE, PREPROVISIONED_DATA[KIT_FILE]
+    )
+
+
 def AptInstall(vm) -> None:
   """Installs the TPCx-BB kit and the tools its scripts use on the VM."""
   # pssh provides parallel-ssh, used by the kit to collect worker information.
   vm.InstallPackages('zip unzip pssh python3')
   vm.RemoteCommand(f'mkdir -p {TPCX_BB_DIR}')
-  vm.InstallPreprovisionedPackageData(PACKAGE_NAME, [KIT_FILE], TPCX_BB_DIR)
+  _FetchKit(vm)
   kit_path = posixpath.join(TPCX_BB_DIR, KIT_FILE)
   vm.RemoteCommand(f'unzip -o -q {kit_path} -d {TPCX_BB_DIR}')
   vm.RemoteCommand(

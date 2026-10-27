@@ -30,6 +30,7 @@ from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import units
 from perfkitbenchmarker.linux_packages import multichase
+from perfkitbenchmarker.linux_packages import numactl
 
 _CHASES_WITHOUT_ARGS = (
     'simple',
@@ -239,6 +240,22 @@ flags.DEFINE_string(
     'If provided, numactl is used to control memory placement and process '
     'CPU affinity. Examples: "--membind=0" or "--cpunodebind=0".',
 )
+_NUMA_BIND_LOCAL = 'local'
+_NUMA_BIND_MAX_DISTANCE = 'max_distance'
+_NUMA_BIND_MODE = flags.DEFINE_enum(
+    'multichase_numa_bind_mode',
+    None,
+    [_NUMA_BIND_LOCAL, _NUMA_BIND_MAX_DISTANCE],
+    'If set, overrides --multichase_numactl_options with options derived from '
+    'the NUMA distance matrix the VM reports, so that a single config gives a '
+    'meaningful answer on any shape without hard-coding node indices. CPUs are '
+    'always bound to the lowest-numbered node with CPUs (the node multichase '
+    'pins itself to anyway). "local" binds memory to that same node and gives '
+    'the best-case latency; "max_distance" binds memory to the node furthest '
+    'from it and gives the worst-case (typically cross-socket) latency. Note '
+    'that --membind is strict, so pair this with a '
+    '--multichase_memory_size_max that fits in a single node.',
+)
 flags.DEFINE_string(
     'multichase_additional_flags',
     '-T 8m -L',
@@ -387,6 +404,45 @@ def Run(benchmark_spec):
   return samples
 
 
+def _ResolveNumactlOptions(vm) -> str:
+  """Returns the numactl options to prefix multichase/multiload with.
+
+  Honors --multichase_numa_bind_mode when set, otherwise passes
+  --multichase_numactl_options straight through.
+
+  Args:
+    vm: VirtualMachine the benchmark runs on.
+
+  Returns:
+    The numactl option string, or '' for no numactl at all.
+  """
+  if not _NUMA_BIND_MODE.value:
+    return FLAGS.multichase_numactl_options
+
+  # multichase pins thread N to the Nth CPU it is allowed to run on, so with no
+  # further restriction thread 0 always lands on the lowest-numbered node that
+  # has CPUs. Make that explicit so the memory binding below is relative to a
+  # known node.
+  cpu_node = min(numactl.GetNuma(vm))
+  if _NUMA_BIND_MODE.value == _NUMA_BIND_LOCAL:
+    memory_node = cpu_node
+  else:
+    distances = numactl.GetNumaDistances(vm).get(cpu_node, {})
+    # Only nodes that actually have memory are valid --membind targets, and a
+    # strict --membind to a memoryless node would fail the run outright.
+    memory_sizes = numactl.GetNumaMemory(vm)
+    candidates = [node for node in distances if memory_sizes.get(node)]
+    if not candidates:
+      raise errors.Benchmarks.RunError(
+          'Cannot honor --multichase_numa_bind_mode=max_distance: the VM '
+          'reports no NUMA distance matrix or no nodes with memory.'
+      )
+    # Ties are common (AMD reports one flat distance for every remote node);
+    # break them on the highest node index for a stable, reproducible choice.
+    memory_node = max(candidates, key=lambda node: (distances[node], node))
+  return f'--cpunodebind={cpu_node} --membind={memory_node}'
+
+
 def RunMultichase(benchmark_spec):
   """Run multichase on the VM.
 
@@ -407,9 +463,16 @@ def RunMultichase(benchmark_spec):
   max_thread_count = float('inf')
 
   base_cmd = []
-  if FLAGS.multichase_numactl_options:
-    base_cmd.extend(('numactl', FLAGS.multichase_numactl_options))
-    base_metadata['numactl_options'] = FLAGS.multichase_numactl_options
+  numactl_options = _ResolveNumactlOptions(vm)
+  if numactl_options:
+    base_cmd.extend(('numactl', numactl_options))
+    base_metadata['numactl_options'] = numactl_options
+  distances = numactl.GetNumaDistances(vm)
+  if distances:
+    first_node = min(distances)
+    base_metadata['numa_node0_distances'] = numactl.FormatNumaDistances(
+        distances[first_node]
+    )
 
   multichase_path = posixpath.join(vm_state.multichase_dir, 'multichase')
   base_cmd.extend((multichase_path, '-a', '-v', '-H'))

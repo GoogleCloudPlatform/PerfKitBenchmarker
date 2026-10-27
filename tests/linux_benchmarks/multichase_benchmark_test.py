@@ -17,8 +17,13 @@
 import functools
 import unittest
 
+from absl.testing import flagsaver
+import mock
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import units
 from perfkitbenchmarker.linux_benchmarks import multichase_benchmark
+from perfkitbenchmarker.linux_packages import numactl
+from tests import pkb_common_test_case
 
 
 class MemorySizeParserTestCase(unittest.TestCase):
@@ -85,6 +90,72 @@ class IterMemorySizesTestCase(unittest.TestCase):
   def testMaxLessThanMin(self):
     result = list(self._func(64 * units.byte, 32 * units.byte))
     self.assertEqual(result, [])
+
+
+class ResolveNumactlOptionsTestCase(pkb_common_test_case.PkbCommonTestCase):
+  """Tests for turning --multichase_numa_bind_mode into numactl options."""
+
+  # Two sockets, two NUMA nodes each: 0-1 on socket 0, 2-3 on socket 1.
+  _DISTANCES = {
+      0: {0: 10, 1: 12, 2: 32, 3: 32},
+      1: {0: 12, 1: 10, 2: 32, 3: 32},
+      2: {0: 32, 1: 32, 2: 10, 3: 12},
+      3: {0: 32, 1: 32, 2: 12, 3: 10},
+  }
+  _CPUS = {0: 4, 1: 4, 2: 4, 3: 4}
+  _MEMORY = {0: 120889, 1: 120889, 2: 120889, 3: 120889}
+
+  def setUp(self):
+    super().setUp()
+    self.enterContext(
+        mock.patch.object(numactl, 'GetNuma', return_value=self._CPUS)
+    )
+    self.enterContext(
+        mock.patch.object(
+            numactl, 'GetNumaDistances', return_value=self._DISTANCES
+        )
+    )
+    self.enterContext(
+        mock.patch.object(numactl, 'GetNumaMemory', return_value=self._MEMORY)
+    )
+
+  @flagsaver.flagsaver(multichase_numactl_options='--localalloc')
+  def testUnsetModePassesFlagThrough(self):
+    self.assertEqual(
+        '--localalloc',
+        multichase_benchmark._ResolveNumactlOptions(mock.Mock()),
+    )
+
+  @flagsaver.flagsaver(multichase_numa_bind_mode='local')
+  def testLocalBindsToTheCpuNode(self):
+    self.assertEqual(
+        '--cpunodebind=0 --membind=0',
+        multichase_benchmark._ResolveNumactlOptions(mock.Mock()),
+    )
+
+  @flagsaver.flagsaver(multichase_numa_bind_mode='max_distance')
+  def testMaxDistanceBreaksTiesOnTheHighestNode(self):
+    # Nodes 2 and 3 are equidistant from node 0; the higher index wins.
+    self.assertEqual(
+        '--cpunodebind=0 --membind=3',
+        multichase_benchmark._ResolveNumactlOptions(mock.Mock()),
+    )
+
+  @flagsaver.flagsaver(multichase_numa_bind_mode='max_distance')
+  def testMaxDistanceSkipsMemorylessNodes(self):
+    with mock.patch.object(
+        numactl, 'GetNumaMemory', return_value={0: 120889, 1: 120889, 2: 0}
+    ):
+      self.assertEqual(
+          '--cpunodebind=0 --membind=1',
+          multichase_benchmark._ResolveNumactlOptions(mock.Mock()),
+      )
+
+  @flagsaver.flagsaver(multichase_numa_bind_mode='max_distance')
+  def testMaxDistanceWithoutDistanceMatrixRaises(self):
+    with mock.patch.object(numactl, 'GetNumaDistances', return_value={}):
+      with self.assertRaises(errors.Benchmarks.RunError):
+        multichase_benchmark._ResolveNumactlOptions(mock.Mock())
 
 
 if __name__ == '__main__':

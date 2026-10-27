@@ -613,12 +613,11 @@ fio_object_storage_latency_10000_10MB:
     fio_nr_files: 10000
     azure_blobfuse_block_size_mb: 0.00390625  # 4KB
 
-fio_managed_lustre_latency_10000_10MB:
+fio_managed_lustre_latency_10000_100MB:
   name: fio_managed_lustre
   flags:
-    fio_generate_scenarios: rand_4k_read_100000MB_iodepth-1_numjobs-1,rand_4k_write_100000MB_iodepth-1_numjobs-1
-    fio_fill_size: 100000M
-    fio_fill_block_size: 2M
+    fio_generate_scenarios: rand_4k_read_1000000MB_iodepth-1_numjobs-1,rand_4k_write_1000000MB_iodepth-1_numjobs-1
+    fio_fill_size: 1000000M
     fio_nr_files: 10000
 
 fio_remote_ssd_max_iops:
@@ -688,10 +687,11 @@ fuse_io500:
 io500_lustre:
   name: io500
   flags:
+    num_vms: 2
     data_disk_type: lustre
     scratch_dir: lustre_dir
     openmpi_version: 4.1.6
-    mpi_ranks_list: [1, 2, 4, 8, 16, 32, 64, 128, 192]
+    mpi_ranks_list: [1, 16, 64, 192]
     ior_easy_direct_io: True
     lustre_set_stripe: True
     lustre_max_dirty_mb: 2000

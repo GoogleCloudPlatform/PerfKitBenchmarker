@@ -151,6 +151,9 @@ NUM_LOCAL_VOLUMES: dict[str, int] = {
     'Standard_D192ds_v7': 6,
     'Standard_D248ds_v7': 5,
     'Standard_D372ds_v7': 6,
+    # HPC series. HBv4 ships 2 x 1.8 TB and HBv5 8 x 1.8 TB local NVMe.
+    'Standard_HB176rs_v4': 2,
+    'Standard_HB368rs_v5': 8,
 }
 
 _MACHINE_TYPES_ONLY_SUPPORT_GEN1_IMAGES = (
@@ -1489,6 +1492,7 @@ class AlmaLinux10BasedAzureVirtualMachine(
   GEN2_IMAGE_URN = 'almalinux:almalinux-x86_64:10-gen2:latest'
   GEN1_IMAGE_URN = 'almalinux:almalinux-x86_64:10-gen1:latest'
   ARM_IMAGE_URN = 'almalinux:almalinux-arm:10-arm64-64k-gen2:latest'
+  SUPPORTS_TRUSTED_LAUNCH = False
 
 
 # Rocky Linux is now distributed via a community gallery:

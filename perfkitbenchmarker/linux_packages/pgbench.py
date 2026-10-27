@@ -148,7 +148,17 @@ def RunPgBench(
   # https://stackoverflow.com/questions/58179080/occasional-temporary-failure-in-name-resolution-while-connecting-to-aws-aurora
   # Resolve the address to ip address first to avoid DNS failure
 
-  if relational_db.engine_type != sql_engine_utils.SPANNER_POSTGRES:
+  if relational_db.engine_type == sql_engine_utils.SPANNER_POSTGRES:
+    connection_string = relational_db.client_vm_query_tools.GetConnectionString(
+        database_name=relational_db.client_vm_query_tools.connection_properties.database_name,
+    )
+  elif relational_db.engine == sql_engine_utils.LAKEBASE_POSTGRES:
+    # Lakebase requires the TLS SNI hostname in connections; connecting to a
+    # resolved IP address fails with "FATAL: Connection does not have SNI".
+    connection_string = relational_db.client_vm_query_tools.GetConnectionString(
+        database_name=test_db_name,
+    )
+  else:
     endpoint = socket.getaddrinfo(
         relational_db.client_vm_query_tools.connection_properties.endpoint,
         relational_db.client_vm_query_tools.connection_properties.port,
@@ -156,10 +166,6 @@ def RunPgBench(
 
     connection_string = relational_db.client_vm_query_tools.GetConnectionString(
         database_name=test_db_name, endpoint=endpoint
-    )
-  else:
-    connection_string = relational_db.client_vm_query_tools.GetConnectionString(
-        database_name=relational_db.client_vm_query_tools.connection_properties.database_name,
     )
 
   if file and path:

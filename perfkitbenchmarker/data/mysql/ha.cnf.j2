@@ -15,7 +15,6 @@ table_open_cache        = 200000
 table_open_cache_instances = 32
 max_prepared_stmt_count = 512000
 skip-name-resolve
-skip-character-set-client-handshake
 performance_schema      = 1
 binlog_row_image= MINIMAL
 
@@ -52,7 +51,7 @@ innodb_buffer_pool_dump_at_shutdown = 0
 server-id                                   = {{ server_id }}
 binlog_format                               = ROW
 log-bin                                     = {{ scratch_dir }}/mysql-bin
-log-slave-updates                           = 1
+log-replica-updates                         = 1
 #read_only                                  = 1
 #super_read_only                            = 1
 sync_binlog                                 = 1

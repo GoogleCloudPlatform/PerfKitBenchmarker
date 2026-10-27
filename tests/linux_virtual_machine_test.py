@@ -714,6 +714,16 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(kernel_release_new, vm.os_metadata['kernel_release'])
     self.assertEqual(8, vm.NumCpusForBenchmark())
 
+  def testRebootSkipVmPreparation(self):
+    FLAGS['skip_vm_preparation'].parse(True)
+    responses = {
+        'sudo reboot': 'bye bye',
+        'stat -c %z /proc/': '',
+    }
+    vm = self.CreateVm(responses)
+    vm.Reboot()
+    self.assertEqual({}, vm.os_metadata)
+
   def testGetNetworkDeviceNames(self):
     responses = self.normal_boot_responses.copy()
     vm = self.CreateVm(responses)

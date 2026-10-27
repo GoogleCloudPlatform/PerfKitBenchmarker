@@ -1,0 +1,54 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: agent-sandbox-load-runner
+  namespace: {{ namespace }}
+spec:
+  parallelism: {{ parallelism | default(1) }}
+  completions: {{ parallelism | default(1) }}
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        app: agent-sandbox-load-runner
+    spec:
+      restartPolicy: Never
+      serviceAccountName: agent-sandbox-load-runner
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: pkb_nodepool
+                    operator: NotIn
+                    values:
+                      - "{{ sandbox_nodepool | default('sandbox') }}"
+      containers:
+        - name: runner
+          image: python:3.12-slim
+          command: ["bash", "-c"]
+          # Note: the load gen script is mounted into Pod via a ConfigMap; CLI
+          # args to drive the loadgen are templated via
+          # kubernetes_commands.ConvertManifestToYamlDicts in
+          # agent_sandbox_benchmark.py
+          resources:
+            requests:
+              cpu: "{{ cpu_request | default('1') }}"
+              memory: "{{ memory_request | default('1Gi') }}"
+            limits:
+              cpu: "{{ cpu_limit | default('2') }}"
+              memory: "{{ memory_limit | default('2Gi') }}"
+          volumeMounts:
+            - name: script
+              mountPath: /opt/load-runner
+              readOnly: true
+            - name: results
+              mountPath: /tmp/results
+      volumes:
+        - name: script
+          configMap:
+            name: agent-sandbox-load-runner-script
+        - name: results
+          emptyDir: {}
