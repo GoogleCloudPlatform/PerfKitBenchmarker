@@ -66,18 +66,77 @@ class TpcxBbKitTest(pkb_common_test_case.PkbCommonTestCase):
     super().setUp()
     self.vm = mock.Mock()
     self.vm.RemoteCommand.return_value = ('', '')
+    self.vm.ShouldDownloadPreprovisionedData.return_value = True
+    self.enter_context(
+        mock.patch.object(tpcx_bb.data, 'ResourceExists', return_value=False)
+    )
 
-  def testInstallInstallsPreprovisionedKitAndUnzipsIt(self):
+  def testInstallDownloadsStockKitAndUnzipsIt(self):
     tpcx_bb.AptInstall(self.vm)
     self.vm.InstallPackages.assert_called_once_with('zip unzip pssh python3')
-    self.vm.InstallPreprovisionedPackageData.assert_called_once_with(
-        'tpcx_bb', ['TPCX-BB-Tool.zip'], tpcx_bb.TPCX_BB_DIR
+    self.vm.ShouldDownloadPreprovisionedData.assert_called_once_with(
+        'tpcx_bb', 'TPCX-BB-Tool.zip'
+    )
+    self.vm.DownloadPreprovisionedData.assert_called_once_with(
+        tpcx_bb.TPCX_BB_DIR, 'tpcx_bb', 'TPCX-BB-Tool.zip'
+    )
+    self.vm.CheckPreprovisionedData.assert_called_once_with(
+        tpcx_bb.TPCX_BB_DIR,
+        'tpcx_bb',
+        'TPCX-BB-Tool.zip',
+        tpcx_bb.PREPROVISIONED_DATA['TPCX-BB-Tool.zip'],
     )
     self.assertIn(
         f'unzip -o -q {tpcx_bb.TPCX_BB_DIR}/TPCX-BB-Tool.zip -d '
         f'{tpcx_bb.TPCX_BB_DIR}',
         _Commands(self.vm),
     )
+
+  @flagsaver.flagsaver(tpcx_bb_kit_bucket_dir='tpc-kits')
+  def testInstallFromCustomBucketDir(self):
+    tpcx_bb.AptInstall(self.vm)
+    self.vm.ShouldDownloadPreprovisionedData.assert_called_once_with(
+        'tpc-kits', 'TPCX-BB-Tool.zip'
+    )
+    self.vm.DownloadPreprovisionedData.assert_called_once_with(
+        tpcx_bb.TPCX_BB_DIR, 'tpc-kits', 'TPCX-BB-Tool.zip'
+    )
+    self.vm.CheckPreprovisionedData.assert_called_once_with(
+        tpcx_bb.TPCX_BB_DIR,
+        'tpc-kits',
+        'TPCX-BB-Tool.zip',
+        tpcx_bb.PREPROVISIONED_DATA['TPCX-BB-Tool.zip'],
+    )
+
+  @flagsaver.flagsaver(preprovision_ignore_checksum=True)
+  def testInstallIgnoreChecksumSkipsCheck(self):
+    tpcx_bb.AptInstall(self.vm)
+    self.vm.DownloadPreprovisionedData.assert_called_once()
+    self.vm.CheckPreprovisionedData.assert_not_called()
+
+  def testInstallMissingKitRaises(self):
+    self.vm.ShouldDownloadPreprovisionedData.return_value = False
+    with self.assertRaisesRegex(
+        errors.Setup.BadPreprovisionedDataError, 'tpcx_bb/'
+    ):
+      tpcx_bb.AptInstall(self.vm)
+    self.vm.DownloadPreprovisionedData.assert_not_called()
+
+  def testInstallPrefersLocalDataDir(self):
+    self.enter_context(
+        mock.patch.object(tpcx_bb.data, 'ResourceExists', return_value=True)
+    )
+    self.enter_context(
+        mock.patch.object(
+            tpcx_bb.data, 'ResourcePath', return_value='/data/TPCX-BB-Tool.zip'
+        )
+    )
+    tpcx_bb.AptInstall(self.vm)
+    self.vm.PushFile.assert_called_once_with(
+        '/data/TPCX-BB-Tool.zip', tpcx_bb.TPCX_BB_DIR
+    )
+    self.vm.ShouldDownloadPreprovisionedData.assert_not_called()
+    self.vm.DownloadPreprovisionedData.assert_not_called()
 
   def testPreprovisionedDataHasKitChecksum(self):
     self.assertIn(tpcx_bb.KIT_FILE, tpcx_bb.PREPROVISIONED_DATA)

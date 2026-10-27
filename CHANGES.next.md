@@ -301,6 +301,8 @@
 -   Add dpb_tpcx_bb_benchmark, which runs the TPCx-BB (BigBench) kit with its
     spark_sql engine on Spark on YARN on an unmanaged Hadoop cluster and reports
     BBQpm@SF.
+-   Add --tpcx_bb_kit_bucket_dir to download the TPCx-BB kit from a folder of
+    the preprovisioned data bucket other than tpcx_bb/.
 
 ### Enhancements:
 
