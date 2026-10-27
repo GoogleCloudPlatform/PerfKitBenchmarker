@@ -19,13 +19,15 @@ from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
 from perfkitbenchmarker.resources import agent_sandbox_spec
 
-_RELEASE = 'v1.0.4'
-_DEFAULT_CONTROLLER_IMAGE = (
-    f'registry.k8s.io/agent-sandbox/agent-sandbox-controller:{_RELEASE}'
+_RELEASE = 'v1.0.8'
+_DEFAULT_CONTROLLER_IMAGE_PREFIX = (
+    'registry.k8s.io/agent-sandbox/agent-sandbox-controller'
 )
-_DEFAULT_SANDBOX_IMAGE = (
-    f'registry.k8s.io/agent-sandbox/python-runtime-sandbox:{_RELEASE}'
+_DEFAULT_SANDBOX_IMAGE_PREFIX = (
+    'registry.k8s.io/agent-sandbox/python-runtime-sandbox'
 )
+_DEFAULT_CONTROLLER_IMAGE = f'{_DEFAULT_CONTROLLER_IMAGE_PREFIX}:{_RELEASE}'
+_DEFAULT_SANDBOX_IMAGE = f'{_DEFAULT_SANDBOX_IMAGE_PREFIX}:{_RELEASE}'
 DEFAULT_CPU_REQUEST = '250m'
 DEFAULT_MEMORY_REQUEST = '256Mi'
 
@@ -40,9 +42,23 @@ class ControllerSpec(spec.BaseSpec):
     self.warmpool_workers: int | None
     self.warmpool_max_batch_size: int | None
     self.kube_api_burst: int | None
-    self.kube_api_qps: int | None
+    self.kube_api_qps: float | None
     self.cpu_request: str
     self.memory_request: str
+    self.cpu_limit: str | None
+    self.memory_limit: str | None
+    self.replicas: int | None
+    self.leader_elect: bool | None
+    self.api_connections: int | None
+    self.separate_watch_connection: bool | None
+    self.warmpool_max_refill_rate: float | None
+    self.warmpool_replenish_delay: str | None
+    self.claim_warm_candidate_grace_period: str | None
+    self.cache_label_selectors: bool | None
+    self.disable_sandbox_events: bool | None
+    self.disable_claim_events: bool | None
+    self.disable_claim_observability_annotations: bool | None
+    self.sandbox_write_behind_window: str | None
     super().__init__(*args, **kwargs)
 
   @classmethod
@@ -55,11 +71,11 @@ class ControllerSpec(spec.BaseSpec):
         ),
         'claim_workers': (
             option_decoders.IntDecoder,
-            {'default': 100, 'none_ok': True},
+            {'default': 150, 'none_ok': True},
         ),
         'sandbox_workers': (
             option_decoders.IntDecoder,
-            {'default': 100, 'none_ok': True},
+            {'default': 200, 'none_ok': True},
         ),
         'warmpool_workers': (
             option_decoders.IntDecoder,
@@ -74,8 +90,8 @@ class ControllerSpec(spec.BaseSpec):
             {'default': 750, 'none_ok': True},
         ),
         'kube_api_qps': (
-            option_decoders.IntDecoder,
-            {'default': -1, 'none_ok': True},
+            option_decoders.FloatDecoder,
+            {'default': -1.0, 'none_ok': True},
         ),
         'cpu_request': (
             option_decoders.StringDecoder,
@@ -84,6 +100,62 @@ class ControllerSpec(spec.BaseSpec):
         'memory_request': (
             option_decoders.StringDecoder,
             {'default': DEFAULT_MEMORY_REQUEST},
+        ),
+        'cpu_limit': (
+            option_decoders.StringDecoder,
+            {'default': '2000m', 'none_ok': True},
+        ),
+        'memory_limit': (
+            option_decoders.StringDecoder,
+            {'default': '1Gi', 'none_ok': True},
+        ),
+        'replicas': (
+            option_decoders.IntDecoder,
+            {'default': 2, 'none_ok': True, 'min': 1},
+        ),
+        'leader_elect': (
+            option_decoders.BooleanDecoder,
+            {'default': True, 'none_ok': True},
+        ),
+        'api_connections': (
+            option_decoders.IntDecoder,
+            {'default': 4, 'none_ok': True, 'min': 1},
+        ),
+        'separate_watch_connection': (
+            option_decoders.BooleanDecoder,
+            {'default': True, 'none_ok': True},
+        ),
+        'warmpool_max_refill_rate': (
+            option_decoders.FloatDecoder,
+            {'default': 100.0, 'none_ok': True, 'min': 0.0},
+        ),
+        'warmpool_replenish_delay': (
+            option_decoders.StringDecoder,
+            {'default': None, 'none_ok': True},
+        ),
+        'claim_warm_candidate_grace_period': (
+            option_decoders.StringDecoder,
+            {'default': None, 'none_ok': True},
+        ),
+        'cache_label_selectors': (
+            option_decoders.BooleanDecoder,
+            {'default': True, 'none_ok': True},
+        ),
+        'disable_sandbox_events': (
+            option_decoders.BooleanDecoder,
+            {'default': True, 'none_ok': True},
+        ),
+        'disable_claim_events': (
+            option_decoders.BooleanDecoder,
+            {'default': True, 'none_ok': True},
+        ),
+        'disable_claim_observability_annotations': (
+            option_decoders.BooleanDecoder,
+            {'default': True, 'none_ok': True},
+        ),
+        'sandbox_write_behind_window': (
+            option_decoders.StringDecoder,
+            {'default': None, 'none_ok': True},
         ),
     })
     return result
@@ -96,6 +168,34 @@ class ControllerSpec(spec.BaseSpec):
         config_values['claim_workers'] = (
             flag_values.agent_sandbox_controller_claim_workers
         )
+      if (
+          'agent_sandbox_controller_sandbox_workers' in flag_values
+          and flag_values['agent_sandbox_controller_sandbox_workers'].present
+      ):
+        config_values['sandbox_workers'] = (
+            flag_values.agent_sandbox_controller_sandbox_workers
+        )
+      if (
+          'agent_sandbox_controller_warmpool_workers' in flag_values
+          and flag_values['agent_sandbox_controller_warmpool_workers'].present
+      ):
+        config_values['warmpool_workers'] = (
+            flag_values.agent_sandbox_controller_warmpool_workers
+        )
+      if (
+          'agent_sandbox_controller_api_connections' in flag_values
+          and flag_values['agent_sandbox_controller_api_connections'].present
+      ):
+        config_values['api_connections'] = (
+            flag_values.agent_sandbox_controller_api_connections
+        )
+      if (
+          'agent_sandbox_warmpool_replenish_delay' in flag_values
+          and flag_values['agent_sandbox_warmpool_replenish_delay'].present
+      ):
+        config_values['warmpool_replenish_delay'] = (
+            flag_values.agent_sandbox_warmpool_replenish_delay
+        )
 
 
 class SandboxTemplateSpec(spec.BaseSpec):
@@ -105,27 +205,73 @@ class SandboxTemplateSpec(spec.BaseSpec):
   """
 
   def __init__(self, *args, **kwargs):
-    self.runtime_class: str
+    self.runtime_class: str | None
     self.image: str
     self.cpu_request: str
     self.memory_request: str
+    self.cpu_limit: str | None
+    self.memory_limit: str | None
     self.labels: dict[str, str] | None
+    self.failed_pod_policy: str | None
+    self.network_policy_management: str | None
+    self.service: bool | dict[str, Any] | None
+    self.termination_grace_period_seconds: int | None
     super().__init__(*args, **kwargs)
 
   @classmethod
   def _GetOptionDecoderConstructions(cls) -> dict[str, Any]:
     result = super()._GetOptionDecoderConstructions()
     result.update({
-        'runtime_class': (option_decoders.StringDecoder, {'default': 'runsc'}),
+        'runtime_class': (
+            option_decoders.StringDecoder,
+            {'default': 'runsc', 'none_ok': True},
+        ),
         'image': (
             option_decoders.StringDecoder,
             {'default': _DEFAULT_SANDBOX_IMAGE},
         ),
         'cpu_request': (option_decoders.StringDecoder, {'default': '100m'}),
         'memory_request': (option_decoders.StringDecoder, {'default': '256Mi'}),
+        'cpu_limit': (
+            option_decoders.StringDecoder,
+            {'default': '500m', 'none_ok': True},
+        ),
+        'memory_limit': (
+            option_decoders.StringDecoder,
+            {'default': '1Gi', 'none_ok': True},
+        ),
         'labels': (
             option_decoders.TypeVerifier,
             {'default': None, 'none_ok': True},
+        ),
+        'failed_pod_policy': (
+            option_decoders.EnumDecoder,
+            {
+                'default': None,
+                'valid_values': [
+                    None,
+                    'Retain',
+                    'Recreate',
+                    'Never',
+                    'OnFailure',
+                    'Always',
+                ],
+            },
+        ),
+        'network_policy_management': (
+            option_decoders.EnumDecoder,
+            {
+                'default': None,
+                'valid_values': [None, 'Managed', 'Unmanaged'],
+            },
+        ),
+        'service': (
+            option_decoders.TypeVerifier,
+            {'default': None, 'none_ok': True, 'valid_types': (bool, dict)},
+        ),
+        'termination_grace_period_seconds': (
+            option_decoders.IntDecoder,
+            {'default': None, 'none_ok': True, 'min': 0},
         ),
     })
     return result
@@ -133,8 +279,28 @@ class SandboxTemplateSpec(spec.BaseSpec):
   @classmethod
   def _ApplyFlags(cls, config_values: dict[str, Any], flag_values: Any) -> None:
     super()._ApplyFlags(config_values, flag_values)
-    if flag_values and flag_values['agent_sandbox_runtime_class'].present:
-      config_values['runtime_class'] = flag_values.agent_sandbox_runtime_class
+    if flag_values:
+      if flag_values['agent_sandbox_runtime_class'].present:
+        config_values['runtime_class'] = flag_values.agent_sandbox_runtime_class
+      if (
+          'agent_sandbox_cpu_request' in flag_values
+          and flag_values['agent_sandbox_cpu_request'].present
+      ):
+        config_values['cpu_request'] = flag_values.agent_sandbox_cpu_request
+      if (
+          'agent_sandbox_cpu_limit' in flag_values
+          and flag_values['agent_sandbox_cpu_limit'].present
+      ):
+        config_values['cpu_limit'] = flag_values.agent_sandbox_cpu_limit
+      if (
+          'agent_sandbox_termination_grace_period_seconds' in flag_values
+          and flag_values[
+              'agent_sandbox_termination_grace_period_seconds'
+          ].present
+      ):
+        config_values['termination_grace_period_seconds'] = (
+            flag_values.agent_sandbox_termination_grace_period_seconds
+        )
 
 
 class SandboxWarmPoolSpec(spec.BaseSpec):
@@ -142,6 +308,7 @@ class SandboxWarmPoolSpec(spec.BaseSpec):
 
   def __init__(self, *args, **kwargs):
     self.replicas: int
+    self.shards: int
     super().__init__(*args, **kwargs)
 
   @classmethod
@@ -149,14 +316,21 @@ class SandboxWarmPoolSpec(spec.BaseSpec):
     result = super()._GetOptionDecoderConstructions()
     result.update({
         'replicas': (option_decoders.IntDecoder, {'default': 150, 'min': 0}),
+        'shards': (option_decoders.IntDecoder, {'default': 1, 'min': 1}),
     })
     return result
 
   @classmethod
   def _ApplyFlags(cls, config_values: dict[str, Any], flag_values: Any) -> None:
     super()._ApplyFlags(config_values, flag_values)
-    if flag_values and flag_values['agent_sandbox_warmpool_replicas'].present:
-      config_values['replicas'] = flag_values.agent_sandbox_warmpool_replicas
+    if flag_values:
+      if flag_values['agent_sandbox_warmpool_replicas'].present:
+        config_values['replicas'] = flag_values.agent_sandbox_warmpool_replicas
+      if (
+          'agent_sandbox_warmpool_shards' in flag_values
+          and flag_values['agent_sandbox_warmpool_shards'].present
+      ):
+        config_values['shards'] = flag_values.agent_sandbox_warmpool_shards
 
 
 class _ControllerDecoder(option_decoders.TypeVerifier):
@@ -217,6 +391,7 @@ class K8sAgentSandboxConfigSpec(agent_sandbox_spec.BaseAgentSandboxConfigSpec):
     self.namespace: str
     self.sandbox_nodepool: str
     self.sandbox_node_taint: str | None
+    self.tune_apf_workload_low: bool
     self.manifest_repo: str
     self.controller: ControllerSpec | None
     self.sandbox_template: SandboxTemplateSpec | None
@@ -236,6 +411,15 @@ class K8sAgentSandboxConfigSpec(agent_sandbox_spec.BaseAgentSandboxConfigSpec):
           '{}.sandbox_warmpool'.format(component_full_name),
           flag_values=flag_values,
       )
+    if self.manifest_ref != _RELEASE:
+      if self.controller.image == _DEFAULT_CONTROLLER_IMAGE:
+        self.controller.image = (
+            f'{_DEFAULT_CONTROLLER_IMAGE_PREFIX}:{self.manifest_ref}'
+        )
+      if self.sandbox_template.image == _DEFAULT_SANDBOX_IMAGE:
+        self.sandbox_template.image = (
+            f'{_DEFAULT_SANDBOX_IMAGE_PREFIX}:{self.manifest_ref}'
+        )
 
   @classmethod
   def _GetOptionDecoderConstructions(cls) -> dict[str, Any]:
@@ -256,6 +440,10 @@ class K8sAgentSandboxConfigSpec(agent_sandbox_spec.BaseAgentSandboxConfigSpec):
                 'default': 'sandbox.gke.io/runtime=runsc:NoSchedule',
                 'none_ok': True,
             },
+        ),
+        'tune_apf_workload_low': (
+            option_decoders.BooleanDecoder,
+            {'default': False},
         ),
         'manifest_repo': (
             option_decoders.StringDecoder,
@@ -286,4 +474,11 @@ class K8sAgentSandboxConfigSpec(agent_sandbox_spec.BaseAgentSandboxConfigSpec):
       if flag_values['agent_sandbox_node_taint'].present:
         config_values['sandbox_node_taint'] = (
             flag_values.agent_sandbox_node_taint
+        )
+      if (
+          'agent_sandbox_tune_apf_workload_low' in flag_values
+          and flag_values['agent_sandbox_tune_apf_workload_low'].present
+      ):
+        config_values['tune_apf_workload_low'] = (
+            flag_values.agent_sandbox_tune_apf_workload_low
         )
