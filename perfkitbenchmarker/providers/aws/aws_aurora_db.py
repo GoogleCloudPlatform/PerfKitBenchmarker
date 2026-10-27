@@ -62,6 +62,7 @@ class AwsAuroraRelationalDb(aws_relational_db.BaseAwsRelationalDb):
     super().__init__(relational_db_spec)
     self.cluster_id = 'pkb-db-cluster-' + FLAGS.run_uri
     self.storage_type = aws_flags.AURORA_STORAGE_TYPE.value
+    self.snapshot_id = self.spec.aws_aurora_snapshot_identifier
     self._load_machine_type = self.spec.db_spec.machine_type
     if self.spec.load_machine_type is not None:
       self._load_machine_type = self.spec.load_machine_type
@@ -84,31 +85,48 @@ class AwsAuroraRelationalDb(aws_relational_db.BaseAwsRelationalDb):
           'zone count: {} '.format(self.spec.high_availability, len(self.zones))
       )
 
-    # Create the cluster.
-    cmd = util.AWS_PREFIX + [
-        'rds',
-        'create-db-cluster',
+    shared_args = [
         '--db-cluster-identifier=%s' % self.cluster_id,
         '--engine=%s' % self.spec.engine,
         '--region=%s' % self.region,
-        '--backup-retention-period=1',  # backups cannot be disabled
     ]
-    if self.spec.aws_aurora_express_configuration:
-      cmd.append('--with-express-configuration')
-    else:
+    subcommand = (
+        'restore-db-cluster-from-snapshot'
+        if self.snapshot_id
+        else 'create-db-cluster'
+    )
+    cmd = util.AWS_PREFIX + ['rds', subcommand] + shared_args
+    if self.snapshot_id:
       cmd.extend([
+          '--snapshot-identifier=%s' % self.snapshot_id,
           '--engine-version=%s' % self.spec.engine_version,
-          '--master-username=%s' % self.spec.database_username,
-          '--master-user-password=%s' % self.spec.database_password,
           '--db-subnet-group-name=%s' % self.db_subnet_group_name,
           '--vpc-security-group-ids=%s' % self.security_group_id,
           '--availability-zones=%s' % self.spec.zones[0],
           '--storage-type=%s' % self.storage_type,
       ])
+    else:
+      cmd.append('--backup-retention-period=1')  # backups cannot be disabled
+      if self.spec.aws_aurora_express_configuration:
+        cmd.append('--with-express-configuration')
+      else:
+        cmd.extend([
+            '--engine-version=%s' % self.spec.engine_version,
+            '--master-username=%s' % self.spec.database_username,
+            '--master-user-password=%s' % self.spec.database_password,
+            '--db-subnet-group-name=%s' % self.db_subnet_group_name,
+            '--vpc-security-group-ids=%s' % self.security_group_id,
+            '--availability-zones=%s' % self.spec.zones[0],
+            '--storage-type=%s' % self.storage_type,
+        ])
     cmd.extend(['--tags'] + util.MakeFormattedDefaultTags())
 
     stdout, _, _ = vm_util.IssueCommand(cmd)
     json_output = json.loads(stdout)
+    if self.snapshot_id:
+      master_username = json_output.get('DBCluster', {}).get('MasterUsername')
+      if master_username:
+        self.spec.database_username = master_username
     for member in json_output.get('DBCluster', {}).get('DBClusterMembers', []):
       self.all_instance_ids.append(member['DBInstanceIdentifier'])
 
@@ -157,6 +175,18 @@ class AwsAuroraRelationalDb(aws_relational_db.BaseAwsRelationalDb):
        Exception:  If could not ready the instance after modification to
                    multi-az.
     """
+    if self.snapshot_id:
+      self._WaitForStatus('available')
+      cmd = util.AWS_PREFIX + [
+          'rds',
+          'modify-db-cluster',
+          '--db-cluster-identifier=%s' % self.cluster_id,
+          '--master-user-password=%s' % self.spec.database_password,
+          '--apply-immediately',
+          '--region=%s' % self.region,
+      ]
+      vm_util.IssueCommand(cmd)
+      self._WaitForStatus('available')
     super()._PostCreate()
     self._SetPrimaryAndSecondaryZones()
 
@@ -265,10 +295,13 @@ class AwsAuroraRelationalDb(aws_relational_db.BaseAwsRelationalDb):
   def _WaitForStatus(self, target_status: str) -> None:
     """Waits for the Aurora cluster to reach a target status."""
     json_output = self._DescribeCluster()
-    status = json_output['DBClusters'][0]['Status']
-    if status != target_status:
+    cluster = json_output['DBClusters'][0]
+    status = cluster['Status']
+    pending_values = cluster.get('PendingModifiedValues')
+    if status != target_status or pending_values:
       raise AuroraStatusChangeError(
-          f'Cluster {self.cluster_id} is {status}. Waiting for {target_status}.'
+          f'Cluster {self.cluster_id} is {status} (pending: {pending_values}).'
+          f' Waiting for {target_status}.'
       )
 
   def Stop(self):
@@ -345,6 +378,8 @@ class AwsAuroraRelationalDb(aws_relational_db.BaseAwsRelationalDb):
   def GetResourceMetadata(self) -> dict[str, Any]:
     metadata = super().GetResourceMetadata()
     metadata['aurora_storage_type'] = self.storage_type
+    if self.snapshot_id:
+      metadata['aws_aurora_snapshot_identifier'] = self.snapshot_id
     if self.spec.aws_aurora_express_configuration:
       metadata['aws_aurora_express_configuration'] = True
     if self.serverless_scaling_configuration:

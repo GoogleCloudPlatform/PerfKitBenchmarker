@@ -36,6 +36,7 @@ class AwsRelationalDbSpec(relational_db_spec.RelationalDbSpec):
 
   aws_rds_dedicated_log_volume: bool
   aws_aurora_express_configuration: bool
+  aws_aurora_snapshot_identifier: str | None
 
   def __init__(self, component_full_name, flag_values=None, **kwargs):
     super().__init__(component_full_name, flag_values=flag_values, **kwargs)
@@ -63,6 +64,13 @@ class AwsRelationalDbSpec(relational_db_spec.RelationalDbSpec):
           'Machine type cannot be specified when using Aurora express '
           'configuration.'
       )
+    if self.aws_aurora_snapshot_identifier and self.engine not in [
+        sql_engine_utils.AURORA_MYSQL,
+        sql_engine_utils.AURORA_POSTGRES,
+    ]:
+      raise errors.Config.InvalidValue(
+          'Snapshot restoration is only supported for Aurora.'
+      )
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -76,6 +84,10 @@ class AwsRelationalDbSpec(relational_db_spec.RelationalDbSpec):
         'aws_aurora_express_configuration': (
             option_decoders.BooleanDecoder,
             {'default': False},
+        ),
+        'aws_aurora_snapshot_identifier': (
+            option_decoders.StringDecoder,
+            {'default': None, 'none_ok': True},
         ),
     })
     return result
@@ -91,4 +103,8 @@ class AwsRelationalDbSpec(relational_db_spec.RelationalDbSpec):
     if flag_values['aws_aurora_express_configuration'].present:
       config_values['aws_aurora_express_configuration'] = (
           flag_values.aws_aurora_express_configuration
+      )
+    if flag_values['aws_aurora_snapshot_identifier'].present:
+      config_values['aws_aurora_snapshot_identifier'] = (
+          flag_values.aws_aurora_snapshot_identifier
       )
