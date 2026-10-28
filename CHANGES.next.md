@@ -732,3 +732,5 @@
     `MEMPOOL_CACHE_SIZE` constant in `app/l2p.h`).
 -   Replace deprecated `pkg_resources` usages with `importlib.resources`,
     `importlib.metadata`, and `packaging.requirements`.
+-   Fix MySQL APT install on GnuPG 2.1+ (e.g. Ubuntu 24.04) writing the repo
+    key as a keybox file that apt ignores; use a legacy `gnupg-ring:` keyring.
