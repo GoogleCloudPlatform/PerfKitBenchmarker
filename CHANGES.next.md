@@ -732,3 +732,5 @@
     `MEMPOOL_CACHE_SIZE` constant in `app/l2p.h`).
 -   Replace deprecated `pkg_resources` usages with `importlib.resources`,
     `importlib.metadata`, and `packaging.requirements`.
+-   Optimize MySQL 8.0 configuration and Sysbench bulk load for the LSSD
+    workload (`unmanaged_mysql_sysbench_lssd`).

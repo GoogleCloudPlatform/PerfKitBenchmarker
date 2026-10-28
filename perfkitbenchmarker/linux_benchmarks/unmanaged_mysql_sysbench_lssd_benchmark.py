@@ -20,6 +20,8 @@ with FIO prefilling of the disk.
 
 import logging
 from absl import flags
+from perfkitbenchmarker import linux_virtual_machine
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_benchmarks import lssd_workloads_util
 from perfkitbenchmarker.linux_benchmarks import unmanaged_mysql_sysbench_benchmark as base_benchmark
 from perfkitbenchmarker.linux_packages import mysql80
@@ -38,6 +40,24 @@ BENCHMARK_CONFIG = (
     .replace('sysbench_run_seconds: 300', 'sysbench_run_seconds: 21600')
 )
 MYSQL_DATA_DIR = '/var/lib/mysql'
+_NOFILE_LIMIT = 500000
+
+# LSSD-specific MySQL and InnoDB tuning parameters applied to [mysqld] so
+# PD-based benchmarks sharing ha.cnf.j2 remain unaffected.
+_LSSD_MYSQLD_OVERRIDES = {
+    'tmpdir': f'{MYSQL_DATA_DIR}/tmp',
+    'innodb_tmpdir': f'{MYSQL_DATA_DIR}/tmp',
+    'open_files_limit': str(_NOFILE_LIMIT),
+    'table_open_cache': '250000',
+    'table_definition_cache': '20000',
+    'innodb_io_capacity': '20000',
+    'innodb_io_capacity_max': '40000',
+    'innodb_flush_neighbors': '0',
+    'innodb_change_buffering': 'all',
+    'innodb_change_buffer_max_size': '25',
+    'innodb_buffer_pool_load_at_startup': '1',
+    'innodb_buffer_pool_dump_at_shutdown': '1',
+}
 
 
 def GetConfig(user_config):
@@ -47,6 +67,81 @@ def GetConfig(user_config):
       benchmark_config=BENCHMARK_CONFIG,
       benchmark_name=BENCHMARK_NAME,
   )
+
+
+def _ConfigureMysqlForLssd(
+    server: linux_virtual_machine.BaseLinuxVirtualMachine, config_path: str
+) -> None:
+  """Applies LSSD-specific MySQL settings to mysqld.cnf."""
+  server.RemoteCommand(f'sudo mkdir -p {MYSQL_DATA_DIR}/tmp')
+  server.RemoteCommand(f'sudo chown mysql:mysql {MYSQL_DATA_DIR}/tmp')
+
+  keys_pattern = '|'.join(_LSSD_MYSQLD_OVERRIDES.keys())
+  server.RemoteCommand(
+      f"sudo sed -i -E '/^({keys_pattern})\\s*=/d' {config_path}"
+  )
+  overrides_block = '\\n'.join(
+      f'{k} = {v}' for k, v in _LSSD_MYSQLD_OVERRIDES.items()
+  )
+  server.RemoteCommand(
+      f"sudo sed -i 's|^\\[mysql\\]|{overrides_block}\\n\\n[mysql]|'"
+      f' {config_path}'
+  )
+  if not FLAGS.mysql_disable_log_bin:
+    # Disable binary logging during bulk data loading so prepare-phase binlogs
+    # do not exhaust local SSD capacity.
+    server.RemoteCommand(
+        "sudo sed -i 's|^enforce-gtid-consistency.*|"
+        f"enforce-gtid-consistency\\ndisable_log_bin|' {config_path}"
+    )
+
+
+def _EnableBinlogAndRestartMysql(
+    server: linux_virtual_machine.BaseLinuxVirtualMachine, config_path: str
+) -> None:
+  """Re-enables binary logging, raises nofile limit, and restarts mysqld."""
+  logging.info('Enabling binary logging and restarting mysqld...')
+  password = FLAGS.run_uri + '_P3rfk1tbenchm4rker#'
+  socket_path = f'{MYSQL_DATA_DIR}/mysql.sock'
+  if not FLAGS.mysql_disable_log_bin:
+    server.RemoteCommand(f"sudo sed -i '/^disable_log_bin/d' {config_path}")
+  server.RemoteCommand(
+      f"sudo mysqladmin -u root -p'{password}' -S {socket_path} shutdown"
+  )
+
+  @vm_util.Retry(
+      poll_interval=1,
+      timeout=300,
+      retryable_exceptions=(mysql80.MysqldFailedToStopError,),
+  )
+  def _WaitUntilMysqlStopped() -> None:
+    _, _, retcode = server.RemoteCommandWithReturnCode(
+        'pgrep -x mysqld', ignore_failure=True
+    )
+    if retcode == 0:
+      raise mysql80.MysqldFailedToStopError('mysqld is still running.')
+
+  _WaitUntilMysqlStopped()
+  server.RemoteCommand(
+      f"sudo sed -i 's/nofile.*/nofile {_NOFILE_LIMIT}/'"
+      ' /etc/security/limits.conf'
+  )
+  server.RemoteCommand('sudo -g mysql -u mysql nohup mysqld &> /dev/null &')
+
+  @vm_util.Retry(
+      poll_interval=1,
+      timeout=300,
+      retryable_exceptions=(mysql80.MysqldFailedToStartError,),
+  )
+  def _WaitUntilMysqlReady() -> None:
+    _, _, retcode = server.RemoteCommandWithReturnCode(
+        f"sudo mysqladmin -u root -p'{password}' -S {socket_path} ping",
+        ignore_failure=True,
+    )
+    if retcode != 0:
+      raise mysql80.MysqldFailedToStartError('mysqld is not ready yet.')
+
+  _WaitUntilMysqlReady()
 
 
 def Prepare(benchmark_spec):
@@ -78,20 +173,17 @@ def Prepare(benchmark_spec):
         server, fs_type=FLAGS.disk_fs_type
     )
 
-  # Install mysql on the final filesystem and point its tmpdirs at the LSSD.
+  # Install mysql on the final filesystem and apply LSSD configuration.
   base_benchmark.InstallPackages(benchmark_spec)
   config_path = mysql80.GetOSDependentDefaults(server.OS_TYPE)[
       mysql80.MYSQL_CONFIG_PATH
   ]
-  server.RemoteCommand(f'sudo mkdir -p {MYSQL_DATA_DIR}/tmp')
-  server.RemoteCommand(f'sudo chown mysql:mysql {MYSQL_DATA_DIR}/tmp')
-  server.RemoteCommand(
-      f"sudo sed -i 's|^tmpdir.*|tmpdir = {MYSQL_DATA_DIR}/tmp\\ninnodb_tmpdir"
-      f" = {MYSQL_DATA_DIR}/tmp|' {config_path}"
-  )
+  _ConfigureMysqlForLssd(server, config_path)
 
   # Start mysqld and load the sysbench data.
   base_benchmark.StartServices(benchmark_spec)
+  _EnableBinlogAndRestartMysql(server, config_path)
+
   logging.info('Checking disk space after database load...')
   stdout, _ = server.RemoteCommand(f'df -h {MYSQL_DATA_DIR}')
   logging.info('Disk space usage for %s:\n%s', MYSQL_DATA_DIR, stdout)
