@@ -732,3 +732,6 @@
     `MEMPOOL_CACHE_SIZE` constant in `app/l2p.h`).
 -   Replace deprecated `pkg_resources` usages with `importlib.resources`,
     `importlib.metadata`, and `packaging.requirements`.
+-   Raise a proper `errors.Config.InvalidValue` when a Beam dynamic pipeline
+    option cannot resolve a NodePort or LoadBalancer IP address, instead of
+    raising a bare string that surfaced as a `TypeError`.
