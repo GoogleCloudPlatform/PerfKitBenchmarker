@@ -36,7 +36,7 @@ FLAGS = flags.FLAGS
 # Used in some fio job files.
 _FILENAME_PREFIX = 'fill-device'
 _MAX_OPEN_FILES = 1000
-_FIO_TEMP_FILE_NAME = 'fio-temp-file'
+FIO_TEMP_FILE_NAME = 'fio-temp-file'
 
 
 def AgainstDevice():
@@ -61,7 +61,7 @@ def GetFilename(disks, device_path=None):
   if AgainstDevice():
     filename = device_path or ':'.join([disk.GetDevicePath() for disk in disks])
   else:
-    filename = None
+    filename = device_path
 
   return filename
 
@@ -407,7 +407,7 @@ def WriteFile(
         f'fill_access_pattern must be "write" or "randwrite", got '
         f'{fill_access_pattern}'
     )
-  filename = f'{disk.GetDevicePath()}/{_FIO_TEMP_FILE_NAME}'
+  filename = f'{disk.GetDevicePath()}/{FIO_TEMP_FILE_NAME}'
   command = (
       f'sudo {exec_path} --filename={filename} '
       f'--ioengine=libaio --name={_FILENAME_PREFIX} '

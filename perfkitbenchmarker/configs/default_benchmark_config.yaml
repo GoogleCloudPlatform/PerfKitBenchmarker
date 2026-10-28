@@ -870,3 +870,11 @@ dpdk_pktgen_multi_nic_gcp:
     dpdk_pktgen_rx_burst: 128
     dpdk_pktgen_num_flows: 12
     dpdk_pktgen_num_memory_channels_per_numa: 2
+
+fio_nfs_latency_single_file:
+  name: fio_nfs
+  flags:
+    data_disk_size: 1024
+    fio_fill_size: 100G
+    fio_generate_scenarios: rand_4k_read_100G_iodepth-1_numjobs-1,rand_4k_write_100G_iodepth-1_numjobs-1
+    fio_runtime: 300
