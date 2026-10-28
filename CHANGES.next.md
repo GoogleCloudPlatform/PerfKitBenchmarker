@@ -734,3 +734,5 @@
     `importlib.metadata`, and `packaging.requirements`.
 -   Fix MySQL APT install on GnuPG 2.1+ (e.g. Ubuntu 24.04) writing the repo
     key as a keybox file that apt ignores; use a legacy `gnupg-ring:` keyring.
+-   Update `bigtable_walkthrough/README.md` to note that the PKB docker image is
+    no longer downloadable.
