@@ -205,6 +205,9 @@ class AzureDatabricksLakebaseTest(pkb_common_test_case.PkbCommonTestCase):
       ('FromExplicitRange', 8.0, 16.0, 8.0, 16.0, '8-16CU'),
       ('FractionalMinAndMax', 0.5, 0.5, 0.5, 0.5, '0.5CU'),
       ('FractionalMinRange', 0.5, 4.0, 0.5, 4.0, '0.5-4CU'),
+      ('MaxAutoscalingRange', 48.0, 64.0, 48.0, 64.0, '48-64CU'),
+      ('MaxFixedSize', 112.0, 112.0, 112.0, 112.0, '112CU'),
+      ('FixedSizeFromExplicitMinOnly', 112.0, None, 112.0, 112.0, '112CU'),
   )
   @flagsaver.flagsaver
   def testResolveComputeUnits(
@@ -372,6 +375,8 @@ class AzureDatabricksLakebaseTest(pkb_common_test_case.PkbCommonTestCase):
       ('MaxLessThanMin', 16.0, 8.0),
       ('SpreadExceeds16', 8.0, 32.0),
       ('ExceedsMax64', 64.0, 72.0),
+      ('AutoscalingRangeAboveMax64', 100.0, 112.0),
+      ('FixedSizeExceedsMax112', 120.0, 120.0),
   )
   @flagsaver.flagsaver
   def testInvalidComputeUnitsRaisesError(self, min_cu: float, max_cu: float):
