@@ -13,9 +13,13 @@
 # limitations under the License.
 """Utility functions for VM local SSD (LSSD) preconditioning and setup."""
 
+from collections.abc import Sequence
 import logging
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import linux_virtual_machine
+
+FLAGS = flags.FLAGS
 
 LSSD_WORKLOAD_PRECONDITION_DISK = flags.DEFINE_bool(
     'lssd_workload_precondition_disk',
@@ -92,4 +96,22 @@ def CreateFileSystemAndMount(
 
   logging.info('Remounting disk')
   vm.MountDisk(device_path, disk.mount_point)
+
+
+def _PreconditionServerDisk(
+    vm: linux_virtual_machine.BaseLinuxVirtualMachine,
+) -> None:
+  """Preconditions and remounts the scratch disk on a server VM."""
+  vm.InstallPackages('fio')
+  PreconditionDisk(vm)
+  CreateFileSystemAndMount(vm, fs_type=FLAGS.disk_fs_type)
+
+
+def PreconditionServerDisksIfEnabled(
+    vms: Sequence[linux_virtual_machine.BaseLinuxVirtualMachine],
+) -> None:
+  """Preconditions and remounts scratch disks on server VMs if enabled."""
+  if LSSD_WORKLOAD_PRECONDITION_DISK.value:
+    logging.info('Preconditioning scratch disks on server VMs.')
+    background_tasks.RunThreaded(_PreconditionServerDisk, vms)
 

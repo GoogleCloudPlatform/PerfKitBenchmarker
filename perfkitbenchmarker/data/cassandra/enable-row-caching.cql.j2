@@ -5,5 +5,5 @@ CREATE TABLE keyspace1.standard1 (
     "C2" blob,
     "C3" blob,
     "C4" blob
-);
+) WITH compaction = {'class': '{{ compaction_strategy }}'};
 ALTER TABLE keyspace1.standard1 WITH caching = {'keys': 'ALL', 'rows_per_partition': 'ALL'};

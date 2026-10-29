@@ -296,13 +296,13 @@ class GceDiskSpec(disk.BaseDiskSpec):
     # Striping all the local ssd disks by default if --num_striped_disks is
     # not set. num_striped_disks is set in config_values if --num_striped_disks
     # is set.
+    machine_type = flag_values.machine_type or flag_values.db_machine_type
     if 'num_striped_disks' not in config_values and (
         config_values.get('disk_type', '') == 'local'
-        and flag_values['machine_type'].present
-        and flag_values.machine_type in FIXED_SSD_MACHINE_TYPES
+        and machine_type in FIXED_SSD_MACHINE_TYPES
     ):
       config_values['num_striped_disks'] = FIXED_SSD_MACHINE_TYPES.get(
-          flag_values.machine_type, 1
+          machine_type, 1
       )
 
   @classmethod
