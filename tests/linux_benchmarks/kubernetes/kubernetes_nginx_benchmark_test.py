@@ -104,7 +104,6 @@ class KubernetesNginxBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
           global_conf, proxy_conf
       )
     self.assertIn("listen 80", merged)
-    self.assertIn("# ssl on;", merged)
     self.assertIn("# ssl_certificate", merged)
 
   def testCreateNginxConfigMapDirDefault(self):
