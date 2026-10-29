@@ -105,9 +105,9 @@ def AptInstall(vm):
     vm.RemoteCommand(
         'cd ~/ffmpeg_sources && wget -O yasm-1.3.0.tar.gz'
         ' https://github.com/yasm/yasm/releases/download/v1.3.0/yasm-1.3.0.tar.gz'
-        ' && tar xzvf yasm-1.3.0.tar.gz && cd yasm-1.3.0 && ./configure'
-        ' --prefix="$HOME/ffmpeg_build" --bindir="$HOME/bin" && make -j && make'
-        ' install'
+        ' && tar xzvf yasm-1.3.0.tar.gz && cd yasm-1.3.0 && CFLAGS="-std=gnu17"'
+        ' ./configure --prefix="$HOME/ffmpeg_build" --bindir="$HOME/bin" &&'
+        ' make -j && make install'
     )
     # Install libx264
     vm.RemoteCommand(
@@ -122,8 +122,11 @@ def AptInstall(vm):
     vm.RemoteCommand(
         'sudo apt-get install libnuma-dev && cd ~/ffmpeg_sources && git clone '
         'https://bitbucket.org/multicoreware/x265_git.git && cd x265_git && '
-        f'git checkout {_LIBX265_TAG} && cd build/linux && '
+        f'git checkout {_LIBX265_TAG} && '
+        "sed -i 's/OLD/NEW/g' source/CMakeLists.txt && "
+        'cd build/linux && '
         'PATH="$HOME/bin:$PATH" cmake -G "Unix Makefiles" '
+        '-DCMAKE_POLICY_VERSION_MINIMUM=3.5 '
         '-DCMAKE_INSTALL_PREFIX="$HOME/ffmpeg_build" -DENABLE_SHARED=off '
         '../../source && PATH="$HOME/bin:$PATH" make && make install'
     )
@@ -158,5 +161,6 @@ def AptInstall(vm):
         '--extra-libs="-lpthread -lm" --bindir="$HOME/bin" --enable-gpl '
         '--enable-libaom --enable-libass --enable-libfreetype '
         '--enable-libvorbis --enable-libvpx --enable-libx264 --enable-libx265 '
-        '--enable-nonfree && PATH="$HOME/bin:$PATH" make -j && make install'
+        '--enable-nonfree --disable-doc && PATH="$HOME/bin:$PATH" make -j && '
+        'make install'
     )
