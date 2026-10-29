@@ -27,6 +27,25 @@ rules. If there are no comments to add, grant approval.
 -   **Client VM Isolation:** Limit new dependencies on the runner VM. Whenever
     possible, install dependencies and execute operations on the *Client VM* or
     *Worker VMs* instead.
+-   **Shared Benchmark Utilities:** Factor reusable workload preparation steps
+    (e.g., disk preconditioning, multi-VM filesystem creation and mounting, disk
+    striping) into common utility modules (e.g., `lssd_workloads_util.py`)
+    instead of duplicating logic across individual benchmark files.
+-   **Separate Benchmarks for High-Variance Hardware/Storage:** Maintain
+    distinct benchmark files (e.g., `cassandra_stress_lssd_benchmark.py` vs.
+    `cassandra_stress_benchmark.py`) for specialized storage or hardware
+    variants (such as Local SSD vs. Persistent Disk) if sharing a single
+    benchmark risks tuning leaks, configuration bleed, or performance drift
+    between variants.
+-   **Client-Server VM Separation:** For benchmarks evaluating server-client
+    architectures, strongly prefer running the server and client on separate VMs
+    rather than colocating them on the same machine to reflect real-world
+    network and resource behavior.
+-   **Split Monolithic Multi-Workload Suites:** If an external harness or
+    benchmark suite bundles disparate sub-workloads with fundamentally different
+    installation, dependencies, or runtime requirements, separate them into
+    dedicated benchmark modules rather than a single complex benchmark with
+    multiple modes.
 
 ## 2. Configuration & Flags
 
@@ -42,6 +61,20 @@ rules. If there are no comments to add, grant approval.
     don't need to be exposed in metadata. Fetching real values from a cloud
     resource rather than relying on a flag directly can also be preferable for
     metadata.
+-   **Conditional Metadata for Unset/Dynamic Flags:** When exposing optional
+    tuning flags that have dynamic or complex underlying defaults (e.g., cache
+    sizes defaulting to a percentage of JVM heap), only include the values in
+    `Sample.metadata` when explicitly configured or non-default, to avoid
+    misleading `None` or inaccurate placeholder values.
+-   **No Redundant Function Parameters for Flags:** Avoid accepting function
+    parameters that merely duplicate existing global flag values when the
+    function can read the flag directly.
+-   **No Redundant Default None for Flag Arguments:** Do not specify default
+    `=None` arguments on internal functions when every caller passes a flag that
+    already defines a standard default.
+-   **Parameterize Workload Execution Timings:** Critical execution parameters
+    (such as warmup time, test duration, or thread counts) should be
+    configurable flags or spec attributes, not hardcoded dictionary literals.
 -   **Single-Use Flags:** Mark flags private if used only in one file.
 -   **Namespace Custom Flags:** Flags must be explicit (e.g.,
     `gke_python_benchmark_threads` has the prefix `gke_python_benchmark`).
@@ -74,6 +107,15 @@ rules. If there are no comments to add, grant approval.
 
 -   **No Inline Dependencies:** Do not add inline module imports inside
     functions.
+-   **Factor Literals into Module Constants:** Extract magic strings, repository
+    URLs (e.g. Git clone URLs), and static file paths into module-level
+    uppercase constants.
+-   **No Boilerplate No-Op Functions:** Do not define empty or no-op functions
+    (such as a `Cleanup` function that only executes `del vm`) when no teardown
+    or resource cleanup is actually performed.
+-   **Docstring Code Formatting:** Format code symbols, class names, and
+    function references inside docstrings with backticks (e.g.
+    `` `base_benchmark.Prepare` ``) for clarity and readability.
 -   **Memoization:** Implement `@functools.lru_cache` for repetitive operations.
 -   **Type Hinting:** Pytype annotations are mandatory.
 
