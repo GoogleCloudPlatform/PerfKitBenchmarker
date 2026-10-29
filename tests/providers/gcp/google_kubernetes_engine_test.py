@@ -559,6 +559,40 @@ class GoogleKubernetesEngineAsyncOpsTestCase(PatchedObjectsTestCase):
         cluster._IssueAsync(cmd)
       # pylint: enable=protected-access
 
+  def test_delete_node_pool_sync(self):
+    """DeleteNodePool issues synchronous gcloud container node-pools delete."""
+    spec = self._spec()
+    with self.patch_critical_objects() as issue_command:
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      cluster.DeleteNodePool('ccc-pool-1')
+    self.assertIn(
+        'gcloud container node-pools delete ccc-pool-1',
+        issue_command.all_commands,
+    )
+    self.assertIn('--quiet', issue_command.all_commands)
+    self.assertNotIn('--async', issue_command.all_commands)
+    self.assertEqual(
+        issue_command.func_to_mock.call_args.kwargs.get('raise_on_failure'),
+        False,
+    )
+
+  def test_delete_node_pool_async(self):
+    """DeleteNodePool passes --async when wait=False."""
+    spec = self._spec()
+    with self.patch_critical_objects() as issue_command:
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      cluster.DeleteNodePool('ccc-pool-1', wait=False)
+    self.assertIn(
+        'gcloud container node-pools delete ccc-pool-1',
+        issue_command.all_commands,
+    )
+    self.assertIn('--quiet', issue_command.all_commands)
+    self.assertIn('--async', issue_command.all_commands)
+    self.assertEqual(
+        issue_command.func_to_mock.call_args.kwargs.get('raise_on_failure'),
+        False,
+    )
+
 
 class GoogleKubernetesEngineGvnicFlagTestCase(PatchedObjectsTestCase):
 
