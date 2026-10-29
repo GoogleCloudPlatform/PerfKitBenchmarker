@@ -863,6 +863,24 @@ class GCEVMFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
       vm._Create()
       return ' '.join(issue_command.call_args[0][0]), issue_command.call_count
 
+  def testMaxRunDurationDeletesByDefault(self):
+    cmd, call_count = self._CreateVmCommand(gce_max_run_duration=3600)
+    self.assertEqual(call_count, 1)
+    self.assertIn('--max-run-duration 3600s', cmd)
+    self.assertIn('--instance-termination-action DELETE', cmd)
+
+  def testMaxRunDurationWithStopAction(self):
+    cmd, _ = self._CreateVmCommand(
+        gce_max_run_duration=600, gce_instance_termination_action='STOP'
+    )
+    self.assertIn('--max-run-duration 600s', cmd)
+    self.assertIn('--instance-termination-action STOP', cmd)
+
+  def testNoMaxRunDurationByDefault(self):
+    cmd, _ = self._CreateVmCommand()
+    self.assertNotIn('--max-run-duration', cmd)
+    self.assertNotIn('--instance-termination-action', cmd)
+
   def testPreemptibleVMFlag(self):
     cmd, call_count = self._CreateVmCommand(gce_preemptible_vms=True)
     self.assertEqual(call_count, 1)
