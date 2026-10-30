@@ -273,6 +273,9 @@ redis_memtier_caching_single_node:
     <<: *redis_memtier_single_base
     memtier_ratio: '1:4'
     redis_server_io_threads: '1,2,3,4'
+    memtier_key_maximum: 6000000
+    load_key_ratio: 0.4
+    max_key_ratio: 0.4
 
 redis_memtier_caching_cluster:
   name: redis_memtier

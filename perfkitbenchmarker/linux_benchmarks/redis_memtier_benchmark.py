@@ -175,6 +175,7 @@ def StartServices(bm_spec: _BenchmarkSpec) -> None:
   # Load the redis server with preexisting data.
   # Run 4 at a time with only the first client VM to reduce memory
   # fragmentation and avoid overloading the server
+  _ConfigureKeyMaximums(server_vm)
   bm_spec.redis_endpoint_ip = server_vm.GetInternalIPs()
   ports = redis_server.GetRedisPorts(server_vm)
   ports_group_of_four = [ports[i : i + 4] for i in range(0, len(ports), 4)]
@@ -198,6 +199,7 @@ def Run(bm_spec: _BenchmarkSpec) -> List[sample.Sample]:
   server_vm: virtual_machine.BaseVirtualMachine | None = None
   if 'servers' in bm_spec.vm_groups:
     server_vm = bm_spec.vm_groups['servers'][0]
+    _ConfigureKeyMaximums(server_vm)
 
   server_names = (
       [vm.name for vm in bm_spec.vm_groups['servers']]
@@ -280,6 +282,26 @@ def Run(bm_spec: _BenchmarkSpec) -> List[sample.Sample]:
 
 def Cleanup(bm_spec: _BenchmarkSpec) -> None:
   del bm_spec
+
+
+def _ConfigureKeyMaximums(
+    server_vm: virtual_machine.BaseVirtualMachine,
+) -> None:
+  """Calculates memtier key maximums from server memory and CPU count."""
+  if not memtier.LOAD_KEY_RATIO.value and not memtier.MAX_KEY_RATIO.value:
+    return
+  kb_to_gb = 1.0 / 1000000
+  key_max_1gb = 1000000
+  memory_gb = server_vm.total_memory_kb * kb_to_gb
+  num_cpus = server_vm.NumCpusForBenchmark()
+  if memtier.LOAD_KEY_RATIO.value:
+    FLAGS.memtier_load_key_maximum = int(
+        memtier.LOAD_KEY_RATIO.value * (memory_gb / num_cpus) * key_max_1gb
+    )
+  if memtier.MAX_KEY_RATIO.value:
+    FLAGS.memtier_key_maximum = int(
+        memtier.MAX_KEY_RATIO.value * (memory_gb / num_cpus) * key_max_1gb
+    )
 
 
 def _UpdateIOThreadsForRedisServer(
