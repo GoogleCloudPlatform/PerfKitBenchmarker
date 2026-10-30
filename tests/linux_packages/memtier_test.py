@@ -11,6 +11,7 @@ from absl.testing import parameterized
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import test_util
+from perfkitbenchmarker.linux_benchmarks import redis_memtier_benchmark
 from perfkitbenchmarker.linux_packages import memtier
 from tests import matchers
 from tests import pkb_common_test_case
@@ -1999,6 +2000,44 @@ class MemtierTestCase(
     meta = memtier.GetMetadata(clients=100, threads=4, pipeline=1)
     self.assertNotIn('memtier_data_size', meta)
     self.assertEqual(meta['memtier_data_size_list'], '1024:1,32:2')
+
+  @flagsaver.flagsaver(load_key_ratio=0.4, max_key_ratio=0.8)
+  def testGetMetadataWithKeyRatios(self):
+    meta = memtier.GetMetadata(clients=100, threads=4, pipeline=1)
+    self.assertEqual(meta['load_key_ratio'], 0.4)
+    self.assertEqual(meta['max_key_ratio'], 0.8)
+
+  @flagsaver.flagsaver(
+      load_key_ratio=0.9,
+      max_key_ratio=1.1,
+      memtier_load_key_maximum=100,
+      memtier_key_maximum=200,
+  )
+  def testConfigureKeyMaximumsOverridesFlagsFromServerSpecs(self):
+    server_vm = mock.MagicMock()
+    server_vm.total_memory_kb = 16000000
+    server_vm.NumCpusForBenchmark.return_value = 4
+
+    redis_memtier_benchmark._ConfigureKeyMaximums(server_vm)
+
+    self.assertEqual(FLAGS.memtier_load_key_maximum, 3600000)
+    self.assertEqual(FLAGS.memtier_key_maximum, 4400000)
+
+  @flagsaver.flagsaver(
+      load_key_ratio=None,
+      max_key_ratio=None,
+      memtier_load_key_maximum=100,
+      memtier_key_maximum=200,
+  )
+  def testConfigureKeyMaximumsPreservesFlagsWhenRatiosUnset(self):
+    server_vm = mock.MagicMock()
+    server_vm.total_memory_kb = 16000000
+    server_vm.NumCpusForBenchmark.return_value = 4
+
+    redis_memtier_benchmark._ConfigureKeyMaximums(server_vm)
+
+    self.assertEqual(FLAGS.memtier_load_key_maximum, 100)
+    self.assertEqual(FLAGS.memtier_key_maximum, 200)
 
 
 if __name__ == '__main__':

@@ -193,6 +193,24 @@ MEMTIER_KEY_MAXIMUM = flags.DEFINE_integer(
         ' specified max key value.'
     ),
 )
+LOAD_KEY_RATIO = flags.DEFINE_float(
+    'load_key_ratio',
+    None,
+    (
+        'Ratio of keys to load into Redis relative to server memory per CPU.'
+        ' If set, overrides memtier_load_key_maximum.'
+    ),
+    lower_bound=0,
+)
+MAX_KEY_RATIO = flags.DEFINE_float(
+    'max_key_ratio',
+    None,
+    (
+        'Ratio of maximum keys for the memtier workload relative to server'
+        ' memory per CPU. If set, overrides memtier_key_maximum.'
+    ),
+    lower_bound=0,
+)
 MEMTIER_LATENCY_CAPPED_THROUGHPUT = flags.DEFINE_bool(
     'latency_capped_throughput',
     False,
@@ -1325,6 +1343,10 @@ def GetMetadata(clients: int, threads: int, pipeline: int) -> Dict[str, Any]:
     meta['memtier_cpu_duration'] = MEMTIER_CPU_DURATION.value
   if MEMTIER_LOAD_KEY_MAXIMUM.value:
     meta['memtier_load_key_maximum'] = MEMTIER_LOAD_KEY_MAXIMUM.value
+  if LOAD_KEY_RATIO.value is not None:
+    meta['load_key_ratio'] = LOAD_KEY_RATIO.value  # pyrefly: ignore[bad-assignment]
+  if MAX_KEY_RATIO.value is not None:
+    meta['max_key_ratio'] = MAX_KEY_RATIO.value  # pyrefly: ignore[bad-assignment]
   return meta
 
 
