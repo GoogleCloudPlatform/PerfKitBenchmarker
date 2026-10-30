@@ -40,7 +40,7 @@ class GceClusterSpec(cluster.BaseClusterSpec):
   CLOUD = provider_info.GCP
 
 
-class GceCluster(cluster.BaseCluster):
+class GceCluster(cluster.SlurmCluster):
   """Class to represent a GCE cluster."""
 
   CLOUD = provider_info.GCP

@@ -35,7 +35,7 @@ class AWSClusterSpec(cluster.BaseClusterSpec):
   CLOUD = provider_info.AWS
 
 
-class AWSCluster(cluster.BaseCluster):
+class AWSCluster(cluster.SlurmCluster):
   """Class to represent a AWS cluster."""
 
   CLOUD = provider_info.AWS
