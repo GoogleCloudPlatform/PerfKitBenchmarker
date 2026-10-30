@@ -459,20 +459,83 @@ sysbench_oltp_base_lssd: &sysbench_oltp_base_lssd
 
 mysql_sysbench_oltp_read_write:
   name: unmanaged_mysql_sysbench
-  flags:
+  flags: &mysql_sysbench_oltp_read_write
     sysbench_testname: oltp_read_write
     <<: *sysbench_oltp_base
 
-mysql_sysbench_oltp_read_only:
+mysql_sysbench_oltp_read_write_in_memory:
   name: unmanaged_mysql_sysbench
   flags:
+    innodb_buffer_pool_size: 100
+    <<: *mysql_sysbench_oltp_read_write
+  vm_groups: &mysql_sysbench_in_memory_vm_groups
+    server:
+      disk_spec:
+        GCP:
+          disk_size: 50
+          disk_type: hyperdisk-balanced
+          provisioned_iops: 12000
+          provisioned_throughput: 180
+          num_striped_disks: 10
+        AWS:
+          disk_size: 50
+          disk_type: gp3
+          provisioned_iops: 12000
+          provisioned_throughput: 180
+          num_striped_disks: 10
+        Azure:
+          disk_size: 50
+          disk_type: PremiumV2_LRS
+          provisioned_iops: 12000
+          provisioned_throughput: 180
+          num_striped_disks: 10
+
+mysql_sysbench_oltp_read_write_on_disk:
+  name: unmanaged_mysql_sysbench
+  flags:
+    innodb_buffer_pool_size: 8
+    <<: *mysql_sysbench_oltp_read_write
+  vm_groups: &mysql_sysbench_on_disk_vm_groups
+    server:
+      disk_spec:
+        GCP:
+          disk_size: 50
+          disk_type: hyperdisk-balanced
+          provisioned_iops: 15000
+          provisioned_throughput: 280
+          num_striped_disks: 10
+        AWS:
+          disk_size: 50
+          disk_type: gp3
+          provisioned_iops: 12000
+          provisioned_throughput: 313
+          num_striped_disks: 10
+
+mysql_sysbench_oltp_read_only:
+  name: unmanaged_mysql_sysbench
+  flags: &mysql_sysbench_oltp_read_only
     sysbench_testname: oltp_read_only
     <<: *sysbench_oltp_base
+
+mysql_sysbench_oltp_read_only_in_memory:
+  name: unmanaged_mysql_sysbench
+  flags:
+    innodb_buffer_pool_size: 100
+    <<: *mysql_sysbench_oltp_read_only
+  vm_groups: *mysql_sysbench_in_memory_vm_groups
+
+mysql_sysbench_oltp_read_only_on_disk:
+  name: unmanaged_mysql_sysbench
+  flags:
+    innodb_buffer_pool_size: 8
+    <<: *mysql_sysbench_oltp_read_only
+  vm_groups: *mysql_sysbench_on_disk_vm_groups
 
 mysql_sysbench_oltp_write_only:
   name: unmanaged_mysql_sysbench
   flags:
     sysbench_testname: oltp_write_only
+    innodb_buffer_pool_size: 100
     <<: *sysbench_oltp_base
 
 mysql_sysbench_oltp_read_only_lssd:
