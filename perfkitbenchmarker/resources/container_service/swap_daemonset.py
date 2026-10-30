@@ -38,14 +38,13 @@ import posixpath
 import textwrap
 from typing import Any, Optional
 from absl import flags
-
-FLAGS = flags.FLAGS
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.resources.container_service import kubectl
 from perfkitbenchmarker.resources.container_service import kubernetes_commands
 
+FLAGS = flags.FLAGS
 
 
 def _ParseCipher(dmsetup_status: str) -> str:
@@ -95,7 +94,6 @@ class SwapDaemonSet(resource.BaseResource):
   """
 
   RESOURCE_TYPE = 'SwapDaemonSet'
-  REQUIRED_ATTRS = []
 
   def __init__(
       self,

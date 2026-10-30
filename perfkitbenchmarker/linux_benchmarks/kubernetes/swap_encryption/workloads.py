@@ -20,7 +20,8 @@ Mirrors the pattern used by fio/utils.py for the fio benchmark.
 PR4 adds cpu_overhead (stress-ng CPU overhead sweep) and io_interference (IO
 interference
 under concurrent swap pressure) on top of the PR3 fio fio microbenchmarks.
-CPU Overhead / IO Interference flags are defined here to keep this module
+# CPU Overhead / IO Interference flags
+# (defined here; benchmark.py defines general execution flags).
 self-contained.
 """
 
@@ -43,7 +44,8 @@ from perfkitbenchmarker.resources.container_service import kubectl
 from perfkitbenchmarker.resources.container_service import swap_daemonset as _ds_mod
 
 # ---------------------------------------------------------------------------
-# CPU Overhead / IO Interference flags (defined here; benchmark.py defines general execution flags).
+# CPU Overhead / IO Interference flags
+# (defined here; benchmark.py defines general execution flags).
 # ---------------------------------------------------------------------------
 
 _STRESS_TIMEOUT_SEC = flags.DEFINE_integer(
@@ -154,6 +156,7 @@ def RunFio(  # pylint: disable=invalid-name
 
   results = []
 
+  daemonset.PodExec(f'mkdir -p {vm_util.VM_TMP_DIR}', ignore_failure=True)
   daemonset.PodExec(f'swapoff {swap_dev}', ignore_failure=True)
 
   prefill_timeout = _PREFILL_GIB * 1024 // 150 + 60
@@ -165,7 +168,7 @@ def RunFio(  # pylint: disable=invalid-name
       (
           f'fio --name=prefill --filename={swap_dev} --ioengine=libaio'
           f' --direct=1 --rw=write --bs=1m --size={_PREFILL_GIB}g --verify=0'
-          ' --output={vm_util.VM_TMP_DIR}/pkb_fio_prefill.log'
+          f' --output={vm_util.VM_TMP_DIR}/pkb_fio_prefill.log'
       ),
       timeout=prefill_timeout,
       ignore_failure=True,
@@ -338,13 +341,13 @@ def _cgroup_swap_limit_mb(daemonset) -> float:
       fi
     done
   """)
-  try:
-    out, _ = daemonset.PodExec(probe, timeout=20, ignore_failure=True)
-  except Exception as e:  # pylint: disable=broad-exception-caught  # pylint: disable=broad-except
-    logging.info('[swap_encryption] cgroup swap-limit probe failed: %s', e)
-    return -1.0
-
+  out, _ = daemonset.PodExec(probe, timeout=20, ignore_failure=True)
   text = (out or '').strip()
+  if not text:
+    logging.info(
+        '[swap_encryption] cgroup swap-limit probe failed or returned empty'
+    )
+    return -1.0
   m = re.search(r'V2=(\S+)', text)
   if m:
     val = m.group(1)
@@ -465,7 +468,7 @@ def _autoscale_vm_bytes(
       return new_vm_bytes
 
     return vm_bytes
-  except Exception as e:  # pylint: disable=broad-exception-caught  # pylint: disable=broad-except
+  except Exception as e:  # pylint: disable=broad-exception-caught,broad-except
     logging.info(
         '[swap_encryption] _autoscale failed (%s); keeping %s', e, vm_bytes
     )
@@ -494,7 +497,7 @@ def _get_stress_vm_method(daemonset) -> str:
         timeout=15,
     )
     combined = out.lower()
-  except Exception as e:  # pylint: disable=broad-exception-caught  # pylint: disable=broad-except
+  except Exception as e:  # pylint: disable=broad-exception-caught,broad-except
     logging.info(
         '[swap_encryption] vm-method detection failed (%s); using rand-set', e
     )
@@ -948,7 +951,7 @@ def RunIoInterference(  # pylint: disable=invalid-name
 
   try:
     _wait_for_stress_warmup()
-  except Exception:  # pylint: disable=broad-exception-caught
+  except Exception:  # pylint: disable=broad-exception-caught,broad-except
     logging.info(
         '[swap_encryption] timed out waiting for swap usage > 0, continuing'
     )
@@ -1114,11 +1117,24 @@ _KERNEL_MEMORY_MB = flags.DEFINE_integer(
     'Memory limit in MB for the cgroup used during the constrained build.',
 )
 
+_REDIS_DATASET_MB = flags.DEFINE_integer(
+    'swap_encryption_redis_dataset_mb',
+    2048,
+    'Dataset size in MB to populate into redis.',
+)
+
+_REDIS_MAXMEMORY_MB = flags.DEFINE_integer(
+    'swap_encryption_redis_maxmemory_mb',
+    1024,
+    'Memory limit in MB for the cgroup used for redis-server.',
+)
+
 
 def RunRedis(
     daemonset: Any,
     base_metadata: dict[str, Any],
     redis_memory_mb: int = 2048,
+    dataset_mb: int = 2400,
 ) -> list[sample.Sample]:
   """Measure redis performance under normal swap environment.
 
@@ -1126,6 +1142,7 @@ def RunRedis(
     daemonset: Active SwapDaemonSet resource.
     base_metadata: Shared metadata dict from BuildMetadata().
     redis_memory_mb: cgroup memory limit in MB for redis-server.
+    dataset_mb: Dataset size in MB to populate into redis.
 
   Returns:
     List of Sample objects from memtier benchmark.
@@ -1135,16 +1152,23 @@ def RunRedis(
       textwrap.dedent("""
     command -v redis-server >/dev/null 2>&1 && command -v memtier_benchmark >/dev/null 2>&1 && command -v cgexec >/dev/null 2>&1 || {
       apt-get update -qq
-      apt-get install -y -qq redis-server memtier-benchmark cgroup-tools
+      apt-get install -y -qq redis-server cgroup-tools
+      apt-get install -y -qq memtier-benchmark || {
+        apt-get install -y -qq build-essential autoconf automake libpcre3-dev libevent-dev pkg-config zlib1g-dev libssl-dev curl
+        cd /tmp
+        curl -sL https://github.com/RedisLabs/memtier_benchmark/archive/refs/tags/2.1.0.tar.gz | tar -xz
+        cd memtier_benchmark-2.1.0
+        autoreconf -ivf && ./configure && make -j$(nproc) && make install
+      }
     }
   """),
-      timeout=180,
+      timeout=300,
   )
 
   daemonset.PodExec(
       'pkill -9 redis-server 2>/dev/null || true',
       ignore_failure=True,
-      _retries=0,
+      retries=0,
   )
 
   mem_bytes = redis_memory_mb * 1024 * 1024
@@ -1178,7 +1202,7 @@ def RunRedis(
   if cgroup_mode == 'CGROUPV1':
     redis_cmd = 'cgexec -g memory:pkb_redis redis-server --daemonize yes'
   elif cgroup_mode == 'CGROUPV2':
-    redis_cmd = textwrap.dedent(f"""
+    redis_cmd = textwrap.dedent("""
       set -e
       echo $$ > /sys/fs/cgroup/pkb_redis/cgroup.procs
       redis-server --daemonize yes
@@ -1201,9 +1225,10 @@ def RunRedis(
   # Calculate data size to exceed RAM limit by ~20%.
   # RAM limit is redis_memory_mb (e.g. 2048 MB).
   # We want ~2400 MB of data. If key-size is 32 and data-size is 1024,
-  # total bytes per record is ~1056. Number of keys needed: 2400 * 1024 * 1024 / 1056 = ~2,383,000 keys.
+  # total bytes per record is ~1056.
+  # Number of keys needed: 2400 * 1024 * 1024 / 1056 = ~2,383,000 keys.
   # Let's use 2,500,000 keys of 1024 bytes data-size to generate ~2.5GB.
-  num_keys = int((redis_memory_mb * 1.2 * 1024 * 1024) / 1056)
+  num_keys = int((dataset_mb * 1024 * 1024) / 1056)
   logging.info(
       '[swap_encryption] Populating redis with %d keys to exceed %d MB RAM',
       num_keys,
@@ -1213,14 +1238,15 @@ def RunRedis(
   try:
     # Population phase
     daemonset.PodExec(
-        f'memtier_benchmark -p 6379 -t 4 -c 50 -d 1024 --key-maximum={num_keys}'
-        ' --key-pattern=G:G --ratio=1:0 -n allkeys',
+        f'memtier_benchmark -p 6379 -t 1 -c 1 -d 1024 --key-maximum={num_keys}'
+        ' --key-pattern=S:S --ratio=1:0 -n allkeys --pipeline 100',
         timeout=600,
     )
     # Test phase
     out, _ = daemonset.PodExec(
         f'memtier_benchmark -p 6379 -t 4 -c 50 -d 1024 --key-maximum={num_keys}'
-        ' --key-pattern=R:R --ratio=1:10 --test-time=30',
+        ' --key-pattern=R:R --ratio=1:10 --test-time=30'
+        ' --print-percentile 50,90,95,99,99.5,99.9,99.95,99.99',
         timeout=300,
     )
     parsed = memtier.MemtierResult.Parse(out, None)
@@ -1232,14 +1258,14 @@ def RunRedis(
           'workload': 'redis',
       })
       results.append(sample_obj)
-  except Exception as e:  # pylint: disable=broad-exception-caught  # pylint: disable=broad-except
+  except Exception as e:  # pylint: disable=broad-exception-caught,broad-except
     logging.error('[swap_encryption] Failed to run or parse memtier: %s', e)
     raise
   finally:
     daemonset.PodExec(
         'pkill -9 redis-server 2>/dev/null || true',
         ignore_failure=True,
-        _retries=0,
+        retries=0,
     )
   return results
 

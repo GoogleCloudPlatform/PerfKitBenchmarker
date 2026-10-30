@@ -22,6 +22,7 @@ After the Zac review refactor:
 import unittest
 from unittest import mock
 
+from absl import flags
 from perfkitbenchmarker.linux_benchmarks.kubernetes.swap_encryption import (
     swap_encryption_benchmark,
 )
@@ -67,6 +68,51 @@ class GetConfigTest(pkb_common_test_case.PkbCommonTestCase):
     ]
     self.assertIn('swap_config', nodepool)
     self.assertTrue(nodepool['swap_config'].get('enabled', False))
+
+  def test_get_config_machine_type_override(self):
+
+    flags.FLAGS.swap_encryption_benchmark_machine_type = 'custom-machine'
+    config = swap_encryption_benchmark.GetConfig({})
+    gcp_spec = config['container_cluster']['nodepools']['benchmark']['vm_spec'][
+        'GCP'
+    ]
+    self.assertEqual(gcp_spec['machine_type'], 'custom-machine')
+
+  def test_get_config_boot_disk_type_override(self):
+
+    flags.FLAGS.swap_encryption_boot_disk_type = 'pd-ssd'
+    config = swap_encryption_benchmark.GetConfig({})
+    gcp_spec = config['container_cluster']['nodepools']['benchmark']['vm_spec'][
+        'GCP'
+    ]
+    self.assertEqual(gcp_spec['boot_disk_type'], 'pd-ssd')
+
+
+class RunTest(pkb_common_test_case.PkbCommonTestCase):
+
+  @mock.patch.object(
+      swap_encryption_benchmark._workloads, 'RunRedis', return_value=[]
+  )
+  def test_run_redis(self, mock_run_redis):
+
+    flags.FLAGS.swap_encryption_workloads = ['redis']
+    flags.FLAGS.swap_encryption_fail_on_degraded = False
+
+    mock_spec = mock.MagicMock()
+    mock_spec.container_cluster.nodepools = {'benchmark': mock.MagicMock()}
+    mock_spec.container_cluster.nodepools['benchmark'].machine_type = (
+        'n2-standard-4'
+    )
+    mock_spec.container_cluster.GetClusterInfo.return_value = 'cluster-info'
+    mock_spec.container_cluster.kubeconfig = 'dummy'
+
+    with mock.patch.object(
+        swap_encryption_benchmark,
+        '_GetDaemonset',
+        return_value=mock.MagicMock(),
+    ):
+      swap_encryption_benchmark.Run(mock_spec)
+      mock_run_redis.assert_called_once()
 
 
 class ParseCipherTest(pkb_common_test_case.PkbCommonTestCase):
@@ -169,3 +215,6 @@ class GetResourceMetadataTest(pkb_common_test_case.PkbCommonTestCase):
       ds.GetResourceMetadata()
 
 
+if __name__ == '__main__':
+
+  unittest.main()

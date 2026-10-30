@@ -811,6 +811,7 @@ class GkeCluster(BaseGkeCluster):
         'deployment/kube-dns',
         condition_name='Available',
         namespace='kube-system',
+        timeout=600,
     )
 
   def _GetInstanceGroups(self):
