@@ -13,7 +13,9 @@
 # limitations under the License.
 """Module containing class for GCP's Bigquery EDW service."""
 
+from collections.abc import Sequence
 import copy
+import dataclasses
 import datetime
 import json
 import logging
@@ -26,7 +28,9 @@ from typing import Any, override
 from absl import flags
 from perfkitbenchmarker import benchmark_spec as bm_spec
 from perfkitbenchmarker import data
+from perfkitbenchmarker import edw_ai_extract_lib
 from perfkitbenchmarker import edw_service
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import google_cloud_sdk
@@ -63,9 +67,58 @@ BQ_CA_CLAUDE_MODEL = flags.DEFINE_string(
     'Model to use for Claude Client in Conversational Analytics benchmarking.',
 )
 
+_AI_EXTRACT_PASS1_MODEL = flags.DEFINE_string(
+    'ai_extract_pass1_model',
+    'gemini-3.5-flash',
+    'Gemini AI extract Pass 1 (extractor) model.',
+)
+_AI_EXTRACT_PASS2_MODEL = flags.DEFINE_string(
+    'ai_extract_pass2_model',
+    'gemini-3.8-flash',
+    'Gemini AI extract Pass 2 (auditor) model.',
+)
+_AI_EXTRACT_TEMPERATURE = flags.DEFINE_float(
+    'ai_extract_temperature',
+    0.0,
+    'Gemini AI extract: google-genai GenerateContentConfig.temperature'
+    ' (sampling randomness) used by both Gemini passes.',
+)
+_AI_EXTRACT_TOP_K = flags.DEFINE_integer(
+    'ai_extract_top_k',
+    40,
+    'Gemini AI extract: google-genai GenerateContentConfig.top_k (sample from'
+    ' the k most likely tokens) used by both Gemini passes.',
+)
+_AI_EXTRACT_TOP_P = flags.DEFINE_float(
+    'ai_extract_top_p',
+    1.0,
+    'Gemini AI extract: google-genai GenerateContentConfig.top_p (nucleus'
+    ' sampling: sample from the smallest token set whose cumulative'
+    ' probability is >= top_p) used by both Gemini passes.',
+)
+_AI_EXTRACT_THINKING_LEVEL = flags.DEFINE_enum(
+    'ai_extract_thinking_level',
+    'MEDIUM',
+    ['MINIMAL', 'LOW', 'MEDIUM', 'HIGH'],
+    'Gemini AI extract: google-genai ThinkingConfig.thinking_level (Gemini'
+    ' 3.x) used by both Gemini passes.',
+)
+_AI_EXTRACT_NUM_THREADS = flags.DEFINE_integer(
+    'ai_extract_num_threads',
+    50,
+    'Gemini AI extract driver concurrency for document processing.',
+)
+
 BQ_CLIENT_FILE = 'bq-jdbc-simba-client-1.8-temp-labels.jar'
 BQ_PYTHON_CLIENT_FILE = 'bq_python_driver.py'
 BQ_PYTHON_CLIENT_DIR = 'edw/bigquery/clients/python'
+# The Gemini AI extract driver is developed internally as of now.
+AI_EXTRACT_DRIVER_FILE = 'bq_ai_extract_driver.py'
+AI_EXTRACT_VERTEX_LOCATION = 'global'
+_AI_EXTRACT_REQUEST_FILE = 'ai_extract_request.json'
+_AI_EXTRACT_OUTPUT_FILE = 'ai_extract_records.jsonl'
+# Reported for a latency metric when no document succeeded (no samples).
+AI_EXTRACT_MISSING_LATENCY_SEC = -1.0
 CLAUDE_PYTHON_DRIVER_FILE = 'claude_python_driver.py'
 CLAUDE_CLIENT_SYSTEM_PROMPT = (
     'You are a helpful assistant. Use the available BigQuery MCP tools to'
@@ -831,6 +884,200 @@ def _NormalizeReservationLocation(location: str) -> str:
   return location
 
 
+@dataclasses.dataclass(frozen=True)
+class GeminiAiExtractSettings:
+  """google-genai generation settings shared by both Gemini passes."""
+
+  pass1_model: str
+  pass2_model: str
+  temperature: float
+  top_k: int
+  top_p: float
+  thinking_level: str
+  num_threads: int
+
+
+def GeminiDriverRecordToResult(
+    raw: dict[str, Any], settings: GeminiAiExtractSettings
+) -> edw_ai_extract_lib.AiExtractDocumentResult:
+  """Convert one bq_ai_extract_driver output line to a document result."""
+  if raw['status'] not in ('ok', 'error') or (raw['status'] == 'error') != (
+      raw['error'] is not None
+  ):
+    raise ValueError(
+        f'Invalid driver record status for {raw["doc_id"]}:'
+        f' status={raw["status"]!r} error={raw["error"]!r}'
+    )
+  ok = raw['status'] == 'ok'
+  usage = dict(raw['usage'])
+  usage['pass1_model'] = settings.pass1_model
+  usage['pass2_model'] = settings.pass2_model
+  return edw_ai_extract_lib.AiExtractDocumentResult(
+      doc_id=raw['doc_id'],
+      error=None if ok else raw['error'],
+      raw_output=json.dumps({
+          'raw_text_p1': raw['raw_text_p1'],
+          'raw_text_p2': raw['raw_text_p2'],
+          'audit': raw['audit'],
+      }),
+      prediction=raw['pass1_json'] if ok else {},
+      confidence=raw['confidence'] if ok else None,
+      usage=usage,
+  )
+
+
+def _MeanLatency(values: Sequence[float]) -> float:
+  """Return mean latency, or AI_EXTRACT_MISSING_LATENCY_SEC if empty."""
+  return (
+      sum(values) / len(values) if values else AI_EXTRACT_MISSING_LATENCY_SEC
+  )
+
+
+class GeminiAiExtractClientInterface(edw_service.EdwAiExtractClientInterface):
+  """Gemini two-pass AI extract (Pass 1 extractor + Pass 2 auditor).
+
+  Runs the dedicated google-genai driver in its own virtualenv on the client
+  VM, reading documents directly from GCS; it does not use the BigQuery query
+  client interface.
+  """
+
+  system = 'gcp_gemini_two_pass'
+  emits_confidence = True
+
+  def __init__(
+      self,
+      project_id: str,
+      key_file: str,
+      settings: GeminiAiExtractSettings,
+  ):
+    """Initialize the client.
+
+    Args:
+      project_id: GCP project ID for Vertex AI and GCS reads.
+      key_file: Service account key file as a local path (pushed to the VM) or
+        the name of a preprovisioned file.
+      settings: Gemini generation settings.
+    """
+    self.client_vm: Any = None
+    self.project_id = project_id
+    self.key_file = key_file
+    self.settings = settings
+
+  @override
+  def SetProvisionedAttributes(
+      self, benchmark_spec: bm_spec.BenchmarkSpec
+  ) -> None:
+    self.client_vm = benchmark_spec.vms[0]
+
+  @override
+  def Prepare(self, package_name: str) -> None:
+    vm = self.client_vm
+    if '/' in self.key_file:
+      vm.PushFile(self.key_file)
+    else:
+      vm.InstallPreprovisionedPackageData(package_name, [self.key_file], '')
+    vm.Install('pip')
+    vm.RemoteCommand(
+        'sudo apt-get -qq update && DEBIAN_FRONTEND=noninteractive sudo'
+        ' apt-get -qq install python3.12-venv'
+    )
+    vm.RemoteCommand('python3 -m venv .venv')
+    vm.RemoteCommand(
+        'source .venv/bin/activate && pip install google-genai'
+        ' google-cloud-storage absl-py'
+    )
+    vm.PushDataFile(os.path.join(BQ_PYTHON_CLIENT_DIR, AI_EXTRACT_DRIVER_FILE))
+
+  @override
+  def Extract(
+      self,
+      documents: edw_ai_extract_lib.AiExtractDocuments,
+      schema: edw_ai_extract_lib.AiExtractSchema,
+  ) -> edw_ai_extract_lib.AiExtractResult:
+    vm = self.client_vm
+    request = {
+        'documents': [
+            {'doc_id': doc_id, 'uri': documents.GcsUri(doc_id)}
+            for doc_id in documents.doc_ids
+        ],
+        'nested_template': schema.NestedTemplate(),
+        'response_schema': schema.GeminiResponseSchema(),
+    }
+    vm_util.CreateRemoteFile(vm, json.dumps(request), _AI_EXTRACT_REQUEST_FILE)
+    settings = self.settings
+    cmd = (
+        f'.venv/bin/python {AI_EXTRACT_DRIVER_FILE}'
+        f' --project={self.project_id}'
+        f' --location={AI_EXTRACT_VERTEX_LOCATION}'
+        f' --credentials_file={os.path.basename(self.key_file)}'
+        f' --pass1_model={settings.pass1_model}'
+        f' --pass2_model={settings.pass2_model}'
+        f' --temperature={settings.temperature} --top_k={settings.top_k}'
+        f' --top_p={settings.top_p} --thinking_level={settings.thinking_level}'
+        f' --num_threads={settings.num_threads}'
+        f' --request_file={_AI_EXTRACT_REQUEST_FILE}'
+        f' --output_file={_AI_EXTRACT_OUTPUT_FILE}'
+    )
+    stdout, _ = vm.RobustRemoteCommand(cmd)
+    summary = json.loads(stdout.strip().splitlines()[-1])
+    output_file_path = os.path.join(
+        vm_util.GetTempDir(), _AI_EXTRACT_OUTPUT_FILE
+    )
+    vm.PullFile(output_file_path, _AI_EXTRACT_OUTPUT_FILE)
+    with open(output_file_path) as f:
+      raw_records = [json.loads(line) for line in f if line.strip()]
+    results = [
+        GeminiDriverRecordToResult(record, settings) for record in raw_records
+    ]
+    edw_ai_extract_lib.CheckAiExtractCoverage(results, documents.doc_ids)
+    usages = [result.usage for result in results]
+    ok_usages = [result.usage for result in results if result.error is None]
+    totals = {
+        key: sum(usage[key] for usage in usages)
+        for key in (
+            'pass1_input_tokens',
+            'pass1_output_tokens',
+            'pass2_input_tokens',
+            'pass2_output_tokens',
+        )
+    }
+    return edw_ai_extract_lib.AiExtractResult(
+        wall_time_sec=summary['extract_wall_time_sec'],
+        document_results=results,
+        usage_metadata=totals,
+        extra_metrics=[
+            (
+                'pass1_latency',
+                _MeanLatency(
+                    [usage['pass1_latency_sec'] for usage in ok_usages]
+                ),
+                'sec',
+            ),
+            (
+                'pass2_latency',
+                _MeanLatency(
+                    [usage['pass2_latency_sec'] for usage in ok_usages]
+                ),
+                'sec',
+            ),
+        ]
+        + [(name, float(value), 'tokens') for name, value in totals.items()],
+    )
+
+  @override
+  def GetMetadata(self) -> dict[str, str]:
+    settings = self.settings
+    return {
+        'pass1_model': settings.pass1_model,
+        'pass2_model': settings.pass2_model,
+        'temperature': str(settings.temperature),
+        'top_k': str(settings.top_k),
+        'top_p': str(settings.top_p),
+        'thinking_level': settings.thinking_level,
+        'num_threads': str(settings.num_threads),
+    }
+
+
 class Bigquery(edw_service.EdwService):
   """Object representing a Bigquery cluster.
 
@@ -860,6 +1107,29 @@ class Bigquery(edw_service.EdwService):
           project_id, dataset_id
       )
     return ConversationalAnalyticsClientInterface(project_id, dataset_id)
+
+  @override
+  def GetAiExtractClientInterface(self) -> GeminiAiExtractClientInterface:
+    """Return the Gemini two-pass AI extract client for this project."""
+    key_file = gcp_flags.GCP_SERVICE_ACCOUNT_KEY_FILE.value
+    if not key_file:
+      raise errors.Config.InvalidValue(
+          '--gcp_service_account_key_file is required for Gemini AI extract.'
+      )
+    project_id, _ = _SplitClusterIdentifier(self.cluster_identifier)
+    return GeminiAiExtractClientInterface(
+        project_id,
+        key_file,
+        GeminiAiExtractSettings(
+            pass1_model=_AI_EXTRACT_PASS1_MODEL.value,
+            pass2_model=_AI_EXTRACT_PASS2_MODEL.value,
+            temperature=_AI_EXTRACT_TEMPERATURE.value,
+            top_k=_AI_EXTRACT_TOP_K.value,
+            top_p=_AI_EXTRACT_TOP_P.value,
+            thinking_level=_AI_EXTRACT_THINKING_LEVEL.value,
+            num_threads=_AI_EXTRACT_NUM_THREADS.value,
+        ),
+    )
 
   def _Create(self):
     """Create a BigQuery cluster.

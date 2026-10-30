@@ -14,12 +14,15 @@
 """Tests for perfkitbenchmarker.providers.gcp.bigquery."""
 
 import json
+from typing import Any
 import unittest
 from unittest import mock
 from absl.testing import flagsaver
 from absl.testing import parameterized
+from perfkitbenchmarker import edw_ai_extract_lib
 from perfkitbenchmarker import edw_service
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import bigquery
 from perfkitbenchmarker.providers.gcp import flags as gcp_flags
 from tests import pkb_common_test_case
@@ -1175,6 +1178,405 @@ class BigqueryTestCase(pkb_common_test_case.PkbCommonTestCase):
       interface.Prepare(PACKAGE_NAME)
 
     self.assertEqual(interface.key_file_path, '/home/perfkit/key.json')
+
+
+_AI_EXTRACT_DOCS = edw_ai_extract_lib.AiExtractDocuments(
+    dataset_id='paystub',
+    storage_prefix='gs://bucket/bqmmdlab/paystub/',
+    paths={
+        '0001': 'documents/0001.pdf',
+        '0002': 'documents/0002.pdf',
+    },
+)
+
+_GEMINI_SETTINGS = bigquery.GeminiAiExtractSettings(
+    'gemini-3.5-flash',
+    'gemini-3.7-flash',
+    0.0,
+    40,
+    1.0,
+    'MEDIUM',
+    8,
+)
+
+
+class _FakeAiExtractSchema:
+  """Minimal schema stub satisfying AiExtractSchema."""
+
+  def NestedTemplate(self) -> dict[str, Any]:
+    return {'name': "employee's name", 'item': [{'amount': 'amount'}]}
+
+  def GeminiResponseSchema(self) -> dict[str, Any]:
+    return {'type': 'OBJECT', 'properties': {'name': {'type': 'STRING'}}}
+
+  def SnowflakeResponseFormat(self) -> dict[str, Any]:
+    return {}
+
+  def SnowflakeResponseToCanonical(
+      self, response: dict[str, Any]
+  ) -> dict[str, Any]:
+    return response
+
+  def DatabricksSchema(self) -> dict[str, Any]:
+    return {}
+
+  def DatabricksResponseToCanonical(
+      self, response: dict[str, Any]
+  ) -> dict[str, Any]:
+    return response
+
+
+class GeminiAiExtractTest(pkb_common_test_case.PkbCommonTestCase):
+
+  def setUp(self):
+    super().setUp()
+    self.remote_files: dict[str, str] = {}
+    self.enter_context(
+        mock.patch.object(
+            vm_util,
+            'CreateRemoteFile',
+            autospec=True,
+            side_effect=lambda vm, text, path, write_mode='w': (
+                self.remote_files.__setitem__(path, text)
+            ),
+        )
+    )
+    self.enter_context(
+        mock.patch.object(
+            vm_util,
+            'GetTempDir',
+            autospec=True,
+            return_value=self.create_tempdir().full_path,
+        )
+    )
+
+  def _CreateClient(
+      self, key_file: str
+  ) -> tuple[bigquery.GeminiAiExtractClientInterface, mock.MagicMock]:
+    mock_vm = mock.MagicMock()
+    client = bigquery.GeminiAiExtractClientInterface(
+        'proj', key_file, _GEMINI_SETTINGS
+    )
+    client.SetProvisionedAttributes(FakeBenchmarkSpec(mock_vm))
+    return client, mock_vm
+
+  def _SetDriverOutput(
+      self,
+      mock_vm: mock.MagicMock,
+      robust_stdout: str,
+      records: list[dict[str, Any]],
+  ) -> None:
+    pulled_text = ''.join(json.dumps(record) + '\n' for record in records)
+
+    def _PullFile(local_path: str, remote_path: str) -> None:
+      del remote_path
+      with open(local_path, 'w') as f:
+        f.write(pulled_text)
+
+    mock_vm.RobustRemoteCommand.return_value = (robust_stdout, '')
+    mock_vm.PullFile.side_effect = _PullFile
+
+  def testGeminiDriverRecordToResultOk(self):
+    raw = {
+        'doc_id': '0001',
+        'status': 'ok',
+        'error': None,
+        'pass1_json': {'name': 'Jane'},
+        'raw_text_p1': '{}',
+        'raw_text_p2': '{}',
+        'audit': {'0': {'confidence': 'High'}},
+        'confidence': {'name': ['High']},
+        'usage': {
+            'pass1_input_tokens': 1000,
+            'pass1_output_tokens': 100,
+            'pass2_input_tokens': 2000,
+            'pass2_output_tokens': 200,
+            'pass1_latency_sec': 1.0,
+            'pass2_latency_sec': 2.0,
+        },
+    }
+
+    result = bigquery.GeminiDriverRecordToResult(raw, _GEMINI_SETTINGS)
+
+    with self.subTest('error'):
+      self.assertIsNone(result.error)
+    with self.subTest('prediction'):
+      self.assertEqual(result.prediction, {'name': 'Jane'})
+    with self.subTest('confidence'):
+      self.assertEqual(result.confidence, {'name': ['High']})
+    with self.subTest('usage'):
+      self.assertEqual(
+          result.usage,
+          dict(
+              raw['usage'],
+              pass1_model='gemini-3.5-flash',
+              pass2_model='gemini-3.7-flash',
+          ),
+      )
+
+  def testGeminiDriverRecordToResultError(self):
+    raw = {
+        'doc_id': '0001',
+        'status': 'error',
+        'error': 'pass1 JSON error',
+        'pass1_json': {'name': 'Jane'},
+        'raw_text_p1': 'garbage',
+        'raw_text_p2': '',
+        'audit': {},
+        'confidence': {'name': ['High']},
+        'usage': {
+            'pass1_input_tokens': 1000,
+            'pass1_output_tokens': 100,
+            'pass2_input_tokens': 0,
+            'pass2_output_tokens': 0,
+            'pass1_latency_sec': 1.0,
+            'pass2_latency_sec': 0.0,
+        },
+    }
+
+    errored = bigquery.GeminiDriverRecordToResult(raw, _GEMINI_SETTINGS)
+
+    with self.subTest('error'):
+      self.assertEqual(errored.error, 'pass1 JSON error')
+    with self.subTest('prediction'):
+      self.assertEqual(errored.prediction, {})
+    with self.subTest('confidence'):
+      self.assertIsNone(errored.confidence)
+
+  @parameterized.named_parameters(
+      ('error_without_message', 'error', None),
+      ('ok_with_error_message', 'ok', 'x'),
+      ('unknown_status', '?', None),
+  )
+  def testGeminiDriverRecordRejectsInconsistentStatus(self, status, error):
+    raw = {'doc_id': '0001', 'status': status, 'error': error}
+    with self.assertRaisesRegex(ValueError, 'Invalid driver record'):
+      bigquery.GeminiDriverRecordToResult(raw, _GEMINI_SETTINGS)
+
+  def testGeminiPreparePushesLocalKeyFile(self):
+    client, mock_vm = self._CreateClient('/keys/k.json')
+
+    client.Prepare('edw_common')
+
+    mock_vm.PushFile.assert_called_once_with('/keys/k.json')
+    mock_vm.InstallPreprovisionedPackageData.assert_not_called()
+    mock_vm.Install.assert_called_once_with('pip')
+    mock_vm.PushDataFile.assert_called_once_with(
+        'edw/bigquery/clients/python/bq_ai_extract_driver.py'
+    )
+
+  def testGeminiPrepareInstallsPreprovisionedKeyFile(self):
+    client, mock_vm = self._CreateClient('k.json')
+
+    client.Prepare('edw_common')
+
+    mock_vm.InstallPreprovisionedPackageData.assert_called_once_with(
+        'edw_common', ['k.json'], ''
+    )
+    mock_vm.PushFile.assert_not_called()
+
+  def testGeminiExtract(self):
+    usage = {
+        'pass1_input_tokens': 1000,
+        'pass1_output_tokens': 100,
+        'pass2_input_tokens': 2000,
+        'pass2_output_tokens': 200,
+        'pass1_latency_sec': 1.0,
+        'pass2_latency_sec': 3.0,
+    }
+    records = [
+        {
+            'doc_id': '0001',
+            'status': 'ok',
+            'error': None,
+            'pass1_json': {'name': 'Jane', 'item': [{'amount': '10'}]},
+            'raw_text_p1': '{}',
+            'raw_text_p2': '{}',
+            'audit': {},
+            'confidence': {
+                'name': ['High'],
+                'item.amount': ['Need human review'],
+            },
+            'usage': usage,
+        },
+        {
+            'doc_id': '0002',
+            'status': 'error',
+            'error': 'pass1 JSON error: x',
+            'pass1_json': {},
+            'raw_text_p1': 'garbage',
+            'raw_text_p2': '',
+            'audit': {},
+            'confidence': {},
+            'usage': dict(
+                usage,
+                pass2_input_tokens=0,
+                pass2_output_tokens=0,
+                pass2_latency_sec=0.0,
+            ),
+        },
+    ]
+    client, mock_vm = self._CreateClient('/keys/k.json')
+    self._SetDriverOutput(
+        mock_vm,
+        robust_stdout='log line\n{"extract_wall_time_sec": 7.5}\n',
+        records=records,
+    )
+    schema = _FakeAiExtractSchema()
+
+    run = client.Extract(_AI_EXTRACT_DOCS, schema)
+
+    mock_vm.RobustRemoteCommand.assert_called_once_with(
+        '.venv/bin/python bq_ai_extract_driver.py'
+        ' --project=proj --location=global --credentials_file=k.json'
+        ' --pass1_model=gemini-3.5-flash --pass2_model=gemini-3.7-flash'
+        ' --temperature=0.0 --top_k=40 --top_p=1.0 --thinking_level=MEDIUM'
+        ' --num_threads=8 --request_file=ai_extract_request.json'
+        ' --output_file=ai_extract_records.jsonl'
+    )
+    request = json.loads(self.remote_files['ai_extract_request.json'])
+    with self.subTest('request_payload'):
+      self.assertEqual(
+          request,
+          {
+              'documents': [
+                  {
+                      'doc_id': '0001',
+                      'uri': 'gs://bucket/bqmmdlab/paystub/documents/0001.pdf',
+                  },
+                  {
+                      'doc_id': '0002',
+                      'uri': 'gs://bucket/bqmmdlab/paystub/documents/0002.pdf',
+                  },
+              ],
+              'nested_template': schema.NestedTemplate(),
+              'response_schema': schema.GeminiResponseSchema(),
+          },
+      )
+    with self.subTest('wall_time'):
+      self.assertEqual(run.wall_time_sec, 7.5)
+    with self.subTest('document_results'):
+      self.assertEqual(
+          [r.error for r in run.document_results], [None, 'pass1 JSON error: x']
+      )
+      self.assertIsNone(run.document_results[1].confidence)
+    with self.subTest('usage_metadata'):
+      self.assertEqual(
+          run.usage_metadata,
+          {
+              'pass1_input_tokens': 2000,
+              'pass1_output_tokens': 200,
+              'pass2_input_tokens': 2000,
+              'pass2_output_tokens': 200,
+          },
+      )
+    with self.subTest('extra_metrics'):
+      metrics = {
+          name: (value, unit) for name, value, unit in run.extra_metrics
+      }
+      self.assertEqual(metrics['pass1_latency'], (1.0, 'sec'))
+      self.assertEqual(metrics['pass2_latency'], (3.0, 'sec'))
+      self.assertEqual(metrics['pass1_input_tokens'], (2000.0, 'tokens'))
+      self.assertEqual(metrics['pass2_output_tokens'], (200.0, 'tokens'))
+
+  def testGeminiExtractAllFailedReportsMissingLatency(self):
+    usage = {
+        'pass1_input_tokens': 1000,
+        'pass1_output_tokens': 100,
+        'pass2_input_tokens': 0,
+        'pass2_output_tokens': 0,
+        'pass1_latency_sec': 4.0,
+        'pass2_latency_sec': 0.0,
+    }
+    records = [
+        {
+            'doc_id': '0001',
+            'status': 'error',
+            'error': 'pass1 JSON error: x',
+            'pass1_json': {},
+            'raw_text_p1': 'garbage',
+            'raw_text_p2': '',
+            'audit': {},
+            'confidence': {},
+            'usage': usage,
+        },
+        {
+            'doc_id': '0002',
+            'status': 'error',
+            'error': 'pass1 JSON error: y',
+            'pass1_json': {},
+            'raw_text_p1': 'garbage',
+            'raw_text_p2': '',
+            'audit': {},
+            'confidence': {},
+            'usage': usage,
+        },
+    ]
+    client, mock_vm = self._CreateClient('/keys/k.json')
+    self._SetDriverOutput(
+        mock_vm,
+        robust_stdout='{"extract_wall_time_sec": 2.0}\n',
+        records=records,
+    )
+
+    run = client.Extract(_AI_EXTRACT_DOCS, _FakeAiExtractSchema())
+
+    with self.subTest('document_errors'):
+      self.assertEqual(
+          [r.error for r in run.document_results],
+          ['pass1 JSON error: x', 'pass1 JSON error: y'],
+      )
+    with self.subTest('missing_latency_sentinel'):
+      metrics = {
+          name: (value, unit) for name, value, unit in run.extra_metrics
+      }
+      self.assertEqual(metrics['pass1_latency'], (-1.0, 'sec'))
+      self.assertEqual(metrics['pass2_latency'], (-1.0, 'sec'))
+      self.assertEqual(metrics['pass1_input_tokens'], (2000.0, 'tokens'))
+
+  def _CreateBigqueryService(self) -> bigquery.Bigquery:
+    spec = mock.Mock(
+        snapshot=None,
+        concurrency=5,
+        node_type=None,
+        node_count=1,
+        endpoint=None,
+        db=None,
+        user=None,
+        password=None,
+        type='bigquery',
+        cluster_identifier='proj.dataset',
+    )
+    return bigquery.Bigquery(spec)
+
+  @flagsaver.flagsaver(
+      (gcp_flags.GCP_SERVICE_ACCOUNT_KEY_FILE, '/keys/k.json'),
+      (bigquery._AI_EXTRACT_PASS1_MODEL, 'p1'),
+      (bigquery._AI_EXTRACT_NUM_THREADS, 3),
+  )
+  def testBigqueryGetAiExtractClientInterface(self):
+    service = self._CreateBigqueryService()
+
+    client = service.GetAiExtractClientInterface()
+
+    self.assertIsInstance(client, bigquery.GeminiAiExtractClientInterface)
+    with self.subTest('project_and_key'):
+      self.assertEqual(client.project_id, 'proj')
+      self.assertEqual(client.key_file, '/keys/k.json')
+    with self.subTest('settings_and_metadata'):
+      self.assertEqual(client.settings.pass1_model, 'p1')
+      self.assertEqual(client.settings.pass2_model, 'gemini-3.8-flash')
+      self.assertEqual(client.settings.num_threads, 3)
+      self.assertEqual(client.GetMetadata()['pass1_model'], 'p1')
+
+  @flagsaver.flagsaver((gcp_flags.GCP_SERVICE_ACCOUNT_KEY_FILE, None))
+  def testBigqueryGetAiExtractClientInterfaceRequiresKeyFile(self):
+    service = self._CreateBigqueryService()
+
+    with self.assertRaisesRegex(
+        errors.Config.InvalidValue, 'gcp_service_account_key_file'
+    ):
+      service.GetAiExtractClientInterface()
 
 
 if __name__ == '__main__':
