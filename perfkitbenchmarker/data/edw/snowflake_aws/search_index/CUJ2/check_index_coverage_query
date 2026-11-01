@@ -1,0 +1,16 @@
+-- TODO: Remove hardcoded table name
+WITH table_metadata AS PROCEDURE ()
+      RETURNS TABLE()
+      LANGUAGE SQL AS
+      $$
+      DECLARE
+        res RESULTSET;
+      BEGIN
+        res := (SHOW TABLES LIKE 'PROTOTYPE_CUJ2_BENCHMARK_100GB_AND_GROWING');
+        RETURN TABLE(res);
+      END
+      $$
+    CALL table_metadata()
+      ->> SELECT *
+        FROM $1
+        WHERE search_optimization_progress = 100;
