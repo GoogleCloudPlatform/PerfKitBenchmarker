@@ -47,6 +47,9 @@ DEFAULT_LAKEBASE_CU = 2.0
 MEMORY_MIB_PER_CU = 2048
 MIN_AUTOSCALING_CU = 0.5
 MAX_AUTOSCALING_CU = 64.0
+# Computes larger than the autoscaling limit are only available as fixed-size
+# computes (min_cu == max_cu), up to 112 CU.
+MAX_FIXED_SIZE_CU = 112.0
 MAX_AUTOSCALING_CU_SPREAD = 16.0
 
 DEFAULT_BRANCH_ID = 'production'
@@ -204,10 +207,15 @@ class AzureDatabricksLakebase(relational_db.BaseRelationalDb):
     else:
       min_cu = max_cu = DEFAULT_LAKEBASE_CU
 
-    if not (MIN_AUTOSCALING_CU <= min_cu <= max_cu <= MAX_AUTOSCALING_CU):
+    max_cu_limit = (
+        MAX_FIXED_SIZE_CU if min_cu == max_cu else MAX_AUTOSCALING_CU
+    )
+    if not (MIN_AUTOSCALING_CU <= min_cu <= max_cu <= max_cu_limit):
       raise errors.Config.InvalidValue(
           f'Lakebase compute units must satisfy {MIN_AUTOSCALING_CU} <= '
-          f'lakebase_min_cu <= lakebase_max_cu <= {MAX_AUTOSCALING_CU}; got '
+          f'lakebase_min_cu <= lakebase_max_cu <= {MAX_AUTOSCALING_CU} for '
+          'autoscaling computes, or lakebase_min_cu == lakebase_max_cu <= '
+          f'{MAX_FIXED_SIZE_CU} for fixed-size computes; got '
           f'min_cu={min_cu}, max_cu={max_cu}.'
       )
     if (max_cu - min_cu) > MAX_AUTOSCALING_CU_SPREAD:

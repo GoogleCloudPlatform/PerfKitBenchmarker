@@ -500,6 +500,9 @@
     client.
 -   Log still running resources at end of benchmark if teardown phase is
     skipped.
+-   Allow fixed-size Azure Databricks Lakebase computes larger than the 64 CU
+    autoscaling limit, up to 112 CU (`--lakebase_min_cu` ==
+    `--lakebase_max_cu`).
 
 ### Bug fixes and maintenance updates:
 
