@@ -206,7 +206,7 @@ class GceVmSpec(virtual_machine_spec.BaseVmSpec):
     self.num_local_ssds: int = None  # pyrefly: ignore[bad-assignment]
     self.preemptible: bool = None  # pyrefly: ignore[bad-assignment]
     self.boot_disk_size: int = None  # pyrefly: ignore[bad-assignment]
-    self.boot_disk_type: str = None  # pyrefly: ignore[bad-assignment]
+    self.boot_disk_type: str | None = None
     self.boot_disk_iops: int = None  # pyrefly: ignore[bad-assignment]
     self.boot_disk_throughput: int = None  # pyrefly: ignore[bad-assignment]
     # But prefer GetProject()
@@ -223,6 +223,11 @@ class GceVmSpec(virtual_machine_spec.BaseVmSpec):
     self.ssd_interface: str
     self.mtu: int | None
     super().__init__(*args, **kwargs)
+    # Set default boot disk type for Gen 3 and later machines if not specified.
+    if self.boot_disk_type is None and isinstance(self.machine_type, str):
+      generation = _GetMachineGeneration(self.machine_type)
+      if generation and generation >= 3:
+        self.boot_disk_type = 'hyperdisk-balanced'
     # Copy num_local_ssds from flag values to max_local_disks.
     self.max_local_disks: int | None = self.num_local_ssds
     self.boot_disk_spec = boot_disk.BootDiskSpec(
@@ -565,6 +570,15 @@ def GetArmArchitecture(machine_type):
     return None
   prefix = re.split(r'[dn]?\-', machine_type)[0]
   return _MACHINE_TYPE_PREFIX_TO_ARM_ARCH.get(prefix)
+
+
+def _GetMachineGeneration(machine_type: str) -> int | None:
+  """Returns the generation of the machine type (e.g. 3 for c3-standard-4)."""
+  if not machine_type:
+    return None
+  family = machine_type.split('-')[0]
+  match = re.search(r'\d', family)
+  return int(match.group()) if match else None
 
 
 def IsLiveMigratableConfidentialCompute(machine_type: str):
