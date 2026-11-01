@@ -1,0 +1,103 @@
+---
+apiVersion: extensions.agents.x-k8s.io/v1alpha1
+kind: SandboxTemplate
+metadata:
+  name: python-sandbox-template
+  namespace: {{ ns }}
+spec:
+  podTemplate:
+    metadata:
+      labels:
+        sandbox: python-sandbox-example
+    spec:
+      runtimeClassName: gvisor
+      containers:
+      - name: python-runtime
+        image: {{ python_image }}
+      nodeSelector:
+        pkb_nodepool: sandbox
+      tolerations:
+      - key: "sandbox.gke.io/runtime"
+        operator: "Equal"
+        value: "gvisor"
+        effect: "NoSchedule"
+      - key: "dedicated"
+        operator: "Equal"
+        value: "agentic-sandbox"
+        effect: "NoSchedule"
+      restartPolicy: "OnFailure"
+---
+apiVersion: extensions.agents.x-k8s.io/v1alpha1
+kind: SandboxWarmPool
+metadata:
+  name: python-sandbox-warmpool
+  namespace: {{ ns }}
+spec:
+  replicas: {{ warmpool_replicas }}
+  sandboxTemplateRef:
+    name: python-sandbox-template
+---
+apiVersion: extensions.agents.x-k8s.io/v1alpha1
+kind: SandboxTemplate
+metadata:
+  name: chromium-sandbox-template
+  namespace: {{ ns }}
+spec:
+  podTemplate:
+    metadata:
+      labels:
+        sandbox: chromium-sandbox-example
+    spec:
+      runtimeClassName: gvisor
+      containers:
+      - name: chromium-runtime
+        image: {{ chromium_image }}
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            socat TCP-LISTEN:9223,fork,reuseaddr TCP:127.0.0.1:9222 &
+            exec chromium --headless --no-sandbox --disable-gpu --disable-dev-shm-usage --remote-debugging-port=9222 --no-first-run --disable-field-trial-config --user-data-dir=/tmp/chrome-data about:blank
+        ports:
+          - containerPort: 9223
+      nodeSelector:
+        pkb_nodepool: sandbox
+      tolerations:
+      - key: "sandbox.gke.io/runtime"
+        operator: "Equal"
+        value: "gvisor"
+        effect: "NoSchedule"
+      - key: "dedicated"
+        operator: "Equal"
+        value: "agentic-sandbox"
+        effect: "NoSchedule"
+      restartPolicy: "OnFailure"
+---
+apiVersion: extensions.agents.x-k8s.io/v1alpha1
+kind: SandboxWarmPool
+metadata:
+  name: chromium-sandbox-warmpool
+  namespace: {{ ns }}
+spec:
+  replicas: {{ chromium_replicas }}
+  sandboxTemplateRef:
+    name: chromium-sandbox-template
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-orchestrator-to-chromium
+  namespace: {{ ns }}
+spec:
+  podSelector:
+    matchLabels:
+      sandbox: chromium-sandbox-example
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: adk-agent
+    ports:
+    - protocol: TCP
+      port: 9223
