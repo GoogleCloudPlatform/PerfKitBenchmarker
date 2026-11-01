@@ -7,6 +7,35 @@ vars:
   region: {{ region }}
   zone: {{ zone }}
 
+{% if 'staging' in zone %}
+# Add skip validators for staging
+validators:
+  - {validator: test_zone_exists, skip: true}
+  - {validator: test_zone_in_region, skip: true}
+  - {validator: test_region_exists, skip: true}
+  - {validator: test_machine_type_in_zone, skip: true}
+  - {validator: test_disk_type_in_zone, skip: true}
+
+# Add provider overrides for staging
+terraform_providers:
+  google:
+    source: hashicorp/google
+    version: ">= 6.22.0"
+    configuration:
+      project: $(vars.project_id)
+      region: $(vars.region)
+      zone: $(vars.zone)
+      compute_custom_endpoint: "https://compute.mtls.googleapis.com/compute/staging_v1/"
+  google-beta:
+    source: hashicorp/google-beta
+    version: ">= 6.22.0"
+    configuration:
+      project: $(vars.project_id)
+      region: $(vars.region)
+      zone: $(vars.zone)
+      compute_custom_endpoint: "https://compute.mtls.googleapis.com/compute/staging_v1/"
+{% endif %}
+
 deployment_groups:
 - group: primary
   modules:
@@ -32,7 +61,10 @@ deployment_groups:
       enable_public_ips: true
       enable_oslogin: false
       machine_type: {{ worker_machine_type }}
-      disk_type: pd-balanced
+      disk_type: {{ 'hyperdisk-balanced' if 'h4d' in worker_machine_type else 'pd-balanced' }}
+      {% if 'h4d' in worker_machine_type %}
+      on_host_maintenance: TERMINATE
+      {% endif %}
       bandwidth_tier: gvnic_enabled
       allow_automatic_updates: false
       instance_image_custom: true
