@@ -80,6 +80,11 @@ rules. If there are no comments to add, grant approval.
     `gke_python_benchmark_threads` has the prefix `gke_python_benchmark`).
 -   **No 1:1 API Flag Mapping:** Group related features logically rather than
     exposing raw Cloud API arguments 1:1.
+-   **Minimal Configuration Overrides:** When overriding shared service or
+    benchmark configurations for a specific workload variant, only include
+    parameters that differ from defaults and have a verified impact on the
+    workload. Omit redundant overrides that duplicate defaults or alter baseline
+    performance without measured justification.
 
 ## 3. Reliability & Error Handling
 
@@ -116,6 +121,12 @@ rules. If there are no comments to add, grant approval.
 -   **Docstring Code Formatting:** Format code symbols, class names, and
     function references inside docstrings with backticks (e.g.
     `` `base_benchmark.Prepare` ``) for clarity and readability.
+-   **Document Tuning Parameter Rationale and Lifecycle Ordering:** When
+    introducing non-default workload, database, or OS tuning parameters (e.g.,
+    I/O capacities, cache limits, or `ulimit` overrides) or non-obvious service
+    restart sequences across benchmark phases, suggest adding inline comments
+    explaining why each value or step is required (mark review comments for
+    this suggestion as "Optional but good to have").
 -   **Memoization:** Implement `@functools.lru_cache` for repetitive operations.
 -   **Type Hinting:** Pytype annotations are mandatory.
 
