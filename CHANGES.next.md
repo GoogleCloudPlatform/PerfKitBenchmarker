@@ -736,3 +736,6 @@
     key as a keybox file that apt ignores; use a legacy `gnupg-ring:` keyring.
 -   Update `bigtable_walkthrough/README.md` to note that the PKB docker image is
     no longer downloadable.
+-   Suppress `not found: 404` errors from `gcloud storage buckets delete` in
+    `GoogleCloudStorageService.DeleteBucket` when tearing down a bucket that was
+    never created.

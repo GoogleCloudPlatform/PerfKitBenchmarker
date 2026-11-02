@@ -17,6 +17,7 @@ import unittest
 from absl import flags
 from absl.testing import flagsaver
 import mock
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import temp_dir
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import gcs
@@ -135,6 +136,56 @@ class GoogleCloudStorageServiceTestCase(pkb_common_test_case.PkbCommonTestCase):
       mock_make_bucket.assert_called_once_with('test-bucket')
     self.assertEqual(bucket.service.location, 'us-central1')
     self.assertEqual(bucket.service.placement, 'us-central1-a')
+
+  def testDeleteBucketSuppressesNotFoundErrors(self):
+    service = gcs.GoogleCloudStorageService()
+    for not_found_stderr in (
+        'ERROR: (gcloud.storage.rm) gs://test-bucket not found: 404.',
+        'BucketNotFoundException: 404 gs://test-bucket does not exist.',
+    ):
+      with self.subTest(stderr=not_found_stderr):
+
+        def _fake_issue_command(
+            cmd,
+            raise_on_failure=True,
+            suppress_failure=None,
+            stderr=not_found_stderr,
+        ):
+          del cmd
+          if suppress_failure and suppress_failure('', stderr, 1):
+            return '', '', 0
+          if raise_on_failure:
+            raise errors.VmUtil.IssueCommandError(stderr)
+          return '', stderr, 1
+
+        with mock.patch.object(
+            vm_util, 'IssueCommand', side_effect=_fake_issue_command
+        ) as mock_issue:
+          service.DeleteBucket('test-bucket')
+          self.assertEqual(mock_issue.call_count, 2)
+          self.assertEqual(
+              mock_issue.call_args_list[1][0][0],
+              ['gcloud', 'storage', 'buckets', 'delete', 'gs://test-bucket'],
+          )
+
+  @flagsaver.flagsaver(default_timeout=0)
+  def testDeleteBucketRaisesOnOtherErrors(self):
+    service = gcs.GoogleCloudStorageService()
+
+    def _fake_issue_command(cmd, raise_on_failure=True, suppress_failure=None):
+      del cmd
+      stderr = 'ERROR: (gcloud.storage.buckets.delete) HTTPError 403: Denied.'
+      if suppress_failure and suppress_failure('', stderr, 1):
+        return '', '', 0
+      if raise_on_failure:
+        raise errors.VmUtil.IssueCommandError(stderr)
+      return '', stderr, 1
+
+    with mock.patch.object(
+        vm_util, 'IssueCommand', side_effect=_fake_issue_command
+    ):
+      with self.assertRaises(vm_util.TimeoutExceededRetryError):
+        service.DeleteBucket('test-bucket')
 
 
 if __name__ == '__main__':
