@@ -46,6 +46,20 @@ rules. If there are no comments to add, grant approval.
     installation, dependencies, or runtime requirements, separate them into
     dedicated benchmark modules rather than a single complex benchmark with
     multiple modes.
+-   **Functions Over Mixins/Inheritance:** When sharing helper logic between
+    classes, prefer standalone utility/helper functions over creating new
+    mixin classes or complex inheritance hierarchies unless inheritance is
+    strictly necessary.
+-   **Protect Default Provider Behavior:** New provider features, hooks, or
+    optimizations must not alter default behavior, baseline resource
+    allocations, or performance of existing workloads across the board
+    unless explicitly intended. Gate invasive or experimental provider
+    behaviors behind flags.
+-   **Atomic CLs & Split Opportunistic Fixes:** Split large, multi-concern
+    changes into smaller, self-contained CLs (e.g., separating client VM
+    scripts, orchestration glue, and scheduling). Do not bundle
+    opportunistic bug fixes (such as intermittent startup errors) into
+    feature CLs; split them into independent CLs.
 
 ## 2. Configuration & Flags
 
@@ -107,6 +121,11 @@ rules. If there are no comments to add, grant approval.
     but can be okay if the timing is not important, such as when waiting for the
     system to calm down after provisioning/pre-loading.
 -   **Teardown Safety:** All resource teardowns must be idempotent.
+-   **No Redundant Exception Handling with `ignore_failure=True`:** When
+    invoking commands with `ignore_failure=True` or
+    `raise_on_failure=False`, do not wrap calls in redundant
+    `try ... except Exception` blocks to catch command execution errors;
+    instead, inspect the returned stderr, returncode, or stdout directly.
 
 ## 4. Coding Standards
 
@@ -129,10 +148,29 @@ rules. If there are no comments to add, grant approval.
     this suggestion as "Optional but good to have").
 -   **Memoization:** Implement `@functools.lru_cache` for repetitive operations.
 -   **Type Hinting:** Pytype annotations are mandatory.
+-   **No Dead or Speculative Code:** Do not introduce unused helper methods,
+    uncalled functions, or speculative hooks that have no active callers. If
+    code is intended for a child/stacked CL, introduce it in the specific CL
+    where it is actually used.
+-   **Reuse Existing Provider Helpers:** Check for existing helper methods on
+    resource or provider classes (e.g., accessor or spec parsing helpers
+    like `GetNodeSelectors`) and reuse or extend them instead of
+    re-implementing raw dictionary/YAML queries.
+-   **Minimal Diffs and No Incidental Changes:** Keep CL diffs focused
+    strictly on the intended change. Revert incidental changes such as
+    moving existing flags to different positions, no-op variable
+    reassignments, or unrelated formatting tweaks.
 
 ## 5. Performance Metrics
 
 -   **Metadata Reporting:** Variations MUST be reported in `Sample.metadata`.
+
+## 6. Testing & Validation
+
+-   **End-to-End Benchmark Verification:** Unit test coverage in PKB is often
+    limited; verify non-trivial or provider-level changes by running an actual
+    benchmark end-to-end to confirm success, and document the verified
+    benchmark run in the `TESTED=` field.
 
 ## Resource specific comments
 
