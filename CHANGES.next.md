@@ -303,6 +303,9 @@
     BBQpm@SF.
 -   Add --tpcx_bb_kit_bucket_dir to download the TPCx-BB kit from a folder of
     the preprovisioned data bucket other than tpcx_bb/.
+-   Add kubernetes_glm_sglang benchmark, which serves GLM-5.3 with SGLang on GKE
+    a4-highgpu-8g (8x NVIDIA B200) nodes and measures it with
+    sglang.bench_serving.
 
 ### Enhancements:
 
