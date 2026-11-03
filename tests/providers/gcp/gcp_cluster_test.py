@@ -12,7 +12,6 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import gcp_cluster
-from perfkitbenchmarker.resources.container_service import kubectl
 from tests import pkb_common_test_case
 
 
@@ -144,8 +143,37 @@ class GcpClusterTest(pkb_common_test_case.PkbCommonTestCase):
       with self.assertRaises(errors.Benchmarks.UnsupportedConfigError):
         self.cluster.RunJob('unsupported_benchmark')
 
-  def testK8sClusterInitAndPostCreate(self):
+  def testSlurmClusterMissingHeadnodeRaisesInvalidValue(self):
+    workers_config = {
+        'cloud': 'GCP',
+        'os_type': 'ubuntu2004',
+        'vm_spec': {'GCP': {'machine_type': 'a4-highgpu-8g'}},
+    }
+    spec_without_headnode = TestGceClusterSpec(
+        'test_slurm_no_headnode', workers=workers_config
+    )
+    with self.assertRaises(errors.Config.InvalidValue):
+      cluster.SlurmCluster(spec_without_headnode)
+
+  def testK8sClusterMissingDefaultPoolRaisesInvalidValue(self):
+    workers_config = {
+        'cloud': 'GCP',
+        'os_type': 'ubuntu2004',
+        'vm_spec': {'GCP': {'machine_type': 'a4-highgpu-8g'}},
+    }
+    spec_without_default_pool = TestGceClusterSpec(
+        'test_k8s_no_default_pool', workers=workers_config
+    )
+    with self.assertRaises(errors.Config.InvalidValue):
+      cluster.K8sCluster(spec_without_default_pool)
+
+  def testK8sClusterInit(self):
     headnode_config = {
+        'cloud': 'GCP',
+        'os_type': 'ubuntu2004',
+        'vm_spec': {'GCP': {'machine_type': 'c3-standard-88'}},
+    }
+    default_pool_config = {
         'cloud': 'GCP',
         'os_type': 'ubuntu2004',
         'vm_spec': {'GCP': {'machine_type': 'e2-standard-16'}},
@@ -156,21 +184,16 @@ class GcpClusterTest(pkb_common_test_case.PkbCommonTestCase):
         'vm_spec': {'GCP': {'machine_type': 'a4-highgpu-8g'}},
     }
     k8s_spec = TestGceClusterSpec(
-        'test_k8s_spec', headnode=headnode_config, workers=workers_config
+        'test_k8s_spec',
+        headnode=headnode_config,
+        default_pool=default_pool_config,
+        workers=workers_config,
     )
     k8s_cluster = cluster.K8sCluster(k8s_spec)
     k8s_cluster.TYPE = 'a4'
-    self.assertEqual(k8s_cluster.headnode_machine_type, 'e2-standard-16')
+    self.assertFalse(hasattr(k8s_cluster, 'headnode_spec'))
+    self.assertEqual(k8s_cluster.default_pool_machine_type, 'e2-standard-16')
     self.assertEqual(k8s_cluster.worker_machine_type, 'a4-highgpu-8g')
-    with mock.patch.object(
-        kubectl, 'RunKubectlCommand', autospec=True
-    ) as mock_kubectl:
-      k8s_cluster._PostCreate()
-      mock_kubectl.assert_called_once_with([
-          'apply',
-          '-k',
-          cluster._TRAINING_OPERATOR_MANIFEST_URL,
-      ])
 
 
 if __name__ == '__main__':

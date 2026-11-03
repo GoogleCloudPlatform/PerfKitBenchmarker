@@ -34,7 +34,6 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
 from perfkitbenchmarker.configs import vm_group_decoders
-from perfkitbenchmarker.resources.container_service import kubectl
 from perfkitbenchmarker.resources.container_service import kubernetes_commands
 
 
@@ -49,7 +48,7 @@ UNMANAGED = flags.DEFINE_boolean(
     'cluster_unmanaged_provision',
     False,
     'Instead of creating with cluster toolset, relying on cloud provider CLI.'
-    ' e.g. gcloud for gcp, awscli for aws.'
+    ' e.g. gcloud for gcp, awscli for aws.',
 )
 SCHEDULER = flags.DEFINE_enum(
     'cluster_scheduler',
@@ -61,15 +60,17 @@ TYPE = flags.DEFINE_string(
     'cluster_type',
     'default',
     'Type of cluster to use. Chances are clusters vary quite differently and '
-    'may as well use its own template.'
-)
-_TRAINING_OPERATOR_MANIFEST_URL = (
-    'github.com/kubeflow/training-operator/manifests/overlays/standalone'
+    'may as well use its own template.',
 )
 
 
 class BaseClusterSpec(spec.BaseSpec):
   """Storing various data about HPC/ML cluster.
+
+  Note that `headnode` and `default_pool` are scheduler-specific optional
+  sections that may coexist in a benchmark config:
+  - `SlurmCluster` reads `headnode` and ignores `default_pool`.
+  - `K8sCluster` reads `default_pool` and ignores `headnode`.
 
   Attributes:
     zone: The region / zone the in which to launch the cluster.
@@ -80,6 +81,12 @@ class BaseClusterSpec(spec.BaseSpec):
   SPEC_TYPE = 'BaseClusterSpec'
   SPEC_ATTRS = ['CLOUD']
   CLOUD = None
+  workers: vm_group_decoders.VmGroupSpec
+  headnode: vm_group_decoders.VmGroupSpec | None
+  default_pool: vm_group_decoders.VmGroupSpec | None
+  cloud: str | None
+  template: str | None
+  unmanaged: bool
 
   @classmethod
   def _ApplyFlags(cls, config_values, flag_values):
@@ -108,18 +115,22 @@ class BaseClusterSpec(spec.BaseSpec):
     # only apply to workers
     if flag_values['num_vms'].present:
       config_values['workers']['vm_count'] = flag_values['num_vms'].value
-    # flags should be applied to workers and headnode
+    # flags should be applied to workers and headnode/default_pool (if present)
     if flag_values['zone'].present:
       config_values['workers']['vm_spec'][cloud]['zone'] = flag_values[
           'zone'
       ].value[0]
-      config_values['headnode']['vm_spec'][cloud]['zone'] = flag_values[
-          'zone'
-      ].value[0]
+      for group_key in ('headnode', 'default_pool'):
+        if config_values.get(group_key):
+          config_values[group_key]['vm_spec'][cloud]['zone'] = flag_values[
+              'zone'
+          ].value[0]
     for flag_name in ('os_type', 'cloud'):
       if flag_values[flag_name].present:
         config_values['workers'][flag_name] = flag_values[flag_name].value
-        config_values['headnode'][flag_name] = flag_values[flag_name].value
+        for group_key in ('headnode', 'default_pool'):
+          if config_values.get(group_key):
+            config_values[group_key][flag_name] = flag_values[flag_name].value
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -136,7 +147,14 @@ class BaseClusterSpec(spec.BaseSpec):
     result = super()._GetOptionDecoderConstructions()
     result.update({
         'workers': (vm_group_decoders.VmGroupSpecDecoder, {}),
-        'headnode': (vm_group_decoders.VmGroupSpecDecoder, {}),
+        'headnode': (
+            vm_group_decoders.VmGroupSpecDecoder,
+            {'default': None, 'none_ok': True},
+        ),
+        'default_pool': (
+            vm_group_decoders.VmGroupSpecDecoder,
+            {'default': None, 'none_ok': True},
+        ),
         'cloud': (option_decoders.StringDecoder, {'default': None}),
         'template': (option_decoders.StringDecoder, {'default': None}),
         'unmanaged': (option_decoders.BooleanDecoder, {'default': False}),
@@ -150,7 +168,12 @@ def GetClusterSpecClass(cloud: str):
 
 
 def GetClusterClass(cloud: str):
-  """Returns the cluster spec class corresponding to the given service."""
+  """Returns the cluster class corresponding to the given cloud."""
+  if UNMANAGED.value and SCHEDULER.value == 'k8s':
+    raise errors.Config.InvalidValue(
+        '--cluster_unmanaged_provision is not supported with '
+        '--cluster_scheduler=k8s.'
+    )
   if (
       UNMANAGED.value
       and TYPE.value == 'default'
@@ -185,7 +208,7 @@ class BaseCluster(resource.BaseResource):
     """Initialize BaseCluster class.
 
     Args:
-      cluster_spec: cluster.BaseBaseClusterSpec object.
+      cluster_spec: cluster.BaseClusterSpec object.
     """
     super().__init__()
     self.zone: str = cluster_spec.workers.vm_spec.zone
@@ -194,12 +217,6 @@ class BaseCluster(resource.BaseResource):
     self.template: str = cluster_spec.template or self.DEFAULT_TEMPLATE
     self.spec: BaseClusterSpec = cluster_spec
     self.worker_machine_type: str = self.machine_type
-    self.headnode_machine_type: str = (
-        cluster_spec.headnode.vm_spec.machine_type
-    )
-    self.headnode_spec: virtual_machine_spec.BaseVmSpec = (
-        cluster_spec.headnode.vm_spec
-    )
     self.workers_spec: virtual_machine_spec.BaseVmSpec = (
         cluster_spec.workers.vm_spec
     )
@@ -230,7 +247,6 @@ class BaseCluster(resource.BaseResource):
         'zone': self.zone,
         'machine_type': self.machine_type,
         'worker_machine_type': self.worker_machine_type,
-        'headnode_machine_type': self.headnode_machine_type,
         'num_workers': self.num_workers,
         'template': self.template,
     }
@@ -251,13 +267,27 @@ class BaseCluster(resource.BaseResource):
 
 
 class SlurmCluster(BaseCluster):
-  """Base class for VM/Slurm-based clusters."""
+  """Base class for VM/Slurm-based clusters.
+
+  Reads `headnode` (`headnode_spec`, `headnode_machine_type`) from the cluster
+  spec and ignores `default_pool`.
+  """
 
   SCHEDULER = 'slurm'
 
   def __init__(self, cluster_spec: BaseClusterSpec):
     """Initialize SlurmCluster class."""
     super().__init__(cluster_spec)
+    if cluster_spec.headnode is None:
+      raise errors.Config.InvalidValue(
+          'SlurmCluster requires a headnode configuration.'
+      )
+    self.headnode_spec: virtual_machine_spec.BaseVmSpec = (
+        cluster_spec.headnode.vm_spec
+    )
+    self.headnode_machine_type: str = (
+        self.headnode_spec.machine_type
+    )
     self.image: str = cluster_spec.workers.vm_spec.image
     self.workers_static_disk_spec: disk.BaseDiskSpec = (
         cluster_spec.workers.disk_spec
@@ -278,6 +308,7 @@ class SlurmCluster(BaseCluster):
   def GetResourceMetadata(self) -> dict[str, Any]:
     metadata = super().GetResourceMetadata()
     metadata.update({
+        'headnode_machine_type': self.headnode_machine_type,
         'image': self.image,
         'os_type': self.os_type,
         'unmanaged': self.unmanaged,
@@ -485,7 +516,7 @@ class SlurmCluster(BaseCluster):
       benchmark_name,
       image,
       install_path,
-      dockerfile
+      dockerfile,
   ):
     """Download squash image from preprovisoned bucket or built from scratch.
 
@@ -529,13 +560,27 @@ class SlurmCluster(BaseCluster):
 
 
 class K8sCluster(BaseCluster):
-  """Base class for Kubernetes-based clusters (GKE, EKS, CKS)."""
+  """Base class for Kubernetes-based clusters (GKE, EKS, CKS).
+
+  Reads `default_pool` (`default_pool_spec`, `default_pool_machine_type`) from
+  the cluster spec and ignores `headnode`.
+  """
 
   SCHEDULER = 'k8s'
 
   def __init__(self, cluster_spec: BaseClusterSpec):
     """Initialize K8sCluster class."""
     super().__init__(cluster_spec)
+    if cluster_spec.default_pool is None:
+      raise errors.Config.InvalidValue(
+          'K8sCluster requires a default_pool configuration.'
+      )
+    self.default_pool_spec: virtual_machine_spec.BaseVmSpec = (
+        cluster_spec.default_pool.vm_spec
+    )
+    self.default_pool_machine_type: str = (
+        self.default_pool_spec.machine_type
+    )
     if not FLAGS.kubeconfig:
       FLAGS.kubeconfig = vm_util.PrependTempDir(f'kubeconfig{FLAGS.run_uri}')
     self.kubeconfig: str = FLAGS.kubeconfig
@@ -545,18 +590,11 @@ class K8sCluster(BaseCluster):
   def GetResourceMetadata(self) -> dict[str, Any]:
     metadata = super().GetResourceMetadata()
     metadata.update({
+        'default_pool_machine_type': self.default_pool_machine_type,
         'num_nodes': self.num_nodes,
         'k8s_version': self.k8s_version,
     })
     return metadata
-
-  def _PostCreate(self):
-    super()._PostCreate()
-    kubectl.RunKubectlCommand([
-        'apply',
-        '-k',
-        _TRAINING_OPERATOR_MANIFEST_URL,
-    ])
 
   def ApplyManifest(self, manifest_file: str, **kwargs: Any) -> Iterator[str]:
     """Applies a rendered Kubernetes manifest.
