@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: provisioning
+  labels:
+    app: provisioning
+spec:
+  replicas: {{ StartReplicas }}
+  selector:
+    matchLabels:
+      app: provisioning
+  template:
+    metadata:
+      labels:
+        app: provisioning
+      annotations:
+        karpenter.sh/do-not-disrupt: "true"
+    spec:
+{% if RuntimeClassName | default(none) %}
+      runtimeClassName: {{ RuntimeClassName }}
+{% endif %}
+{% set effective_spread = SpreadMode | default(('anti_affinity' if (OnePodPerNode | default(true)) else 'none')) %}
+{% if effective_spread == 'tsc' %}
+      topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: DoNotSchedule
+        labelSelector:
+          matchLabels:
+            app: provisioning
+{% elif effective_spread == 'anti_affinity' %}
+      # Enforce 1 pod per node so burst (0->N) and incremental (1->2) scale-ups
+      # provision N distinct nodes rather than bin-packing onto a single VM.
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchLabels:
+                app: provisioning
+            topologyKey: kubernetes.io/hostname
+{% endif %}
+      # Matches NoSchedule taint on EKS Karpenter provisioning NodePool so pods
+      # land on the right pool. Harmless on GKE (nodes carry no such taint).
+      tolerations:
+      - key: pkb_nodepool
+        value: provisioning
+        effect: NoSchedule
+        operator: Equal
+      containers:
+      - name: workload
+        image: {{ Image }}
+        command: ["sh", "-c", "sleep infinity"]
+        resources:
+          requests:
+            cpu: {{ CpuRequest }}
+            memory: {{ MemoryRequest }}
+          limits:
+            cpu: {{ CpuLimit | default(CpuRequest) }}
+            memory: {{ MemoryLimit | default(MemoryRequest) }}
+      terminationGracePeriodSeconds: 1

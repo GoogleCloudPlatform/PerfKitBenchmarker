@@ -1,0 +1,19 @@
+kubernetes_node_autoprovisioning:
+  flags:
+    gke_max_cpu: 1000
+    gke_max_memory: 4000
+    container_cluster_version: "1.33"
+    node_autoprovisioning_platform: "gke_ccc"
+    node_autoprovisioning_worker_label: "cloud.google.com/compute-class=provisioning"
+    # optimize-utilization: NAP drains idle nodes in ~60s vs ~10min for balanced.
+    # Required for cold-reset drain wait (300s) to succeed on reused clusters.
+    gke_autoscaling_profile: optimize-utilization
+  container_cluster:
+    cloud: GCP
+    type: Kubernetes
+    min_vm_count: 0
+    max_vm_count: 100
+    vm_spec:
+      GCP:
+        machine_type: e2-standard-4
+        zone: us-east1-b

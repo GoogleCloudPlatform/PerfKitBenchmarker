@@ -44,6 +44,7 @@ from perfkitbenchmarker.resources.container_service import container_cluster
 from perfkitbenchmarker.resources.container_service import kubectl
 from perfkitbenchmarker.resources.container_service import kubernetes_cluster
 from perfkitbenchmarker.resources.container_service import kubernetes_commands
+import yaml
 
 FLAGS = flags.FLAGS
 # GPU types which practically require spot to get.
@@ -1326,8 +1327,10 @@ class EksKarpenterCluster(BaseEksCluster):
     for nodepool in self.nodepools.values():
       self._CreateKarpenterNodePool(nodepool)
 
-  def _CreateKarpenterNodePool(self, nodepool: container.BaseNodePoolConfig):
-    """Creates the Karpenter NodePool and EC2NodeClass."""
+  def _BuildKarpenterNodePoolYaml(
+      self, nodepool: container.BaseNodePoolConfig
+  ) -> list[dict[str, Any]]:
+    """Builds the Karpenter NodePool + EC2NodeClass YAML dicts for nodepool."""
     yaml_nodepool = kubernetes_commands.ConvertManifestToYamlDicts(
         'container/karpenter/nodepool.yaml.j2',
         NODEPOOL_NAME=nodepool.name,
@@ -1367,7 +1370,36 @@ class EksKarpenterCluster(BaseEksCluster):
           1000, math.ceil(nodepool.max_nodes * vcpu_per_node * 1.05)
       )
       yaml_nodepool[0]['spec']['limits'] = {'cpu': cpu_limit}
-    kubernetes_commands.ApplyYaml(yaml_nodepool)
+    return yaml_nodepool
+
+  def _CreateKarpenterNodePool(self, nodepool: container.BaseNodePoolConfig):
+    """Creates the Karpenter NodePool and EC2NodeClass."""
+    kubernetes_commands.ApplyYaml(self._BuildKarpenterNodePoolYaml(nodepool))
+
+  def SaveNodePoolManifest(self, nodepool_name: str, path: str) -> None:
+    """Writes the Karpenter NodePool manifest for nodepool_name to path.
+
+    The saved manifest can later be used to delete+recreate the NodePool for
+    cold-start reset (see MakeKarpenterPoolReset in the benchmark).
+
+    Args:
+      nodepool_name: The name of the nodepool.
+      path: The path to write the manifest to.
+    """
+    nodepool = self.nodepools.get(nodepool_name)
+    if nodepool is None:
+      raise ValueError(
+          f'NodePool {nodepool_name!r} not found; available: '
+          f'{list(self.nodepools)}'
+      )
+    # _BuildKarpenterNodePoolYaml returns RecursiveDict (defaultdict subclass)
+    # which yaml.safe_dump_all cannot serialize; round-trip through JSON to
+    # get plain dicts.
+    plain_dicts = json.loads(
+        json.dumps(self._BuildKarpenterNodePoolYaml(nodepool))
+    )
+    with open(path, 'w') as f:
+      yaml.safe_dump_all(plain_dicts, f, default_flow_style=False)
 
   def _Delete(self):
     """Deletes the control plane and worker nodes."""

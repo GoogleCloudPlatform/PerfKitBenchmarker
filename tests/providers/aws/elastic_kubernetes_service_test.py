@@ -450,6 +450,23 @@ class EksKarpenterTest(BaseEksTest):
   def testInitEksClusterWorks(self):
     elastic_kubernetes_service.EksKarpenterCluster(EKS_SPEC)
 
+  def testSaveNodePoolManifestWritesYamlAndRaisesForUnknown(self):
+    cluster = elastic_kubernetes_service.EksKarpenterCluster(EKS_SPEC)
+    cluster.nodepools['default'] = mock.Mock()
+    manifest_path = os.path.join(self.create_tempdir().full_path, 'np.yaml')
+    with mock.patch.object(
+        cluster,
+        '_BuildKarpenterNodePoolYaml',
+        return_value=[{'kind': 'NodePool', 'metadata': {'name': 'default'}}],
+    ):
+      cluster.SaveNodePoolManifest('default', manifest_path)
+    with open(manifest_path) as f:
+      content = f.read()
+    self.assertIn('kind: NodePool', content)
+    self.assertIn('name: default', content)
+    with self.assertRaises(ValueError):
+      cluster.SaveNodePoolManifest('nonexistent', manifest_path)
+
   @flagsaver.flagsaver(kubeconfig='/tmp/kubeconfig')
   def testEksYamlCreateFull(self):
     cluster = elastic_kubernetes_service.EksKarpenterCluster(EKS_SPEC)

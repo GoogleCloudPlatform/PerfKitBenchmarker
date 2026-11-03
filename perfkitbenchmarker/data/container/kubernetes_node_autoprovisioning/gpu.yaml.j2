@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: provisioning
+  labels:
+    app: provisioning
+spec:
+  replicas: {{ StartReplicas }}
+  selector:
+    matchLabels:
+      app: provisioning
+  template:
+    metadata:
+      labels:
+        app: provisioning
+      annotations:
+        karpenter.sh/do-not-disrupt: "true"
+    spec:
+{% set effective_spread = SpreadMode | default(('anti_affinity' if (OnePodPerNode | default(true)) else 'none')) %}
+{% if effective_spread == 'tsc' %}
+      topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: DoNotSchedule
+        labelSelector:
+          matchLabels:
+            app: provisioning
+{% elif effective_spread == 'anti_affinity' %}
+      # Enforce 1 pod per node so burst (0->N) and incremental (1->2) scale-ups
+      # provision N distinct GPU nodes.
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchLabels:
+                app: provisioning
+            topologyKey: kubernetes.io/hostname
+{% endif %}
+      containers:
+      - name: cuda
+        image: {{ Image }}
+        command: ["sh", "-c", "nvidia-smi && sleep infinity"]
+        resources:
+          requests:
+            nvidia.com/gpu: {{ GpuCount }}
+{% if CpuRequest | default(none) %}
+            cpu: {{ CpuRequest }}
+{% endif %}
+{% if MemoryRequest | default(none) %}
+            memory: {{ MemoryRequest }}
+{% endif %}
+          limits:
+            nvidia.com/gpu: {{ GpuCount }}
+{% if (CpuLimit | default(none)) or (CpuRequest | default(none)) %}
+            cpu: {{ CpuLimit | default(CpuRequest) }}
+{% endif %}
+{% if (MemoryLimit | default(none)) or (MemoryRequest | default(none)) %}
+            memory: {{ MemoryLimit | default(MemoryRequest) }}
+{% endif %}
+      tolerations:
+      - key: "nvidia.com/gpu"
+        operator: "Exists"
+        effect: "NoSchedule"
+      - key: pkb_nodepool
+        value: provisioning
+        effect: NoSchedule
+        operator: Equal
+      terminationGracePeriodSeconds: 1

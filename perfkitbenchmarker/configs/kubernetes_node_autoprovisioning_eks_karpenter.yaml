@@ -1,0 +1,25 @@
+kubernetes_node_autoprovisioning:
+  flags:
+    container_cluster_version: "1.33"
+    node_autoprovisioning_platform: "eks_karpenter"
+    node_autoprovisioning_worker_label: "pkb_nodepool=provisioning"
+  container_cluster:
+    cloud: AWS
+    type: Karpenter
+    min_vm_count: 0
+    max_vm_count: 100
+    vm_spec:
+      AWS:
+        machine_type: m8i.xlarge
+        zone: us-east-2a
+    nodepools:
+      provisioning:
+        vm_count: 1
+        min_vm_count: 0
+        max_vm_count: 100
+        machine_families:
+          - m8i
+        vm_spec:
+          AWS:
+            machine_type: m8i.xlarge
+            zone: us-east-2a

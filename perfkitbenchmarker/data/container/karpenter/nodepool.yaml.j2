@@ -22,6 +22,12 @@ spec:
         group: karpenter.k8s.aws
         kind: EC2NodeClass
         name: default
+{% if NODEPOOL_NAME == 'provisioning' %}
+      taints:
+        - key: pkb_nodepool
+          value: provisioning
+          effect: NoSchedule
+{% endif %}
       expireAfter: 720h # 30 * 24h = 720h
   disruption:
     consolidationPolicy: WhenEmptyOrUnderutilized
