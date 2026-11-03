@@ -16,6 +16,7 @@
 For documentation of commands to run at startup and shutdown, see:
 http://hadoop.apache.org/docs/current/hadoop-project-dist/hadoop-common/ClusterSetup.html#Hadoop_Startup
 """
+
 import functools
 import logging
 import os
@@ -209,6 +210,15 @@ def AptInstall(vm):
 
 def InstallGcsConnector(vm, install_dir=HADOOP_LIB_DIR):
   """Install the GCS connector for Hadoop, which allows I/O to GCS."""
+  if HadoopVersion() >= version.Version('3.5'):
+    # Hadoop 3.5+ bundles hadoop-gcp in share/hadoop/common/lib, which conflicts
+    # with the standalone gcs-connector jar.
+    logging.info(
+        'Hadoop %s or higher is installed, skipping GCS connector'
+        ' installation.',
+        HadoopVersion(),
+    )
+    return
   connector_url = (
       'https://storage.googleapis.com/hadoop-lib/gcs/'
       'gcs-connector-hadoop{}-latest.jar'.format(HadoopVersion().major)

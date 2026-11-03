@@ -237,7 +237,7 @@ def _RenderConfig(
 
 def _GetOnlineWorkerCount(leader):
   """Curl Spark Master Web UI for worker status."""
-  cmd = "curl http://localhost:8080 | grep 'Alive Workers' | grep -o '[0-9]\\+'"
+  cmd = "curl http://localhost:8080 | grep 'Alive' | grep -o '[0-9]\\+'"
   stdout = leader.RemoteCommand(cmd)[0]
   return int(stdout)
 
