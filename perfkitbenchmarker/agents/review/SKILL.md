@@ -160,6 +160,13 @@ rules. If there are no comments to add, grant approval.
     strictly on the intended change. Revert incidental changes such as
     moving existing flags to different positions, no-op variable
     reassignments, or unrelated formatting tweaks.
+-   **No Unused Function Parameters:** Do not include unused parameters
+    (silenced with `del param`) in standalone or internal helper functions
+    unless required to conform to a base class interface, callback signature, or
+    PKB lifecycle hook.
+-   **No Optional Arguments Unless Omitted by a Call Site:** Only use optional
+    arguments (e.g., `| None = None` or default parameter values) when they are
+    actually omitted by at least one call site.
 
 ## 5. Performance Metrics
 
