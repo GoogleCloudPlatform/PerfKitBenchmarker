@@ -748,6 +748,38 @@ class TestRunBenchmarks(pkb_common_test_case.PkbCommonTestCase):
     # zone_2 is the new zone picked.
     self.assertEqual(FLAGS.zone, ['zone_2'])
 
+  @parameterized.named_parameters(
+      ('Quota', benchmark_status.FailedSubstatus.QUOTA),
+      ('Unsupported', benchmark_status.FailedSubstatus.UNSUPPORTED),
+      (
+          'InsufficientCapacity',
+          benchmark_status.FailedSubstatus.INSUFFICIENT_CAPACITY,
+      ),
+  )
+  @flagsaver.flagsaver(zone=['any'])
+  def testAnyZoneRetry(self, failed_substatus):
+    test_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml()
+    test_spec.failed_substatus = failed_substatus
+    self._MockLoadProviderUtils(gcp_utils)
+    self._MockGcpUtils('GetRegionFromZone')
+    self._MockGcpUtils(
+        'GetZonesFromMachineType', return_value={'zone_1', 'zone_2'}
+    )
+
+    test_retry_manager = pkb.ZoneRetryManager(test_machine_type)
+    self.assertEqual(test_retry_manager.max_retries, 2)
+    initial_zone = FLAGS.zone[0]
+    self.assertIn(initial_zone, {'zone_1', 'zone_2'})
+
+    test_retry_manager.HandleSmartRetries(test_spec)
+
+    expected_other_zone = 'zone_2' if initial_zone == 'zone_1' else 'zone_1'
+    self.assertEqual(FLAGS.zone, [expected_other_zone])
+    self.assertEqual(test_retry_manager._zones_tried, {initial_zone})
+    self.assertEqual(FLAGS.retries, 0)
+    self.assertFalse(FLAGS.smart_capacity_retry)
+    self.assertFalse(FLAGS.smart_quota_retry)
+
   @parameterized.named_parameters(('ZonesFlag', 'zones'), ('ZoneFlag', 'zone'))
   @flagsaver.flagsaver(retries=2)
   def testChooseAndSetNewZone(self, zone_flag):
