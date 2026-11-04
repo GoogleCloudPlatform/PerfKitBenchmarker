@@ -311,11 +311,13 @@ class Clickhouse(edw_service.EdwService):
   def _WaitForDeployment(self) -> None:
     """Waits for ClickHouse pods to be ready."""
     try:
-      kubernetes_commands.WaitForRollout(
-          f'statefulset.apps/{self._GetClickhouseReplicaPrefix()}-0-0',
-          namespace=_NAMESPACE,
-          timeout=60 * 4 + 20 * self.node_count,
-      )
+      for shard in range(self.num_shards):
+        for replica in range(self.num_replicas):
+          kubernetes_commands.WaitForRollout(
+              f'statefulset.apps/{self._GetClickhouseReplicaPrefix()}-{shard}-{replica}',
+              namespace=_NAMESPACE,
+              timeout=60 * 4 + 20 * self.node_count,
+          )
       kubernetes_commands.WaitForResource(
           'pods/chk-keeper-cluster-keeper-cluster-0-0-0',
           namespace=_NAMESPACE,
