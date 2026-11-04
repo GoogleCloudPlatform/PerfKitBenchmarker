@@ -24,6 +24,7 @@ collection.
 """
 
 import json
+import os
 import time
 from typing import Any, Callable, cast
 
@@ -252,22 +253,21 @@ def ResetToColdState(
 
 
 def MakeKarpenterPoolReset(
-    nodepool_name: str, manifest_path: str
+    nodepool_name: str,
+    manifest_path: str,
+    timeout_s: int = _RESET_TIMEOUT_S,
 ) -> Callable[[], None]:
   """Returns a callable that deletes then re-applies a Karpenter NodePool CR."""
 
   def _Reset() -> None:
-    kubectl.RunKubectlCommand(
-        [
-            'delete',
-            'nodepool.karpenter.sh',
-            nodepool_name,
-            '--ignore-not-found',
-        ],
-        raise_on_failure=False,
-    )
+    kubectl.RunKubectlCommand([
+        'delete',
+        'nodepool.karpenter.sh',
+        nodepool_name,
+        '--ignore-not-found',
+    ])
     WaitForZeroWorkerNodes(
-        f'pkb_nodepool={nodepool_name}', timeout_s=300, poll_s=10
+        f'pkb_nodepool={nodepool_name}', timeout_s=timeout_s, poll_s=10
     )
     kubectl.RunKubectlCommand(['apply', '-f', manifest_path])
 
@@ -415,7 +415,9 @@ def CollectScaleSamples(
   return samples
 
 
-def _BuildGkePriorities() -> list[dict[str, Any]]:
+def _BuildGkePriorities(
+    cluster: kubernetes_cluster.KubernetesCluster,
+) -> list[dict[str, Any]]:
   """Constructs the list of priority tier dicts for GKE ComputeClass."""
   if _CCC_PRIORITIES.value:
     return json.loads(_CCC_PRIORITIES.value)
@@ -430,7 +432,16 @@ def _BuildGkePriorities() -> list[dict[str, Any]]:
     if _CCC_MACHINE_TYPE.value:
       tier['machine_type'] = _CCC_MACHINE_TYPE.value
     else:
-      tier['machine_family'] = 'n4'
+      default_mt = (
+          cluster.default_nodepool.machine_type
+          if cluster.default_nodepool is not None
+          else None
+      )
+      tier['machine_family'] = (
+          default_mt.split('-')[0]
+          if isinstance(default_mt, str) and '-' in default_mt
+          else 'n4'
+      )
   if _CCC_MIN_CORES.value:
     tier['min_cores'] = _CCC_MIN_CORES.value
   if _CCC_MAX_PODS_PER_NODE.value:
@@ -438,9 +449,12 @@ def _BuildGkePriorities() -> list[dict[str, Any]]:
   return [tier]
 
 
-def _ApplyGkeComputeClass(class_name: str = 'provisioning') -> None:
+def _ApplyGkeComputeClass(
+    cluster: kubernetes_cluster.KubernetesCluster,
+    class_name: str = 'provisioning',
+) -> None:
   """Renders and applies the benchmark-owned ComputeClass to the GKE cluster."""
-  priorities = _BuildGkePriorities()
+  priorities = _BuildGkePriorities(cluster)
   yaml_docs = kubernetes_commands.ConvertManifestToYamlDicts(
       'container/kubernetes_node_autoprovisioning/compute_class.yaml.j2',
       class_name=class_name,
@@ -464,7 +478,11 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
       kubernetes_cluster.KubernetesCluster, bm_spec.container_cluster
   )
   if _PLATFORM.value == 'gke_ccc':
-    _ApplyGkeComputeClass(class_name='provisioning')
+    _ApplyGkeComputeClass(cluster, class_name='provisioning')
+  elif _PLATFORM.value == 'eks_auto':
+    manifest_path = _GetNodePoolManifestPath()
+    cluster.SaveNodePoolManifest('provisioning', manifest_path)
+    kubectl.RunKubectlCommand(['apply', '-f', manifest_path])
   if _WORKLOAD.value == 'gpu':
     yaml_docs = kubernetes_commands.ConvertManifestToYamlDicts(
         _GPU_MANIFEST,
@@ -505,6 +523,10 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
       pod_spec.setdefault('nodeSelector', {})[
           'cloud.google.com/compute-class'
       ] = 'provisioning'
+  elif _PLATFORM.value == 'eks_auto':
+    for yaml_doc in yaml_docs:
+      pod_spec = yaml_doc['spec']['template']['spec']
+      pod_spec.setdefault('nodeSelector', {})['pkb_nodepool'] = 'provisioning'
   list(kubernetes_commands.ApplyYaml(yaml_docs))
   if _START_REPLICAS.value > 0:
     kubernetes_commands.WaitForRollout(_DEPLOYMENT, timeout=_RESET_TIMEOUT_S)
@@ -521,17 +543,18 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
     reset_pool = MakeGkeComputeClassPoolReset(
         cluster, class_name='provisioning'
     )
-  elif _PLATFORM.value in ('eks_auto', 'aks_nap'):
+  elif _PLATFORM.value == 'aks_nap':
     reset_pool = lambda: None
   else:
-    reset_pool = MakeKarpenterPoolReset(
-        'provisioning', _GetNodePoolManifestPath()
-    )
+    manifest_path = _GetNodePoolManifestPath()
+    if not os.path.exists(manifest_path):
+      cluster.SaveNodePoolManifest('provisioning', manifest_path)
+    reset_pool = MakeKarpenterPoolReset('provisioning', manifest_path)
 
   if _START_REPLICAS.value == 0:
     kubectl.RunKubectlCommand(['scale', '--replicas=0', _DEPLOYMENT])
     if _POOL_STATE.value == 'absent':
-      if _PLATFORM.value in ('eks_auto', 'aks_nap'):
+      if _PLATFORM.value == 'aks_nap':
         WaitForZeroWorkerNodes(_WORKER_LABEL.value, _RESET_TIMEOUT_S)
       reset_pool()
     elif _POOL_STATE.value == 'zero':
@@ -581,7 +604,7 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
 
 
 def Cleanup(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
-  """Deletes the provisioning deployment and ComputeClass."""
+  """Deletes the provisioning deployment and benchmark-owned pool CRs."""
   del bm_spec
   kubectl.RunKubectlCommand(
       ['delete', 'deployment', 'provisioning', '--ignore-not-found'],
@@ -590,5 +613,15 @@ def Cleanup(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
   if _PLATFORM.value == 'gke_ccc':
     kubectl.RunKubectlCommand(
         ['delete', 'computeclass', 'provisioning', '--ignore-not-found'],
+        raise_on_failure=False,
+    )
+  elif _PLATFORM.value == 'eks_auto':
+    kubectl.RunKubectlCommand(
+        [
+            'delete',
+            'nodepool.karpenter.sh',
+            'provisioning',
+            '--ignore-not-found',
+        ],
         raise_on_failure=False,
     )

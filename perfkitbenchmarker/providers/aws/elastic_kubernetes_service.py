@@ -53,6 +53,7 @@ _RARE_GPU_TYPES = [
     virtual_machine_spec.GPU_A100,
     virtual_machine_spec.GPU_B200,
 ]
+_EKS_AUTO_GPU_FAMILIES = ('g6', 'g6e', 'g5', 'p4d', 'p5')
 
 
 def RecursivelyUpdateDictionary(
@@ -601,6 +602,41 @@ class EksAutoCluster(BaseEksCluster):
       self._InstallS3CsiAddon()
     if aws_flags.EKS_INSTALL_NEURON_DEVICE_PLUGIN.value:
       self._InstallNeuronDevicePlugin()
+
+  def SaveNodePoolManifest(self, nodepool_name: str, path: str) -> None:
+    """Writes an EKS Auto Mode NodePool manifest for nodepool_name to path."""
+    nodepool = self.nodepools.get(nodepool_name) or self.default_nodepool
+    nodepool_families = (
+        list(nodepool.machine_families)
+        if nodepool is not None and nodepool.machine_families
+        else []
+    )
+    default_mt = nodepool.machine_type if nodepool is not None else None
+    parsed_family = util.GetMachineFamily(default_mt)
+    is_gpu = bool((nodepool is not None and nodepool.gpu_type) or self.gpu_type)
+    machine_type: str | None = None
+    instance_families: list[str] = []
+    if nodepool_families:
+      instance_families = nodepool_families
+    elif is_gpu:
+      if default_mt and parsed_family in _EKS_AUTO_GPU_FAMILIES:
+        machine_type = default_mt
+      else:
+        instance_families = ['g6', 'g6e', 'g5']
+    elif default_mt:
+      machine_type = default_mt
+    else:
+      instance_families = ['m8i']
+    capacity_type = 'spot' if self.use_spot else 'on-demand'
+    rendered = vm_util.ReadAndRenderJinja2Template(
+        'container/karpenter/eks_auto_nodepool.yaml.j2',
+        nodepool_name=nodepool_name,
+        instance_families=instance_families,
+        machine_type=machine_type,
+        capacity_type=capacity_type,
+    )
+    with open(path, 'w') as f:
+      f.write(rendered)
 
   # AWS-stable identifiers for the Mountpoint for S3 CSI driver:
   # https://docs.aws.amazon.com/eks/latest/userguide/s3-csi.html

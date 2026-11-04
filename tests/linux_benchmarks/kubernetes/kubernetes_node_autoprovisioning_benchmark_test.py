@@ -835,6 +835,89 @@ class BenchmarkRunTest(pkb_common_test_case.PkbCommonTestCase):
         'provisioning', '/tmp/np.yaml'
     )
 
+  @flagsaver.flagsaver(node_autoprovisioning_platform='eks_auto')
+  def testPrepareAndCleanupEksAuto(self):
+    temp_np = self.create_tempdir().create_file('np.yaml').full_path
+    bm_spec = mock.Mock()
+    bm_spec.container_cluster = mock.Mock()
+    applied_docs = []
+    self.enter_context(
+        mock.patch.object(
+            kubernetes_commands,
+            'ApplyYaml',
+            side_effect=lambda docs: applied_docs.extend(docs) or [],
+        )
+    )
+    self.enter_context(
+        mock.patch.object(npb, '_GetNodePoolManifestPath', return_value=temp_np)
+    )
+    mock_kubectl = self.enter_context(
+        mock.patch.object(
+            kubectl, 'RunKubectlCommand', return_value=('', '', 0)
+        )
+    )
+    npb.Prepare(bm_spec)
+    self.assertLen(applied_docs, 1)
+    pod_spec = applied_docs[0]['spec']['template']['spec']
+    self.assertEqual(pod_spec['nodeSelector']['pkb_nodepool'], 'provisioning')
+    bm_spec.container_cluster.SaveNodePoolManifest.assert_called_once_with(
+        'provisioning', temp_np
+    )
+    mock_kubectl.assert_called_once_with(['apply', '-f', temp_np])
+
+    mock_kubectl.reset_mock()
+    npb.Cleanup(bm_spec)
+    self.assertEqual(mock_kubectl.call_count, 2)
+
+  @flagsaver.flagsaver(
+      node_autoprovisioning_platform='eks_auto',
+      node_autoprovisioning_workload='gpu',
+  )
+  def testRunEksAutoStandaloneRegeneratesMissingManifest(self):
+    temp_dir = self.create_tempdir().full_path
+    missing_np = f'{temp_dir}/missing-provisioning-nodepool.yaml'
+    bm_spec = mock.Mock()
+    bm_spec.container_cluster = mock.Mock()
+    self.enter_context(
+        mock.patch.object(
+            npb, '_GetNodePoolManifestPath', return_value=missing_np
+        )
+    )
+    self.enter_context(mock.patch.object(kubernetes_commands, 'WaitForRollout'))
+    self.enter_context(
+        mock.patch.object(npb, 'CollectScaleSamples', return_value=[])
+    )
+    mock_kubectl = self.enter_context(
+        mock.patch.object(
+            kubectl, 'RunKubectlCommand', return_value=('', '', 0)
+        )
+    )
+
+    npb.Run(bm_spec)
+
+    bm_spec.container_cluster.SaveNodePoolManifest.assert_called_once_with(
+        'provisioning', missing_np
+    )
+    self.assertIn(
+        'nodepool.karpenter.sh', mock_kubectl.call_args_list[1].args[0]
+    )
+
+  @flagsaver.flagsaver()
+  def testBuildGkePrioritiesDerivesMachineFamilyFromCluster(self):
+    cluster = mock.Mock()
+    cluster.default_nodepool.machine_type = 'n4d-standard-4'
+    self.assertEqual(
+        npb._BuildGkePriorities(cluster), [{'machine_family': 'n4d'}]
+    )
+    cluster.default_nodepool.machine_type = 'c3d-standard-4'
+    self.assertEqual(
+        npb._BuildGkePriorities(cluster), [{'machine_family': 'c3d'}]
+    )
+    cluster.default_nodepool = None
+    self.assertEqual(
+        npb._BuildGkePriorities(cluster), [{'machine_family': 'n4'}]
+    )
+
 
 if __name__ == '__main__':
   unittest.main()
