@@ -1,6 +1,8 @@
+import copy
 import json
 import os
 import tempfile
+from typing import Any
 import unittest
 from unittest import mock
 from urllib import parse
@@ -20,7 +22,7 @@ from tests import matchers
 from tests import pkb_common_test_case
 
 
-EKS_SPEC_DICT = {
+EKS_SPEC_DICT: dict[str, Any] = {
     'cloud': 'AWS',
     'vm_spec': {
         'AWS': {
@@ -236,6 +238,75 @@ class ElasticKubernetesServiceTest(BaseEksTest):
     self.assertEqual(node_groups[1]['minSize'], 2)
     self.assertEqual(node_groups[1]['maxSize'], 10)
     self.assertEqual(node_groups[1]['desiredCapacity'], 3)
+
+  def _CreateJson(self, spec_dict):
+    self.MockIssueCommand({'create cluster': [('Cluster created', '', 0)]})
+    cluster = elastic_kubernetes_service.EksCluster(
+        container_spec.ContainerClusterSpec('NAME', **spec_dict)
+    )
+    self.MockJsonRead(cluster)
+    cluster._Create()
+    assert self.patched_read_json is not None
+    return cluster, self.patched_read_json.call_args_list[0][0][0]
+
+  def testEksClusterDefaultHasNoVolumeTypeOrAddons(self):
+    cluster, called_json = self._CreateJson(EKS_SPEC_DICT)
+    self.assertNotIn('volumeType', called_json['managedNodeGroups'][0])
+    self.assertNotIn('addons', called_json)
+    metadata = cluster.GetResourceMetadata()
+    self.assertEqual(metadata['boot_disk_type'], 'gp2')
+    self.assertNotIn('enable_network_policy', metadata)
+    self.assertNotIn('eks_vpc_cni_network_policy', metadata)
+
+  def testEksClusterBootDiskTypeSetsVolumeType(self):
+    spec_dict = copy.deepcopy(EKS_SPEC_DICT)
+    spec_dict['vm_spec']['AWS']['boot_disk_type'] = 'gp3'
+    spec_dict['nodepools'] = {
+        'nginx': {
+            'vm_spec': {
+                'AWS': {'machine_type': 'm6i.xlarge', 'zone': 'us-west-1b'}
+            },
+        }
+    }
+    cluster, called_json = self._CreateJson(spec_dict)
+    node_groups = called_json['managedNodeGroups']
+    self.assertEqual(node_groups[0]['volumeType'], 'gp3')
+    self.assertNotIn('volumeType', node_groups[1])
+    self.assertEqual(cluster.GetResourceMetadata()['boot_disk_type'], 'gp3')
+
+  def testEksClusterBootDiskTypeOnNodepool(self):
+    spec_dict = copy.deepcopy(EKS_SPEC_DICT)
+    spec_dict['nodepools'] = {
+        'nginx': {
+            'vm_spec': {
+                'AWS': {
+                    'machine_type': 'm6i.xlarge',
+                    'zone': 'us-west-1b',
+                    'boot_disk_type': 'io2',
+                }
+            },
+        }
+    }
+    _, called_json = self._CreateJson(spec_dict)
+    node_groups = called_json['managedNodeGroups']
+    self.assertNotIn('volumeType', node_groups[0])
+    self.assertEqual(node_groups[1]['volumeType'], 'io2')
+
+  def testEksClusterVpcCniNetworkPolicy(self):
+    spec_dict = copy.deepcopy(EKS_SPEC_DICT)
+    spec_dict['enable_network_policy'] = True
+    cluster, called_json = self._CreateJson(spec_dict)
+    self.assertEqual(
+        called_json['addons'],
+        [{
+            'name': 'vpc-cni',
+            'configurationValues': '{"enableNetworkPolicy": "true"}',
+            'resolveConflicts': 'overwrite',
+        }],
+    )
+    metadata = cluster.GetResourceMetadata()
+    self.assertTrue(metadata['enable_network_policy'])
+    self.assertTrue(metadata['eks_vpc_cni_network_policy'])
 
   def testGetNodePoolNames(self):
     # Mock the output of the aws cli command
@@ -469,6 +540,16 @@ class EksAutoClusterTest(BaseEksTest):
     self.assertIn('node.kubernetes.io/instance-type', pinned_rendered)
     self.assertIn('"g6.xlarge"', pinned_rendered)
 
+  def testEksAutoNetworkPolicyRaises(self):
+    spec_dict = copy.deepcopy(EKS_SPEC_DICT)
+    spec_dict['type'] = 'Auto'
+    spec_dict['enable_network_policy'] = True
+    cluster = elastic_kubernetes_service.EksAutoCluster(
+        container_spec.ContainerClusterSpec('NAME', **spec_dict)
+    )
+    with self.assertRaises(errors.Config.InvalidValue):
+      cluster._Create()
+
 
 class InferenceS3StorageTest(BaseEksTest):
   """Tests S3 PV/PVC apply for kubernetes_ai_inference on AWS."""
@@ -571,6 +652,29 @@ class EksKarpenterTest(BaseEksTest):
     self.assertIn('name: default', content)
     with self.assertRaises(ValueError):
       cluster.SaveNodePoolManifest('nonexistent', manifest_path)
+
+  def testEksYamlCreateVpcCniNetworkPolicy(self):
+    spec_dict = copy.deepcopy(EKS_SPEC_DICT)
+    spec_dict['enable_network_policy'] = True
+    cluster = elastic_kubernetes_service.EksKarpenterCluster(
+        container_spec.ContainerClusterSpec('NAME', **spec_dict)
+    )
+    self.MockJsonRead(cluster)
+    self.MockIssueCommand({
+        'cloudformation deploy': [('Deployed', '', 0)],
+        'create cluster': [('Cluster created', '', 0)],
+        'curl': [('', '', 0)],
+    })
+    cluster._Create()
+    assert self.patched_read_json is not None
+    called_json = self.patched_read_json.call_args_list[0][0][0]
+    self.assertEqual(
+        [a['name'] for a in called_json['addons']],
+        ['eks-pod-identity-agent', 'vpc-cni'],
+    )
+    metadata = cluster.GetResourceMetadata()
+    self.assertTrue(metadata['enable_network_policy'])
+    self.assertTrue(metadata['eks_vpc_cni_network_policy'])
 
   @flagsaver.flagsaver(kubeconfig='/tmp/kubeconfig')
   def testEksYamlCreateFull(self):

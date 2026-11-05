@@ -408,6 +408,11 @@ class AwsVmSpec(virtual_machine_spec.BaseVmSpec):
     """
     result = super()._GetOptionDecoderConstructions()
     result.update({
+        # Currently only read by EKS node groups (as the volumeType).
+        'boot_disk_type': (
+            option_decoders.StringDecoder,
+            {'default': None, 'none_ok': True},
+        ),
         'use_spot_instance': (
             option_decoders.BooleanDecoder,
             {'default': False},

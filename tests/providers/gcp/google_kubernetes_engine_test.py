@@ -355,6 +355,100 @@ class GoogleKubernetesEngineTestCase(PatchedObjectsTestCase):
       self.assertNotIn('--workload-pool', issue_command.all_commands)
       self.assertNotIn('--workload-metadata', issue_command.all_commands)
 
+  def testCreateDataplaneV2NotSetByDefault(self):
+    spec = self.create_kubernetes_engine_spec()
+    with self.patch_critical_objects() as issue_command:
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      cluster._Create()
+      self.assertNotIn('--enable-dataplane-v2', issue_command.all_commands)
+      self.assertNotIn('gke_enable_dataplane_v2', cluster.GetResourceMetadata())
+
+  def testCreateDataplaneV2(self):
+    spec = container_spec.ContainerClusterSpec(
+        'NAME',
+        **{
+            'cloud': 'GCP',
+            'enable_network_policy': True,
+            'vm_spec': {
+                'GCP': {
+                    'machine_type': 'fake-machine-type',
+                    'zone': 'us-central1-a',
+                    'project': 'fakeproject',
+                },
+            },
+            'vm_count': 2,
+        },
+    )
+    with self.patch_critical_objects() as issue_command:
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      cluster._Create()
+      create_cmd = issue_command.func_to_mock.call_args_list[0][0][0]
+      self.assertEqual(create_cmd.count('--enable-dataplane-v2'), 1)
+      metadata = cluster.GetResourceMetadata()
+      self.assertTrue(metadata['enable_network_policy'])
+      self.assertTrue(metadata['gke_enable_dataplane_v2'])
+
+  def testCreateMaxPodsPerNode(self):
+    spec = container_spec.ContainerClusterSpec(
+        'NAME',
+        **{
+            'cloud': 'GCP',
+            'max_pods': 64,
+            'vm_spec': {
+                'GCP': {
+                    'machine_type': 'fake-machine-type',
+                    'zone': 'us-central1-a',
+                    'project': 'fakeproject',
+                },
+            },
+            'nodepools': {
+                'dense': {
+                    'max_pods': 256,
+                    'vm_spec': {
+                        'GCP': {
+                            'machine_type': 'fake-machine-type',
+                            'zone': 'us-central1-a',
+                            'project': 'fakeproject',
+                        },
+                    },
+                },
+            },
+        },
+    )
+    with self.patch_critical_objects() as issue_command:
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      cluster._Create()
+      create_cmd = issue_command.GetCommandWithSubstring('clusters create')
+      pool_cmd = issue_command.GetCommandWithSubstring(
+          'node-pools create dense'
+      )
+      self.assertIn('--max-pods-per-node 64', create_cmd)
+      self.assertIn('--max-pods-per-node 256', pool_cmd)
+      metadata = cluster.GetResourceMetadata()
+      self.assertEqual(metadata['max_pods'], 64)
+      self.assertEqual(metadata['nodepools']['dense']['max_pods'], 256)
+
+  @flagsaver.flagsaver(gke_addons='HttpLoadBalancing,NetworkPolicy')
+  def testCreateDataplaneV2ConflictsWithLegacyNetworkPolicyAddon(self):
+    spec = container_spec.ContainerClusterSpec(
+        'NAME',
+        **{
+            'cloud': 'GCP',
+            'enable_network_policy': True,
+            'vm_spec': {
+                'GCP': {
+                    'machine_type': 'fake-machine-type',
+                    'zone': 'us-central1-a',
+                    'project': 'fakeproject',
+                },
+            },
+        },
+    )
+    with self.patch_critical_objects():
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      with self.assertRaises(errors.Config.InvalidValue):
+        cluster._Create()
+
 
 class GoogleKubernetesEngineAutoscalingTestCase(PatchedObjectsTestCase):
 

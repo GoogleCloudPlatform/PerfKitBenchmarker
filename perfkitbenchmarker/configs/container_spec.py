@@ -226,6 +226,7 @@ class NodepoolSpec(spec.BaseSpec):
 
   Attributes:
     vm_spec: The vm spec which defines the nodepool.
+    max_pods: Optional maximum number of pods per node in the nodepool.
   """
 
   vm_spec: virtual_machine_spec.BaseVmSpec
@@ -241,6 +242,7 @@ class NodepoolSpec(spec.BaseSpec):
     self.vm_count: int
     self.min_vm_count: int | None
     self.max_vm_count: int | None
+    self.max_pods: int | None
     self.vm_spec: virtual_machine_spec.BaseVmSpec
     self.machine_families: list[str] | None
     self.sandbox_config: SandboxSpec | None
@@ -275,6 +277,10 @@ class NodepoolSpec(spec.BaseSpec):
         'max_vm_count': (
             option_decoders.IntDecoder,
             {'default': None, 'none_ok': True, 'min': 0},
+        ),
+        'max_pods': (
+            option_decoders.IntDecoder,
+            {'default': None, 'none_ok': True, 'min': 1},
         ),
         'vm_spec': (spec.PerCloudConfigDecoder, {}),
         'sandbox_config': (_SandboxDecoder, {'default': None}),
@@ -420,9 +426,13 @@ class ContainerClusterSpec(spec.BaseSpec):
     vm_count: The number of nodes to create for the default nodepool.
     min_vm_count: The minimum number of nodes for autoscaling.
     max_vm_count: The maximum number of nodes for autoscaling.
+    max_pods: Optional maximum number of pods per node for the default nodepool
+      (and inherited by secondary nodepools unless overridden).
     tpu_topology: The TPU topology of the default nodepool.
     tpu_count: The number of TPUs per node for the default nodepool.
     enable_aam: Whether to enable automatic application monitoring.
+    enable_network_policy: Whether to enable Kubernetes NetworkPolicy
+      enforcement on the cluster's CNI/dataplane.
   """
 
   cloud: str
@@ -439,9 +449,11 @@ class ContainerClusterSpec(spec.BaseSpec):
   vm_count: int
   min_vm_count: int | None
   max_vm_count: int | None
+  max_pods: int | None
   tpu_topology: str | None
   tpu_count: int | None
   enable_aam: bool
+  enable_network_policy: bool
 
   def __init__(self, component_full_name, flag_values=None, **kwargs):
     super().__init__(component_full_name, flag_values=flag_values, **kwargs)
@@ -552,6 +564,14 @@ class ContainerClusterSpec(spec.BaseSpec):
         'enable_aam': (
             option_decoders.BooleanDecoder,
             {'default': False},
+        ),
+        'enable_network_policy': (
+            option_decoders.BooleanDecoder,
+            {'default': False},
+        ),
+        'max_pods': (
+            option_decoders.IntDecoder,
+            {'default': None, 'none_ok': True, 'min': 1},
         ),
         'tpu_topology': (option_decoders.StringDecoder, {'default': None}),
         'tpu_count': (option_decoders.IntDecoder, {'default': None}),

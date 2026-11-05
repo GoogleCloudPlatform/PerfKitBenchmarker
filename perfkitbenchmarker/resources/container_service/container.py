@@ -150,6 +150,7 @@ class BaseNodePoolConfig:
     min_nodes: int. The minimum number of nodes in the node pool. If set to a
       non-num_nodes value, the nodepool uses auLike above.
     max_nodes: int. The maximum number of nodes in the node pool. Like above.
+    max_pods: int | None. Optional maximum number of pods per node.
     disk_type: str. The type of disk for the nodes in the node pool.
     disk_size: int. The size of the disk for the nodes in the node pool in GB.
     gpu_type: str. The type of GPU for the nodes in the node pool.
@@ -185,6 +186,7 @@ class BaseNodePoolConfig:
     self.num_nodes: int = 1
     self.min_nodes: int = 1
     self.max_nodes: int = 1
+    self.max_pods: int | None = None
     self.disk_type: str | None = vm_spec.boot_disk_type
     self.disk_size: int = vm_spec.boot_disk_size  # pyrefly: ignore[bad-assignment]
     self.gpu_type: str | None = vm_spec.gpu_type

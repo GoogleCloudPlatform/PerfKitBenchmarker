@@ -506,6 +506,8 @@ class GkeCluster(BaseGkeCluster):
       result['gce_local_ssd_count'] = self.default_nodepool.max_local_disks
       result['gce_local_ssd_interface'] = self.default_nodepool.ssd_interface
     result['gke_nccl_fast_socket'] = self.enable_nccl_fast_socket
+    if self.enable_network_policy:
+      result['gke_enable_dataplane_v2'] = True
     if self.image_type:
       result['image_type'] = self.image_type
     if gcp_flags.MAX_CPU.value:
@@ -568,6 +570,15 @@ class GkeCluster(BaseGkeCluster):
       cmd.args.append(f'--addons={gcp_flags.GKE_ADDONS.value}')
     if gcp_flags.GKE_ENABLE_WORKLOAD_IDENTITY.value:
       cmd.flags['workload-pool'] = f'{self.project}.svc.id.goog'
+    if self.enable_network_policy:
+      addons = (gcp_flags.GKE_ADDONS.value or '').split(',')
+      if 'NetworkPolicy' in addons:
+        raise errors.Config.InvalidValue(
+            'enable_network_policy uses Dataplane V2 (--enable-dataplane-v2)'
+            ' and cannot be combined with --gke_addons=NetworkPolicy.'
+        )
+      if '--enable-dataplane-v2' not in cmd.args:
+        cmd.args.append('--enable-dataplane-v2')
     if not self.release_channel:
       cmd.args.append('--no-enable-autoupgrade')
     self._AddNodeParamsToCmd(
@@ -739,6 +750,8 @@ class GkeCluster(BaseGkeCluster):
         cmd.flags['local-ssd-count'] = nodepool_config.max_local_disks
 
     cmd.flags['num-nodes'] = nodepool_config.num_nodes
+    if nodepool_config.max_pods:
+      cmd.flags['max-pods-per-node'] = nodepool_config.max_pods
     # zone may be split a comma separated list. For regional clusters, zone
     # holds the region name; do not set node-locations so GKE uses default.
     if nodepool_config.zone and not util.IsRegion(nodepool_config.zone):

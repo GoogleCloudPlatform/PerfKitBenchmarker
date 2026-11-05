@@ -189,6 +189,13 @@ flags.DEFINE_boolean(
     'Enable automatic node provisioning for Azure AKS clusters. '
     'This is automatically set to True for the provision_node_pools benchmark.',
 )
+flags.DEFINE_boolean(
+    'azure_aks_standard_tier',
+    False,
+    'Use the AKS Standard tier (--tier standard), which enables dynamic'
+    ' kube-apiserver control-plane scaling (Free tier pins an unscaled'
+    ' control plane). Automatically enabled when max_total_nodes > 256.',
+)
 BLOBFUSE_BLOCK_SIZE_MB = flags.DEFINE_float(
     'azure_blobfuse_block_size_mb',
     2,

@@ -36,6 +36,7 @@ class BaseContainerCluster(resource.BaseResource):
     else:
       self.min_nodes: int = cluster_spec.min_vm_count
     self.max_nodes: int = cluster_spec.max_vm_count or cluster_spec.vm_count
+    self.enable_network_policy: bool = cluster_spec.enable_network_policy
     self.gpu_type: str | None = None
     self.gpu_count: int | None = None
     self.default_nodepool = self._InitializeDefaultNodePool(
@@ -104,6 +105,7 @@ class BaseContainerCluster(resource.BaseResource):
     nodepool_config.num_nodes = cluster_spec.vm_count
     nodepool_config.min_nodes = self.min_nodes
     nodepool_config.max_nodes = self.max_nodes
+    nodepool_config.max_pods = cluster_spec.max_pods
     nodepool_config.tpu_topology = cluster_spec.tpu_topology
     nodepool_config.tpu_count = cluster_spec.tpu_count
     self.InitializeNodePoolForCloud(vm_config, nodepool_config)
@@ -137,6 +139,11 @@ class BaseContainerCluster(resource.BaseResource):
       nodepool_config.min_nodes = nodepool_spec.min_vm_count
     nodepool_config.max_nodes = (
         nodepool_spec.max_vm_count or nodepool_spec.vm_count
+    )
+    nodepool_config.max_pods = (
+        nodepool_spec.max_pods
+        if nodepool_spec.max_pods is not None
+        else self.default_nodepool.max_pods
     )
     self.InitializeNodePoolForCloud(vm_config, nodepool_config)
     return nodepool_config
@@ -243,6 +250,8 @@ class BaseContainerCluster(resource.BaseResource):
             'max_size': nodepool.max_nodes,
             'min_size': nodepool.min_nodes,
         })
+      if nodepool.max_pods is not None:
+        nodepool_metadata['max_pods'] = nodepool.max_pods
       nodepools_metadata[name] = nodepool_metadata
 
     metadata = {
@@ -267,6 +276,12 @@ class BaseContainerCluster(resource.BaseResource):
           'max_size': self.max_nodes,
           'min_size': self.min_nodes,
       })
+
+    if self.default_nodepool.max_pods is not None:
+      metadata['max_pods'] = self.default_nodepool.max_pods
+
+    if self.enable_network_policy:
+      metadata['enable_network_policy'] = True
 
     return metadata
 
