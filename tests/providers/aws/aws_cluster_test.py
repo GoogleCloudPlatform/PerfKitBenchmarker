@@ -268,6 +268,46 @@ Monitoring:
     self.assertEqual(
         self.cluster.vms, [self.cluster.headnode_vm] + self.cluster.worker_vms)
 
+  def testAwsP6ClusterRunJobMergesDefaultEnv(self):
+    self.assertFalse(hasattr(self.cluster, 'gpus_per_node'))
+    p6_cluster = aws_cluster.AWSP6Cluster(self.cluster_spec)
+    self.assertEqual(p6_cluster.gpus_per_node, 8)
+    p6_cluster.num_workers = 2
+    p6_cluster.headnode_vm = mock.MagicMock()
+    p6_cluster._container_images['nccl_cluster'] = '/opt/apps/p6.sqsh'
+    p6_cluster.headnode_vm.RemoteCommand.side_effect = [
+        ('Submitted batch job 7\n', ''),
+        ('nccl output', ''),
+    ]
+    with mock.patch.object(
+        aws_cluster.data,
+        'ResourcePath',
+        return_value='/path/to/slurm_job.sbatch.j2',
+    ):
+      p6_cluster.RunJob(
+          'nccl_cluster',
+          command='./all_reduce_perf',
+          env={'NCCL_DEBUG': 'INFO'},
+          gpus_per_node=8,
+      )
+      p6_cluster.headnode_vm.RenderTemplate.assert_called_once_with(
+          '/path/to/slurm_job.sbatch.j2',
+          '/opt/apps/slurm_job.sbatch',
+          {
+              'job_name': 'slurm_job',
+              'num_workers': 2,
+              'output_path': '/opt/apps/slurm-%j.out',
+              'env': {'FI_PROVIDER': 'efa', 'NCCL_DEBUG': 'INFO'},
+              'image': '/opt/apps/p6.sqsh',
+              'command': './all_reduce_perf',
+              'gpus_per_node': 8,
+          },
+          should_log_file=True,
+      )
+      p6_cluster.headnode_vm.PullFile.assert_called_once_with(
+          vm_util.GetTempDir(), '/opt/apps/slurm-7.out'
+      )
+
 
 if __name__ == '__main__':
   unittest.main()

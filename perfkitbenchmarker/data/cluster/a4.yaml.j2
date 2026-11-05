@@ -134,7 +134,7 @@ deployment_groups:
   # using gcsfuse. If you prefer to use a pre-existing bucket, use the
   # modules/file-system/pre-existing-network-storage module.
   - id: gcs_bucket
-    source: community/modules/file-system/cloud-storage-bucket
+    source: modules/file-system/cloud-storage-bucket
     settings:
       enable_hierarchical_namespace: true
       local_mount: /gcs

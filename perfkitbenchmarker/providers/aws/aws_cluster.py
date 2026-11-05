@@ -1,5 +1,6 @@
 """Class to represent a AWS cluster."""
 
+from collections.abc import Mapping
 import json
 import os
 from typing import Any, Tuple
@@ -314,7 +315,9 @@ class AWSP6Cluster(AWSCluster):
   """Class representing a P6-B200 cluster."""
 
   DEFAULT_TEMPLATE = 'cluster/p6.yaml.j2'
+  DEFAULT_JOB_ENV: Mapping[str, str] = {'FI_PROVIDER': 'efa'}
   TYPE = 'p6'
+  gpus_per_node: int = 8
 
   def _PostCreate(self):
     super()._PostCreate()

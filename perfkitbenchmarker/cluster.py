@@ -14,8 +14,10 @@
 
 """Class to represent a Cluster object."""
 
+from collections.abc import Mapping
 import os
 import posixpath
+import re
 import typing
 from typing import Any, Callable, Iterator, List, Tuple
 import uuid
@@ -222,6 +224,7 @@ class BaseCluster(resource.BaseResource):
     )
     self.num_workers: int = cluster_spec.workers.vm_count
     self.name: str = f'pkb{FLAGS.run_uri}'[:10]
+    self._container_images: dict[str, str] = {}
 
   def DeployContainerImage(
       self,
@@ -233,7 +236,10 @@ class BaseCluster(resource.BaseResource):
 
   def RunJob(
       self,
-      benchmark_name: str,
+      benchmark_name: str | None = None,
+      job_name: str = '',
+      command: str | None = None,
+      env: Mapping[str, str] | None = None,
       timeout: int = 7200,
       **template_vars: Any,
   ) -> Tuple[str, str]:
@@ -274,6 +280,8 @@ class SlurmCluster(BaseCluster):
   """
 
   SCHEDULER = 'slurm'
+  DEFAULT_JOB_TEMPLATE = 'cluster/slurm_job.sbatch.j2'
+  DEFAULT_JOB_ENV: Mapping[str, str] = {}
 
   def __init__(self, cluster_spec: BaseClusterSpec):
     """Initialize SlurmCluster class."""
@@ -327,30 +335,70 @@ class SlurmCluster(BaseCluster):
     self.InstallSquashImage(
         benchmark_name, sqsh_name, self.nfs_path, dockerfile
     )
-    return posixpath.join(self.nfs_path, sqsh_name)
+    image_path = posixpath.join(self.nfs_path, sqsh_name)
+    self._container_images[benchmark_name] = image_path
+    return image_path
 
   def RunJob(
       self,
-      benchmark_name: str,
+      benchmark_name: str | None = None,
+      job_name: str = 'slurm_job',
+      command: str | None = None,
+      env: Mapping[str, str] | None = None,
       timeout: int = 7200,
       **template_vars: Any,
   ) -> Tuple[str, str]:
-    template_path = posixpath.join(benchmark_name, 'slurm.sh.j2')
-    try:
-      data.ResourcePath(template_path)
-    except data.ResourceNotFound as exc:
-      raise errors.Benchmarks.UnsupportedConfigError(
-          f'{benchmark_name} does not support Slurm template {template_path}'
-      ) from exc
-    srun_cmd = vm_util.ReadAndRenderJinja2Template(
-        template_path, trim_spaces=True, **template_vars
+    """Renders an sbatch script to the headnode and runs it synchronously."""
+    assert self.headnode_vm is not None
+    template_name = f'{job_name}.sbatch.j2'
+    if benchmark_name and data.ResourceExists(
+        posixpath.join(benchmark_name, template_name)
+    ):
+      template_path = posixpath.join(benchmark_name, template_name)
+    else:
+      # Generic templates are stored in data/cluster/.
+      template_path = posixpath.join('cluster', template_name)
+      if template_path == self.DEFAULT_JOB_TEMPLATE and not command:
+        raise ValueError(
+            'command is required when using default Slurm template '
+            f'{self.DEFAULT_JOB_TEMPLATE}.'
+        )
+
+    job_dir = self.nfs_path or '.'
+    remote_script_path = posixpath.join(job_dir, f'{job_name}.sbatch')
+    output_pattern = posixpath.join(job_dir, 'slurm-%j.out')
+    merged_env = {**self.DEFAULT_JOB_ENV, **(env or {})}
+    context = {
+        'job_name': job_name,
+        'num_workers': self.num_workers,
+        'output_path': output_pattern,
+        'env': merged_env,
+        'command': command,
+        **template_vars,
+    }
+    if image := template_vars.get('image') or (
+        self._container_images.get(benchmark_name) if benchmark_name else None
+    ):
+      context['image'] = image
+    self.headnode_vm.RenderTemplate(
+        data.ResourcePath(template_path),
+        remote_script_path,
+        context,
+        should_log_file=True,
     )
-    return self.RemoteCommand(
-        srun_cmd,
+    stdout, _ = self.headnode_vm.RemoteCommand(
+        f'sbatch --wait {remote_script_path}',
         login_shell=True,
         timeout=timeout,
-        env=template_vars.get('env_export', ''),
     )
+    match = re.search(r'Submitted batch job (\d+)', stdout)
+    if not match:
+      raise errors.VirtualMachine.RemoteCommandError(
+          f'Failed to parse Slurm batch job ID from sbatch output: {stdout}'
+      )
+    output_path = posixpath.join(job_dir, f'slurm-{match.group(1)}.out')
+    self.headnode_vm.PullFile(vm_util.GetTempDir(), output_path)
+    return self.headnode_vm.RemoteCommand(f'cat {output_path}')
 
   def RemoteCommand(
       self,

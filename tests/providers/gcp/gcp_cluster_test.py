@@ -81,10 +81,13 @@ class GcpClusterTest(pkb_common_test_case.PkbCommonTestCase):
   def testGetClusterClassSlurmTypes(self):
     with flagsaver.flagsaver(cluster_type='default'):
       self.assertIs(cluster.GetClusterClass('GCP'), gcp_cluster.GceCluster)
+      self.assertFalse(hasattr(gcp_cluster.GceCluster, 'gpus_per_node'))
     with flagsaver.flagsaver(cluster_type='h4d'):
       self.assertIs(cluster.GetClusterClass('GCP'), gcp_cluster.H4dCluster)
+      self.assertFalse(hasattr(gcp_cluster.H4dCluster, 'gpus_per_node'))
     with flagsaver.flagsaver(cluster_type='a4'):
       self.assertIs(cluster.GetClusterClass('GCP'), gcp_cluster.A4Cluster)
+      self.assertEqual(gcp_cluster.A4Cluster.gpus_per_node, 8)
 
   def testSlurmClusterDeployContainerImage(self):
     self.cluster.TYPE = 'a4'
@@ -93,55 +96,151 @@ class GcpClusterTest(pkb_common_test_case.PkbCommonTestCase):
     ) as mock_install:
       image_path = self.cluster.DeployContainerImage('nccl_cluster')
       self.assertEqual(image_path, '/opt/apps/a4.sqsh')
+      self.assertEqual(
+          self.cluster._container_images['nccl_cluster'], '/opt/apps/a4.sqsh'
+      )
       mock_install.assert_called_once_with(
           'nccl_cluster', 'a4.sqsh', '/opt/apps', 'nccl_cluster/a4.dockerfile'
       )
 
   def testSlurmClusterRunJobSuccess(self):
+    self.cluster.headnode_vm = mock.MagicMock()
+    self.cluster._container_images['nccl_cluster'] = '/opt/apps/a4.sqsh'
+    self.cluster.headnode_vm.RemoteCommand.side_effect = [
+        ('Submitted batch job 42\n', ''),
+        ('nccl output', ''),
+    ]
     with (
         mock.patch.object(
-            data, 'ResourcePath', return_value='/path/to/slurm.sh.j2'
-        ),
+            data, 'ResourceExists', return_value=False
+        ) as mock_resource_exists,
         mock.patch.object(
-            vm_util,
-            'ReadAndRenderJinja2Template',
-            return_value='--mpi=pmix ./all_reduce_perf',
-        ) as mock_render,
-        mock.patch.object(
-            self.cluster,
-            'RemoteCommand',
-            return_value=('nccl output', ''),
-        ) as mock_remote,
+            data, 'ResourcePath', return_value='/path/to/slurm_job.sbatch.j2'
+        ) as mock_resource_path,
     ):
       stdout, stderr = self.cluster.RunJob(
           'nccl_cluster',
+          command='./all_reduce_perf',
+          env={'NCCL_DEBUG': 'INFO'},
           timeout=3600,
-          operation='all_reduce',
-          env_export='export NCCL_DEBUG=INFO;',
+          gpus_per_node=8,
       )
       self.assertEqual(stdout, 'nccl output')
       self.assertEqual(stderr, '')
-      mock_render.assert_called_once_with(
-          'nccl_cluster/slurm.sh.j2',
-          trim_spaces=True,
-          operation='all_reduce',
-          env_export='export NCCL_DEBUG=INFO;',
+      mock_resource_exists.assert_called_once_with(
+          'nccl_cluster/slurm_job.sbatch.j2'
       )
-      mock_remote.assert_called_once_with(
-          '--mpi=pmix ./all_reduce_perf',
-          login_shell=True,
-          timeout=3600,
-          env='export NCCL_DEBUG=INFO;',
+      mock_resource_path.assert_called_once_with('cluster/slurm_job.sbatch.j2')
+      self.cluster.headnode_vm.RenderTemplate.assert_called_once_with(
+          '/path/to/slurm_job.sbatch.j2',
+          '/opt/apps/slurm_job.sbatch',
+          {
+              'job_name': 'slurm_job',
+              'num_workers': 2,
+              'output_path': '/opt/apps/slurm-%j.out',
+              'env': {'NCCL_DEBUG': 'INFO'},
+              'image': '/opt/apps/a4.sqsh',
+              'command': './all_reduce_perf',
+              'gpus_per_node': 8,
+          },
+          should_log_file=True,
+      )
+      self.cluster.headnode_vm.PullFile.assert_called_once_with(
+          vm_util.GetTempDir(), '/opt/apps/slurm-42.out'
+      )
+      self.assertSequenceEqual(
+          [
+              mock.call(
+                  'sbatch --wait /opt/apps/slurm_job.sbatch',
+                  login_shell=True,
+                  timeout=3600,
+              ),
+              mock.call('cat /opt/apps/slurm-42.out'),
+          ],
+          self.cluster.headnode_vm.RemoteCommand.mock_calls,
       )
 
-  def testSlurmClusterRunJobMissingTemplateRaisesUnsupportedConfigError(self):
-    with mock.patch.object(
-        data,
-        'ResourcePath',
-        side_effect=data.ResourceNotFound('missing template'),
+  def testSlurmClusterRunJobCustomJobTemplate(self):
+    self.cluster.headnode_vm = mock.MagicMock()
+    self.cluster.headnode_vm.RemoteCommand.side_effect = [
+        ('Submitted batch job 99\n', ''),
+        ('job output', ''),
+    ]
+    with (
+        mock.patch.object(
+            data, 'ResourceExists', return_value=True
+        ) as mock_resource_exists,
+        mock.patch.object(
+            data,
+            'ResourcePath',
+            return_value='/path/to/custom_slurm_job.sbatch.j2',
+        ) as mock_resource_path,
     ):
-      with self.assertRaises(errors.Benchmarks.UnsupportedConfigError):
-        self.cluster.RunJob('unsupported_benchmark')
+      stdout, _ = self.cluster.RunJob('my_bench', job_name='step1')
+      self.assertEqual(stdout, 'job output')
+      mock_resource_exists.assert_called_once_with('my_bench/step1.sbatch.j2')
+      mock_resource_path.assert_called_once_with('my_bench/step1.sbatch.j2')
+      self.cluster.headnode_vm.RenderTemplate.assert_called_once_with(
+          '/path/to/custom_slurm_job.sbatch.j2',
+          '/opt/apps/step1.sbatch',
+          {
+              'job_name': 'step1',
+              'num_workers': 2,
+              'output_path': '/opt/apps/slurm-%j.out',
+              'env': {},
+              'command': None,
+          },
+          should_log_file=True,
+      )
+
+  def testSlurmClusterRunJobTemplateVarsImageOverridesContainerImages(self):
+    self.cluster.headnode_vm = mock.MagicMock()
+    self.cluster._container_images['my_bench'] = '/opt/apps/a4.sqsh'
+    self.cluster.headnode_vm.RemoteCommand.side_effect = [
+        ('Submitted batch job 100\n', ''),
+        ('job output', ''),
+    ]
+    with (
+        mock.patch.object(data, 'ResourceExists', return_value=False),
+        mock.patch.object(
+            data, 'ResourcePath', return_value='/path/to/slurm_job.sbatch.j2'
+        ),
+    ):
+      self.cluster.RunJob(
+          'my_bench',
+          command='./run_step',
+          image='/opt/apps/custom.sqsh',
+      )
+      self.cluster.headnode_vm.RenderTemplate.assert_called_once_with(
+          '/path/to/slurm_job.sbatch.j2',
+          '/opt/apps/slurm_job.sbatch',
+          {
+              'job_name': 'slurm_job',
+              'num_workers': 2,
+              'output_path': '/opt/apps/slurm-%j.out',
+              'env': {},
+              'command': './run_step',
+              'image': '/opt/apps/custom.sqsh',
+          },
+          should_log_file=True,
+      )
+
+  def testSlurmClusterRunJobMissingCommandRaisesValueError(self):
+    self.cluster.headnode_vm = mock.MagicMock()
+    with self.assertRaises(ValueError):
+      self.cluster.RunJob()
+
+  def testSlurmClusterRunJobMissingJobIdRaisesRemoteCommandError(self):
+    self.cluster.headnode_vm = mock.MagicMock()
+    self.cluster.headnode_vm.RemoteCommand.return_value = ('bad output', '')
+    with mock.patch.object(
+        data, 'ResourcePath', return_value='/path/to/slurm_job.sbatch.j2'
+    ):
+      with self.assertRaises(errors.VirtualMachine.RemoteCommandError):
+        self.cluster.RunJob(
+            command='./all_reduce_perf',
+            gpus_per_node=8,
+        )
 
   def testSlurmClusterMissingHeadnodeRaisesInvalidValue(self):
     workers_config = {

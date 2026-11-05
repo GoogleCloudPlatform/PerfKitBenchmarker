@@ -218,6 +218,7 @@ class A4Cluster(GceCluster):
 
   DEFAULT_TEMPLATE = 'cluster/a4.yaml.j2'
   TYPE = 'a4'
+  gpus_per_node: int = 8
 
   def _PostCreate(self):
     super()._PostCreate()
