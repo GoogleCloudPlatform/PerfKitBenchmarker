@@ -199,5 +199,80 @@ class AzurePublicIPAddressTest(pkb_common_test_case.PkbCommonTestCase):
       self.ip_address._Create()
 
 
+class AzureNICTest(pkb_common_test_case.PkbCommonTestCase):
+
+  def setUp(self):
+    super().setUp()
+    mock_rg = self.enter_context(
+        mock.patch.object(
+            azure_virtual_machine.azure_network,
+            'GetResourceGroup',
+            autospec=True,
+        )
+    )
+    mock_rg.return_value.args = ['--resource-group', 'test_rg']
+    mock_network = mock.create_autospec(
+        azure_virtual_machine.azure_network.AzureNetwork, instance=True
+    )
+    mock_network.region = 'westus2'
+    mock_network.nsgs = []
+    mock_subnet = mock.create_autospec(
+        azure_virtual_machine.azure_network.AzureSubnet, instance=True
+    )
+    mock_subnet.id = 'test_subnet_id'
+    self.nic = azure_virtual_machine.AzureNIC(
+        network=mock_network,
+        subnet=mock_subnet,
+        name='test_nic',
+        public_ip=None,
+        accelerated_networking=True,
+    )
+
+  def testCreateIssuesRetryableCommand(self):
+    mock_retryable_cmd = self.enter_context(
+        mock.patch.object(
+            vm_util,
+            'IssueRetryableCommand',
+            autospec=True,
+            return_value=('', ''),
+        )
+    )
+    self.nic._Create()
+    mock_retryable_cmd.assert_called_once_with([
+        azure_virtual_machine.azure.AZURE_PATH,
+        'network',
+        'nic',
+        'create',
+        '--location',
+        'westus2',
+        '--name',
+        'test_nic',
+        '--resource-group',
+        'test_rg',
+        '--subnet',
+        'test_subnet_id',
+        '--accelerated-networking',
+        'true',
+    ])
+
+  def testCreateRetriesOnTransientCommandFailure(self):
+    self.enter_context(
+        mock.patch.object(vm_util.time, 'sleep', autospec=True)
+    )
+    mock_cmd = self.enter_context(
+        mock.patch.object(
+            vm_util,
+            'IssueCommand',
+            autospec=True,
+            side_effect=[
+                ('', 'deadlock detected by _ModuleLock', 1),
+                ('', '', 0),
+            ],
+        )
+    )
+    self.nic._Create()
+    self.assertEqual(mock_cmd.call_count, 2)
+
+
 if __name__ == '__main__':
   unittest.main()

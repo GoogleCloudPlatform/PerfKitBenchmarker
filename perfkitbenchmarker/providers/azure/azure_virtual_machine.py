@@ -453,7 +453,7 @@ class AzureNIC(resource.BaseResource):
     for nsg in self.network.nsgs:
       if nsg.subnet.name == self.subnet.name:
         cmd += ['--network-security-group', nsg.name]
-    vm_util.IssueCommand(cmd)
+    vm_util.IssueRetryableCommand(cmd)
 
   def _Exists(self):
     if self._deleted:
