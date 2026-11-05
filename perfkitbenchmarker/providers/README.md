@@ -14,6 +14,7 @@ provider(s) you want to benchmark:
 *   [IBMCloud](https://cloud.ibm.com)
 *   [AliCloud](http://www.aliyun.com)
 *   [DigitalOcean](https://www.digitalocean.com)
+*   [Oracle Cloud Infrastructure](https://www.oracle.com/cloud/)
 *   [Rackspace Cloud](https://www.rackspace.com)
 *   [ProfitBricks](https://www.profitbricks.com/)
 
@@ -33,6 +34,7 @@ want to test Google Cloud, you only need to install and configure `gcloud`.
 *   [IBMCloud](#setup-ibmcloud-endpoints-and-credentials)
 *   [AliCloud](#install-alicloud-cli-and-setup-authentication)
 *   [DigitalOcean](#digitalocean-configuration-and-credentials)
+*   [OCI](#install-oci-cli-and-setup-authentication)
 *   [RackSpace](#installing-clis-and-credentials-for-rackspace)
 *   [ProfitBricks](#profitbricks-configuration-and-credentials)
 
@@ -362,6 +364,37 @@ $ ./pkb.py --cloud=IBMCloud --benchmarks=iperf --machine_type=cx2-4x8 \
 2.  Authenticate with `doctl`. The easiest way is running `doctl auth login` and
     following the instructions, but any of the options at the `doctl` site will
     work.
+
+### Install OCI CLI and setup authentication
+
+1.  Install the OCI CLI, either with `pip install -r
+    perfkitbenchmarker/providers/oci/requirements.txt` or by following
+    https://docs.oracle.com/en-us/iaas/Content/API/SDKDocs/cliinstall.htm.
+
+2.  Create an API signing key and config file by running `oci setup config`.
+    PKB uses the `DEFAULT` profile in `~/.oci/config` unless `--oci_profile` is
+    set.
+
+3.  Tell PKB which compartment to create resources in, either with
+    `--oci_compartment_id=<compartment OCID>` or by adding a default to
+    `~/.oci/oci_cli_rc`:
+
+    ```
+    [DEFAULT]
+    compartment-id = <compartment OCID>
+    ```
+
+`--zone` takes a region such as `us-ashburn-1`. To pick an availability domain,
+add an `-ad-N` suffix (for example `us-ashburn-1-ad-2`) or set
+`--oci_availability_domain`. For Flex shapes, set the shape size with
+`--oci_ocpus` and `--oci_memory_in_gbs`. Block volume performance is selected
+with `--data_disk_type` (`lower_cost`, `balanced`, `higher_performance` or
+`ultra_high_performance`) or `--oci_vpus_per_gb`.
+
+```bash
+$ ./pkb.py --cloud=OCI --benchmarks=iperf --machine_type=VM.Standard.E5.Flex \
+    --oci_ocpus=2 --zone=us-ashburn-1 --os_type=ol9
+```
 
 ### Installing CLIs and credentials for Rackspace
 

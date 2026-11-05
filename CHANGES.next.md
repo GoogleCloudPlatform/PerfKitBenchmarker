@@ -306,6 +306,9 @@
 -   Add kubernetes_glm_sglang benchmark, which serves GLM-5.3 with SGLang on GKE
     a4-highgpu-8g (8x NVIDIA B200) nodes and measures it with
     sglang.bench_serving.
+-   Add Oracle Cloud Infrastructure (OCI) as a new provider, supporting VMs
+    (Ubuntu 22.04/24.04, Oracle Linux 8/9), VCN networking with firewall rules,
+    and block volume scratch disks. (GH-7174 from @gadgilrajeev)
 
 ### Enhancements:
 
