@@ -799,6 +799,99 @@ class TestRunBenchmarks(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(FLAGS[zone_flag].value[0], 'us-west1-a')  # pyrefly: ignore[unsupported-operation]
     self.assertEmpty(test_retry_manager._zones_tried)
 
+  def testGetMachineTypesFromContainerCluster(self):
+    yaml_config = textwrap.dedent("""
+        cluster_boot:
+          container_cluster:
+            cloud: GCP
+            type: Kubernetes
+            vm_count: 1
+            vm_spec:
+              GCP:
+                machine_type: n4-standard-16
+                zone: us-east5-b
+            nodepools:
+              postgres:
+                vm_count: 1
+                vm_spec:
+                  GCP:
+                    machine_type: c4-standard-16
+                    zone: us-east5-b
+              custom_pool:
+                vm_count: 1
+                vm_spec:
+                  GCP:
+                    machine_type:
+                      cpus: 4
+                      memory: 8GiB
+                    zone: us-east5-b
+        """)
+    test_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
+        yaml_config, 'cluster_boot'
+    )
+    test_spec.vms_to_boot = {}
+    self.assertEqual(
+        pkb._GetMachineTypes(test_spec),
+        ['c4-standard-16', 'n4-standard-16'],
+    )
+
+  @parameterized.named_parameters(('ZonesFlag', 'zones'), ('ZoneFlag', 'zone'))
+  @flagsaver.flagsaver()
+  def testConstructContainerClusterUpdatesZoneFromFlags(self, zone_flag):
+    FLAGS[zone_flag].parse(['us-east5-c'])
+    yaml_config = textwrap.dedent("""
+        cluster_boot:
+          container_registry:
+            cloud: GCP
+          container_cluster:
+            cloud: GCP
+            type: Kubernetes
+            vm_count: 1
+            vm_spec:
+              GCP:
+                machine_type: n4-standard-16
+                zone: us-east5-b
+            nodepools:
+              postgres:
+                vm_count: 1
+                vm_spec:
+                  GCP:
+                    machine_type: n4-standard-16
+                    zone: us-east5-b
+        """)
+    test_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
+        yaml_config, 'cluster_boot'
+    )
+    self.enter_context(
+        mock.patch.object(providers, 'LoadProvider', autospec=True)
+    )
+    self.enter_context(
+        mock.patch.object(
+            pkb.bm_spec.container_cluster,
+            'GetContainerClusterClass',
+            autospec=True,
+        )
+    )
+    self.enter_context(
+        mock.patch.object(
+            pkb.bm_spec.container_registry,
+            'GetContainerRegistryClass',
+            autospec=True,
+        )
+    )
+    test_spec.ConstructContainerRegistry()
+    test_spec.ConstructContainerCluster()
+    assert test_spec.config.container_cluster is not None
+    assert test_spec.config.container_registry is not None
+    self.assertEqual(
+        test_spec.config.container_cluster.vm_spec.zone, 'us-east5-c'
+    )
+    self.assertEqual(
+        test_spec.config.container_cluster.nodepools['postgres'].vm_spec.zone,
+        'us-east5-c',
+    )
+    self.assertEqual(test_spec.config.container_registry.zone, 'us-east5-c')
+
 
 class FreezeRestoreTest(pkb_common_test_case.PkbCommonTestCase):
 

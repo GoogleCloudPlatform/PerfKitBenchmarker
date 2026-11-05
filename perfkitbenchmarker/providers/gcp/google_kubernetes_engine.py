@@ -320,6 +320,15 @@ class BaseGkeCluster(kubernetes_cluster.KubernetesCluster):
     stdout, _, _ = cmd.Issue(raise_on_failure=False)
     return True if stdout else False
 
+  def Delete(self, *args, **kwargs) -> None:
+    if not self.created:
+      if self._Exists():
+        logging.info('Deleting partially created GKE cluster %s.', self.name)
+        cmd = self._GcloudCommand('container', 'clusters', 'delete', self.name)
+        cmd.IssueRetryable(timeout=ONE_HOUR)
+      return
+    super().Delete(*args, **kwargs)
+
   def _Delete(self) -> None:
     """Deletes the cluster."""
     if self.capacity_buffer:

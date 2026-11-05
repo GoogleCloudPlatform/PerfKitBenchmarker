@@ -277,6 +277,51 @@ class GoogleKubernetesEngineTestCase(PatchedObjectsTestCase):
       ):
         cluster._Create()
 
+  def testCreateFailureCleansUpPartiallyCreatedCluster(self):
+    spec = self.create_kubernetes_engine_spec()
+    with self.patch_critical_objects():
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      issue_command = self.MockIssueCommand({
+          'clusters describe': [('', '', 0)],
+          'clusters delete': [('', '', 0)],
+      })
+      mock_kubectl = self.enter_context(
+          mock.patch.object(
+              kubectl, 'RunRetryableKubectlCommand', autospec=True
+          )
+      )
+
+      cluster.Delete()
+
+      self.assertFalse(cluster.created)
+      mock_kubectl.assert_not_called()
+      self.assertIn(
+          f'gcloud container clusters delete pkb-{_RUN_URI}',
+          issue_command.all_commands,
+      )
+
+  def testCreateFailureSkipsDeleteWhenClusterDoesNotExist(self):
+    spec = self.create_kubernetes_engine_spec()
+    with self.patch_critical_objects():
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      issue_command = self.MockIssueCommand({
+          'clusters describe': [('', '', 1)],
+      })
+      mock_kubectl = self.enter_context(
+          mock.patch.object(
+              kubectl, 'RunRetryableKubectlCommand', autospec=True
+          )
+      )
+
+      cluster.Delete()
+
+      self.assertFalse(cluster.created)
+      mock_kubectl.assert_not_called()
+      self.assertNotIn(
+          'gcloud container clusters delete',
+          issue_command.all_commands,
+      )
+
   def testGetCredentials(self):
     spec = self.create_kubernetes_engine_spec()
     with self.patch_critical_objects() as issue_command, mock.patch.object(

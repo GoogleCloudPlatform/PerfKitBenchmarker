@@ -1392,6 +1392,13 @@ def _GetMachineTypes(spec: bm_spec.BenchmarkSpec) -> list[str]:
   results = set()
   for vm_group_spec in spec.vms_to_boot.values():
     results.add(vm_group_spec.vm_spec.machine_type)
+  cluster_spec = spec.config.container_cluster
+  if cluster_spec:
+    if isinstance(cluster_spec.vm_spec.machine_type, str):
+      results.add(cluster_spec.vm_spec.machine_type)
+    for nodepool_spec in cluster_spec.nodepools.values():
+      if isinstance(nodepool_spec.vm_spec.machine_type, str):
+        results.add(nodepool_spec.vm_spec.machine_type)
   return sorted(list(results))
 
 

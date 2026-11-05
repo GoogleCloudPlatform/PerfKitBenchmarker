@@ -742,3 +742,5 @@
 -   Suppress `not found: 404` errors from `gcloud storage buckets delete` in
     `GoogleCloudStorageService.DeleteBucket` when tearing down a bucket that was
     never created.
+-   Support smart zone retries and failed cluster cleanup for GKE benchmarks in
+    PKB.

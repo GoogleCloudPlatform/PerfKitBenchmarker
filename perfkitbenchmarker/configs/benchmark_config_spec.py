@@ -1408,6 +1408,8 @@ class BenchmarkConfigSpec(spec.BaseSpec):
 
   vm_groups: dict[str, vm_group_decoders.VmGroupSpec]
   agent_sandbox: agent_sandbox_spec.BaseAgentSandboxConfigSpec | None
+  container_cluster: container_spec.ContainerClusterSpec | None
+  container_registry: container_spec.ContainerRegistrySpec | None
 
   def __init__(self, component_full_name, expected_os_types=None, **kwargs):
     """Initializes a BenchmarkConfigSpec.

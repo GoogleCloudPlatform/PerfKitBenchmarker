@@ -375,11 +375,16 @@ class BenchmarkSpec:
 
   def ConstructContainerCluster(self):
     """Create the container cluster."""
-    if self.config.container_cluster is None:  # pyrefly: ignore[missing-attribute]
+    if self.config.container_cluster is None:
       return
+    if FLAGS.zone or FLAGS.zones:
+      zone = (FLAGS.zone or FLAGS.zones)[0]
+      self.config.container_cluster.vm_spec.zone = zone
+      for nodepool_spec in self.config.container_cluster.nodepools.values():
+        nodepool_spec.vm_spec.zone = zone
 
-    cloud = self.config.container_cluster.cloud  # pyrefly: ignore[missing-attribute]
-    cluster_type = self.config.container_cluster.type  # pyrefly: ignore[missing-attribute]
+    cloud = self.config.container_cluster.cloud
+    cluster_type = self.config.container_cluster.type
     providers.LoadProvider(cloud)
     container_cluster_class = container_cluster.GetContainerClusterClass(
         cloud, cluster_type
@@ -418,9 +423,11 @@ class BenchmarkSpec:
 
   def ConstructContainerRegistry(self):
     """Create the container registry."""
-    if self.config.container_registry is None:  # pyrefly: ignore[missing-attribute]
+    if self.config.container_registry is None:
       return
-    cloud = self.config.container_registry.cloud  # pyrefly: ignore[missing-attribute]
+    if FLAGS.zone or FLAGS.zones:
+      self.config.container_registry.zone = (FLAGS.zone or FLAGS.zones)[0]
+    cloud = self.config.container_registry.cloud
     providers.LoadProvider(cloud)
     container_registry_class = container_registry.GetContainerRegistryClass(
         cloud
