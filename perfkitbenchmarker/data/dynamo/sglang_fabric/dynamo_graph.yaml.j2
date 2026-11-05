@@ -12,6 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+{%- macro worker_affinity() %}
+        affinity:
+          {{ 'podAffinity' if pod_placement == 'colocated' else 'podAntiAffinity' }}:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              - labelSelector:
+                  matchExpressions:
+                    - key: nvidia.com/dynamo-component-type
+                      operator: In
+                      values:
+                        - worker
+                topologyKey: kubernetes.io/hostname
+{%- endmacro %}
+{%- set use_compute_domain = enable_compute_domain if enable_compute_domain is defined else true %}
+{% if use_compute_domain %}
 apiVersion: resource.nvidia.com/v1beta1
 kind: ComputeDomain
 metadata:
@@ -23,6 +37,7 @@ spec:
     resourceClaimTemplate:
       name: {{ compute_domain_channel }}
 ---
+{% endif %}
 apiVersion: nvidia.com/v1alpha1
 kind: DynamoGraphDeployment
 metadata:
@@ -31,7 +46,7 @@ metadata:
 spec:
   envs:
     - name: HF_HOME
-      value: /data/model
+      value: {{ model_path_prefix or '/tmp/model' }}
   services:
     Frontend:
       componentType: frontend
@@ -39,6 +54,11 @@ spec:
       extraPodSpec:
         mainContainer:
           image: {{ frontend_image }}
+{% if router_mode %}
+          args:
+            - --router-mode
+            - {{ router_mode }}
+{% endif %}
           envFrom:
             - secretRef:
                 name: hf-token-secret
@@ -49,11 +69,14 @@ spec:
       replicas: {{ decode_replicas }}
       resources:
         limits:
-          gpu: "{{ gpu_count }}"
+          gpu: "{{ decode_tp | default(gpu_count) }}"
       extraPodSpec:
+{%- if (pod_placement | default('unconstrained')) != 'unconstrained' %}{{ worker_affinity() }}{% endif %}
+{% if use_compute_domain %}
         resourceClaims:
           - name: compute-domain-channel
             resourceClaimTemplateName: {{ compute_domain_channel }}
+{% endif %}
         mainContainer:
           image: {{ workload_image }}
           workingDir: /workspace
@@ -67,14 +90,21 @@ spec:
             - --served-model-name
             - {{ dynamo_model_id }}
             - --tp
-            - "{{ gpu_count }}"
+            - "{{ decode_tp | default(gpu_count) }}"
             - --trust-remote-code
             - --disaggregation-mode
             - decode
             - --disaggregation-bootstrap-port
             - "30001"
+{% if disaggregation_transfer_backend %}
+            - --disaggregation-transfer-backend
+            - {{ disaggregation_transfer_backend }}
+{% endif %}
             - --host
             - 0.0.0.0
+{% for arg in decode_extra_args | default([]) %}
+            - "{{ arg }}"
+{% endfor %}
           envFrom:
             - secretRef:
                 name: hf-token-secret
@@ -84,20 +114,25 @@ spec:
             - name: {{ key }}
               value: "{{ value }}"
 {% endfor %}
+{% if use_compute_domain %}
           resources:
             claims:
               - name: compute-domain-channel
+{% endif %}
     prefill:
       componentType: worker
       subComponentType: prefill
       replicas: {{ prefill_replicas }}
       resources:
         limits:
-          gpu: "{{ gpu_count }}"
+          gpu: "{{ prefill_tp | default(gpu_count) }}"
       extraPodSpec:
+{%- if (pod_placement | default('unconstrained')) != 'unconstrained' %}{{ worker_affinity() }}{% endif %}
+{% if use_compute_domain %}
         resourceClaims:
           - name: compute-domain-channel
             resourceClaimTemplateName: {{ compute_domain_channel }}
+{% endif %}
         mainContainer:
           image: {{ workload_image }}
           workingDir: /workspace
@@ -111,14 +146,21 @@ spec:
             - --served-model-name
             - {{ dynamo_model_id }}
             - --tp
-            - "{{ gpu_count }}"
+            - "{{ prefill_tp | default(gpu_count) }}"
             - --trust-remote-code
             - --disaggregation-mode
             - prefill
             - --disaggregation-bootstrap-port
             - "30001"
+{% if disaggregation_transfer_backend %}
+            - --disaggregation-transfer-backend
+            - {{ disaggregation_transfer_backend }}
+{% endif %}
             - --host
             - 0.0.0.0
+{% for arg in prefill_extra_args | default([]) %}
+            - "{{ arg }}"
+{% endfor %}
           envFrom:
             - secretRef:
                 name: hf-token-secret
@@ -128,6 +170,8 @@ spec:
             - name: {{ key }}
               value: "{{ value }}"
 {% endfor %}
+{% if use_compute_domain %}
           resources:
             claims:
               - name: compute-domain-channel
+{% endif %}

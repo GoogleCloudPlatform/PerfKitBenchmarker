@@ -12,6 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+{%- macro worker_affinity() %}
+        affinity:
+          {{ 'podAffinity' if pod_placement == 'colocated' else 'podAntiAffinity' }}:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              - labelSelector:
+                  matchExpressions:
+                    - key: nvidia.com/dynamo-component-type
+                      operator: In
+                      values:
+                        - worker
+                topologyKey: kubernetes.io/hostname
+{%- endmacro %}
 apiVersion: nvidia.com/v1alpha1
 kind: DynamoGraphDeployment
 metadata:
@@ -20,7 +32,7 @@ metadata:
 spec:
   envs:
     - name: HF_HOME
-      value: /data/model
+      value: {{ model_path_prefix or '/tmp/model' }}
   services:
     Frontend:
       componentType: frontend
@@ -28,6 +40,11 @@ spec:
       extraPodSpec:
         mainContainer:
           image: {{ frontend_image }}
+{% if router_mode %}
+          args:
+            - --router-mode
+            - {{ router_mode }}
+{% endif %}
           envFrom:
             - secretRef:
                 name: hf-token-secret
@@ -38,8 +55,9 @@ spec:
       replicas: {{ decode_replicas }}
       resources:
         limits:
-          gpu: "{{ gpu_count }}"
+          gpu: "{{ decode_tp | default(gpu_count) }}"
       extraPodSpec:
+{%- if (pod_placement | default('cross_node')) != 'unconstrained' %}{{ worker_affinity() }}{% endif %}
         mainContainer:
           image: {{ workload_image }}
           workingDir: /workspace
@@ -53,14 +71,21 @@ spec:
             - --served-model-name
             - {{ dynamo_model_id }}
             - --tp
-            - "{{ gpu_count }}"
+            - "{{ decode_tp | default(gpu_count) }}"
             - --trust-remote-code
             - --disaggregation-mode
             - decode
             - --disaggregation-bootstrap-port
             - "30001"
+{% if disaggregation_transfer_backend %}
+            - --disaggregation-transfer-backend
+            - {{ disaggregation_transfer_backend }}
+{% endif %}
             - --host
             - 0.0.0.0
+{% for arg in decode_extra_args | default([]) %}
+            - "{{ arg }}"
+{% endfor %}
           envFrom:
             - secretRef:
                 name: hf-token-secret
@@ -76,8 +101,9 @@ spec:
       replicas: {{ prefill_replicas }}
       resources:
         limits:
-          gpu: "{{ gpu_count }}"
+          gpu: "{{ prefill_tp | default(gpu_count) }}"
       extraPodSpec:
+{%- if (pod_placement | default('cross_node')) != 'unconstrained' %}{{ worker_affinity() }}{% endif %}
         mainContainer:
           image: {{ workload_image }}
           workingDir: /workspace
@@ -91,14 +117,21 @@ spec:
             - --served-model-name
             - {{ dynamo_model_id }}
             - --tp
-            - "{{ gpu_count }}"
+            - "{{ prefill_tp | default(gpu_count) }}"
             - --trust-remote-code
             - --disaggregation-mode
             - prefill
             - --disaggregation-bootstrap-port
             - "30001"
+{% if disaggregation_transfer_backend %}
+            - --disaggregation-transfer-backend
+            - {{ disaggregation_transfer_backend }}
+{% endif %}
             - --host
             - 0.0.0.0
+{% for arg in prefill_extra_args | default([]) %}
+            - "{{ arg }}"
+{% endfor %}
           envFrom:
             - secretRef:
                 name: hf-token-secret
