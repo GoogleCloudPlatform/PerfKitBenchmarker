@@ -116,11 +116,17 @@ def AptInstall(vm):
         vm.RemoteCommand(
             'sudo mkdir -p /root/.gnupg && sudo chmod 700 /root/.gnupg'
         )
+        # Use the "gnupg-ring:" prefix so that GnuPG 2.1+ writes a legacy
+        # binary OpenPGP keyring. Without it, gpg creates a keybox (.kbx)
+        # file, which apt ignores in /etc/apt/trusted.gpg.d/ ("unsupported
+        # filetype").
         vm.RemoteCommand(
             'sudo gpg --no-default-keyring --keyring'
-            ' /etc/apt/trusted.gpg.d/mysql.gpg --keyserver'
+            ' gnupg-ring:/etc/apt/trusted.gpg.d/mysql.gpg --keyserver'
             f' keyserver.ubuntu.com --recv-keys {key}'
         )
+        # apt reads keyrings as the unprivileged _apt user.
+        vm.RemoteCommand('sudo chmod 644 /etc/apt/trusted.gpg.d/mysql.gpg')
       else:
         raise RuntimeError('No public key found by regex.')
     else:

@@ -25,6 +25,7 @@ import os
 import posixpath
 import re
 import time
+from absl import flags
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
@@ -36,8 +37,35 @@ JNA_JAR_URL = (
     'net/java/dev/jna/jna/4.1.0/jna-4.1.0.jar'
 )
 CASSANDRA_GIT_REPRO = 'https://github.com/apache/cassandra.git'
-CASSANDRA_YAML_TEMPLATE = 'cassandra/cassandra.yaml.j2'
 CASSANDRA_RACKDC_TEMPLATE = 'cassandra/cassandra-rackdc.properties.j2'
+CASSANDRA_YAML_TEMPLATE_PATH = flags.DEFINE_string(
+    'cassandra_yaml_template_path',
+    'cassandra/cassandra.yaml.j2',
+    'Path to the cassandra.yaml Jinja2 template resource.',
+)
+CASSANDRA_ROW_CACHE_SIZE = flags.DEFINE_string(
+    'cassandra_row_cache_size',
+    '0MiB',
+    'Row cache size in cassandra.yaml (e.g. 0MiB, 1024MiB, 4GiB).',
+)
+CASSANDRA_KEY_CACHE_SIZE = flags.DEFINE_string(
+    'cassandra_key_cache_size',
+    '0MiB',
+    'Key cache size in cassandra.yaml (default is 0MiB, which disables key'
+    ' cache; e.g. 0MiB, 100MiB).',
+)
+CASSANDRA_DISK_ACCESS_MODE = flags.DEFINE_enum(
+    'cassandra_disk_access_mode',
+    None,
+    ['auto', 'mmap', 'mmap_index_only', 'standard'],
+    'Disk access mode in cassandra.yaml for SSTable reads.',
+)
+CASSANDRA_JVM_HEAP_SIZE = flags.DEFINE_string(
+    'cassandra_jvm_heap_size',
+    None,
+    'JVM heap size (-Xms and -Xmx) in jvm-server.options (e.g. 8G, 16G,'
+    ' 4096M). When unset, Cassandra auto-calculates heap size from system RAM.',
+)
 CASSANDRA_KEYSPACE_TEMPLATE = (
     'cassandra/create-keyspace-cassandra-stress.cql.j2'
 )
@@ -56,13 +84,31 @@ CLUSTER_START_SLEEP = 30
 NODE_START_SLEEP = 30
 
 
+@flags.validator('cassandra_jvm_heap_size')
+def _ValidateJvmHeapSize(value):
+  return value is None or bool(re.fullmatch(r'[1-9]\d*[MGmg]', value))
+
+
+def _ConfigureJvmHeap(vm, cassandra_conf_path, heap_size):
+  """Sets -Xms and -Xmx in jvm-server.options on 'vm'."""
+  jvm_options_path = posixpath.join(cassandra_conf_path, 'jvm-server.options')
+  vm.RemoteCommand(f"sudo sed -i '/^-Xm[sx]/d' {jvm_options_path}")
+  vm.RemoteCommand(
+      f"printf '\\n-Xms{heap_size}\\n-Xmx{heap_size}\\n' |"
+      f' sudo tee -a {jvm_options_path} >/dev/null'
+  )
+
+
 def CheckPrerequisites():
   """Verifies that the required resources are present.
 
   Raises:
     perfkitbenchmarker.data.ResourceNotFound: On missing resource.
   """
-  for resource in (CASSANDRA_YAML_TEMPLATE, CASSANDRA_RACKDC_TEMPLATE):
+  for resource in (
+      CASSANDRA_YAML_TEMPLATE_PATH.value,
+      CASSANDRA_RACKDC_TEMPLATE,
+  ):
     data.ResourcePath(resource)
 
 
@@ -151,17 +197,25 @@ def Configure(vm, seed_vms, custom_cassandra_conf=None):
       'cluster_name': 'Test cluster',
       'datacenter': 'datacenter',
       'rack': vm.name,
+      'row_cache_size': CASSANDRA_ROW_CACHE_SIZE.value,
+      'key_cache_size': CASSANDRA_KEY_CACHE_SIZE.value,
+      'disk_access_mode': CASSANDRA_DISK_ACCESS_MODE.value,
   }
   context.update(custom_cassandra_conf)
   logging.info('cassandra yaml context: %s', context)
-  for template in [CASSANDRA_YAML_TEMPLATE, CASSANDRA_RACKDC_TEMPLATE]:
+  cassandra_conf_path = posixpath.join(CASSANDRA_DIR, 'conf')
+  templates = (
+      (CASSANDRA_YAML_TEMPLATE_PATH.value, 'cassandra.yaml'),
+      (CASSANDRA_RACKDC_TEMPLATE, 'cassandra-rackdc.properties'),
+  )
+  for template, target_filename in templates:
     local_path = data.ResourcePath(template)
-    cassandra_conf_path = posixpath.join(CASSANDRA_DIR, 'conf')
-    remote_path = posixpath.join(
-        '~', os.path.splitext(os.path.basename(template))[0]
-    )
+    remote_path = posixpath.join('~', target_filename)
+    dest_path = posixpath.join(cassandra_conf_path, target_filename)
     vm.RenderTemplate(local_path, remote_path, context=context)
-    vm.RemoteCommand(f'sudo cp {remote_path} {cassandra_conf_path}')
+    vm.RemoteCommand(f'sudo cp {remote_path} {dest_path}')
+  if CASSANDRA_JVM_HEAP_SIZE.value:
+    _ConfigureJvmHeap(vm, cassandra_conf_path, CASSANDRA_JVM_HEAP_SIZE.value)
   vm.RemoteCommand(f'mkdir {vm.GetScratchDir()}/cassandra')
   vm.RemoteCommand(f'sudo chmod -R 755 {vm.GetScratchDir()}/cassandra')
   _SetupPy311(vm)
@@ -196,14 +250,34 @@ def Start(vm):
   vm.RemoteCommand(f'{GetCassandraPath()}')
 
 
-def CreateKeyspace(vm, replication_factor, is_row_cache_enabled):
+def CreateKeyspace(
+    vm,
+    replication_factor,
+    is_row_cache_enabled,
+    compaction_strategy,
+):
   """Create a keyspace on a VM."""
-  RunCql(vm, CASSANDRA_KEYSPACE_TEMPLATE, replication_factor)
+  RunCql(
+      vm,
+      CASSANDRA_KEYSPACE_TEMPLATE,
+      replication_factor,
+      compaction_strategy,
+  )
   if is_row_cache_enabled:
-    RunCql(vm, CASSANDRA_ROW_CACHE_TEMPLATE, replication_factor)
+    RunCql(
+        vm,
+        CASSANDRA_ROW_CACHE_TEMPLATE,
+        replication_factor,
+        compaction_strategy,
+    )
 
 
-def RunCql(vm, template, replication_factor):
+def RunCql(
+    vm,
+    template,
+    replication_factor,
+    compaction_strategy,
+):
   """Run a CQL file on a VM."""
   cassandra_conf_path = posixpath.join(CASSANDRA_DIR, 'conf')
   template_path = data.ResourcePath(template)
@@ -218,6 +292,7 @@ def RunCql(vm, template, replication_factor):
       context={
           'keyspace': 'keyspace1',
           'replication_factor': replication_factor,
+          'compaction_strategy': compaction_strategy,
       },
   )
   vm.RemoteCommand(f'sudo cp {remote_path} {cassandra_conf_path}')

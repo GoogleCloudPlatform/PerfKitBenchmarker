@@ -1,0 +1,15 @@
+kubernetes_node_autoprovisioning:
+  flags:
+    container_cluster_version: "1.33"
+    node_autoprovisioning_platform: "aks_nap"
+    node_autoprovisioning_worker_label: "kubernetes.azure.com/mode=user"
+    azure_aks_auto_node_provisioning: True
+  container_cluster:
+    cloud: Azure
+    type: Kubernetes
+    min_vm_count: 0
+    max_vm_count: 100
+    vm_spec:
+      Azure:
+        machine_type: Standard_D4s_v4
+        zone: eastus2

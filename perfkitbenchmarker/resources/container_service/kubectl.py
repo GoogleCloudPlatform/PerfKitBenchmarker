@@ -7,6 +7,16 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.resources.container_service import kubernetes_events
 
+flags.DEFINE_string(
+    'kubeconfig',
+    None,
+    'Path to kubeconfig to be used by kubectl. '
+    "If unspecified, it will be set to a file in this run's "
+    'temporary directory.',
+)
+
+flags.DEFINE_string('kubectl', 'kubectl', 'Path to kubectl tool')
+
 
 class RetryableKubectlError(errors.VmUtil.IssueCommandTimeoutError):
   pass

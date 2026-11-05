@@ -87,7 +87,6 @@ by the PKB framework in Cleanup().
 
 import logging
 import textwrap
-import time
 from typing import Any
 
 from absl import flags
@@ -96,6 +95,7 @@ from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import sample
+
 from perfkitbenchmarker.linux_benchmarks.kubernetes.swap_encryption import utils as _utils
 from perfkitbenchmarker.linux_benchmarks.kubernetes.swap_encryption import workloads as _workloads
 from perfkitbenchmarker.resources.container_service import swap_daemonset as _ds_mod
@@ -154,7 +154,7 @@ _ENABLE_ZSWAP = flags.DEFINE_boolean(
 
 _MIN_FREE_KBYTES = flags.DEFINE_integer(
     'swap_encryption_min_free_kbytes',
-    65536,
+    67584,
     'Value written to /proc/sys/vm/min_free_kbytes to trigger earlier '
     'swapping. Set 0 to leave the kernel default unchanged.',
 )
@@ -202,7 +202,7 @@ BENCHMARK_NAME = 'modular_swap_benchmark'
 BENCHMARK_CONFIG = """
 modular_swap_benchmark:
   description: >
-    fio microbenchmarks (Tier 1) on swap-encrypted GKE/EKS nodes. Swap-enabled 'benchmark' nodepool declared in BENCHMARK_CONFIG;
+    fio microbenchmarks on swap-encrypted GKE/EKS nodes. Swap-enabled 'benchmark' nodepool declared in BENCHMARK_CONFIG;
     GKE cluster creation applies --system-config-from-file (dm-crypt swapConfig)
     automatically via swap_config field on NodepoolSpec.
   container_cluster:
@@ -223,10 +223,14 @@ modular_swap_benchmark:
             boot_disk_type: hyperdisk-balanced
             boot_disk_size: 500
             zone: us-central1-a
+          AWS:
+            machine_type: i4i.4xlarge
+            boot_disk_size: 100
+            zone: us-east-1a
         swap_config:
           enabled: true
           swappiness: 100
-          min_free_kbytes: 200
+          min_free_kbytes: 67584
           watermark_scale_factor: 500
           boot_disk_iops: 160000
           boot_disk_throughput: 2400
@@ -247,6 +251,7 @@ _NODEPOOL = flags.DEFINE_string(
     'benchmark',
     'Name of the node pool to deploy the benchmark DaemonSet on.',
 )
+
 
 _INSTANCE_SIZE_LABEL = flags.DEFINE_string(
     'swap_encryption_instance_size_label',
@@ -270,7 +275,7 @@ _FAIL_ON_DEGRADED = flags.DEFINE_boolean(
     True,
     'When True (default), raise an error at the end of Run() if the run was'
     ' catastrophically degraded — e.g. the benchmark pod was OOM-evicted and'
-    ' replaced mid-run, Gate 1 (fio) produced no samples, or the stress-ng'
+    ' replaced mid-run, fio produced no samples, or the stress-ng'
     ' swap-pressure workload was OOM-killed before completing.  This prevents'
     ' PKB from reporting SUCCEEDED for a run whose post-eviction workloads'
     ' produced empty or meaningless data.  Set False to keep the legacy'
@@ -282,13 +287,13 @@ _WORKLOADS = flags.DEFINE_list(
     ['all'],
     'Which Run() workloads to execute, for fast iteration against an'
     ' already-provisioned cluster (e.g. --run_stage=run --run_uri=...). '
-    ' Comma-separated subset of: fio (Tier 1 microbenchmarks), cpu_overhead'
+    ' Comma-separated subset of: fio (microbenchmarks), cpu_overhead'
     ' (stress-ng CPU overhead + swap pressure), io_interference (I/O'
     ' interference), redis (redis), kernel_build (kernel build), opensearch'
     ' (opensearch).  Default "all" runs everything.  Example:'
     ' --swap_encryption_workloads=cpu_overhead runs only the swap-pressure'
     ' workload. Workloads not listed are skipped and do not affect the'
-    ' degraded-run gate (e.g. skipping fio will not be reported as "Gate 1'
+    ' degraded-run gate (e.g. skipping fio will not be reported as "fio'
     ' produced no samples").',
 )
 
@@ -318,7 +323,26 @@ _DEFAULT_POOL = 'default-pool'
 
 
 def GetConfig(user_config: dict[str, Any]) -> dict[str, Any]:  # pylint: disable=invalid-name
-  return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+  """Gets the benchmark config."""
+  config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+
+  if (
+      'container_cluster' in config
+      and 'nodepools' in config['container_cluster']
+  ):
+    benchmark_pool = config['container_cluster']['nodepools'].get('benchmark')
+    if (
+        benchmark_pool
+        and 'vm_spec' in benchmark_pool
+        and 'GCP' in benchmark_pool['vm_spec']
+    ):
+      gcp_spec = benchmark_pool['vm_spec']['GCP']
+      if FLAGS.swap_encryption_benchmark_machine_type:
+        gcp_spec['machine_type'] = FLAGS.swap_encryption_benchmark_machine_type
+      if FLAGS.swap_encryption_boot_disk_type:
+        gcp_spec['boot_disk_type'] = FLAGS.swap_encryption_boot_disk_type
+
+  return config
 
 
 def Prepare(spec: _BenchmarkSpec) -> None:  # pylint: disable=invalid-name
@@ -341,6 +365,16 @@ def Prepare(spec: _BenchmarkSpec) -> None:  # pylint: disable=invalid-name
   cluster = spec.container_cluster
 
   logging.info('[swap_encryption] Deploying privileged DaemonSet')
+
+  # When running with --run_stage=prepare,run, the provision stage is skipped
+  # and the BenchmarkSpec is restored from pickle, skipping its __init__.
+  # As a result, LoadProvider() is not called and cloud-specific modules
+  # (like gcp_swap_daemonset) are missing from the _RESOURCE_REGISTRY.
+  # We explicitly call it here to guarantee they are registered.
+  # pylint: disable-next=g-import-not-at-top
+  from perfkitbenchmarker import providers
+  providers.LoadProvider(spec.container_cluster.CLOUD)
+
   daemonset_class = resource.GetResourceClass(
       _ds_mod.SwapDaemonSet, CLOUD=spec.container_cluster.CLOUD
   )
@@ -349,7 +383,6 @@ def Prepare(spec: _BenchmarkSpec) -> None:  # pylint: disable=invalid-name
       namespace=_DS_NAMESPACE,
       label=_DS_LABEL,
       nodepool=_BENCHMARK_NODEPOOL,
-      image=FLAGS.swap_encryption_daemonset_image,
   )
   # Register before Create() so PKB auto-deletes on failure/cleanup.
   spec.resources.append(daemonset)
@@ -419,7 +452,7 @@ def _WorkloadSelected(token: str) -> bool:
 
 
 def Run(spec: _BenchmarkSpec) -> list[sample.Sample]:  # pylint: disable=invalid-name
-  """Execute all benchmark workloads with gate logic.
+  """Execute all benchmark workloads.
 
   Args:
     spec: The benchmark specification.
@@ -427,21 +460,21 @@ def Run(spec: _BenchmarkSpec) -> list[sample.Sample]:  # pylint: disable=invalid
   Returns:
     A list of sample.Sample objects.
 
-  Execution is structured in three gated tiers matching the execution plan:
+  Execution is structured matching the execution plan:
 
-    Tier 1 (Gate 1) — fio microbenchmarks
-      Raw I/O ceiling of the swap device.  Gate 1 fails if fio produces
+    fio microbenchmarks
+      Raw I/O ceiling of the swap device.  fio fails if fio produces
       zero samples (device not found, O_DIRECT error, etc.).
 
-    Tier 2 (Gate 2) — stress-ng CPU overhead + I/O interference
-      Requires an active swap device (Gate 1 must pass).  Gate 2 fails if
+    stress-ng CPU overhead + I/O interference
+      Requires an active swap device (fio must pass).  cpu overhead fails if
       stress-ng does not complete within timeout.
 
-    Tier 3 (Gate 3) — real-world workloads (Redis, kernel build, OpenSearch)
-      Independent of Tier 2 results; always attempted if Gate 1 passed.
+    real-world workloads (Redis, kernel build, OpenSearch)
+      Independent of cpu overhead results; always attempted if fio passed.
       Individual workload failures are logged but do not abort the others.
 
-  If Gate 1 fails, Tiers 2 and 3 are skipped — there is no point measuring
+  If fio fails, remaining workloads are skipped — there is no point measuring
   application-level swap performance when the raw device is inaccessible.
   """
   daemonset = _GetDaemonset(spec)
@@ -475,47 +508,72 @@ def Run(spec: _BenchmarkSpec) -> list[sample.Sample]:  # pylint: disable=invalid
       benchmark_name=BENCHMARK_NAME,
   )
   results: list[sample.Sample] = []
-  t_run_start = time.time()
 
   logging.info('[swap_encryption] swap device: %s', swap_dev)
 
-  # ── Tier 1 / Gate 1: fio microbenchmarks ─────────────────────────────────
-  tier1_results = []
+  # ── fio microbenchmarks ─────────────────────────────────
+  fio_results = []
   if _WorkloadSelected('fio'):
-    logging.info('[swap_encryption] ── Tier 1 / Gate 1: fio microbenchmarks ──')
+    logging.info('[swap_encryption] ── fio microbenchmarks ──')
     try:
-      tier1_results = _workloads.RunFio(
+      fio_results = _workloads.RunFio(
           daemonset,
           swap_dev,
           base_metadata,
           _FIO_RUNTIME_SEC.value,
           FLAGS.swap_encryption_swap_type,
       )
-      results += tier1_results
+      results += fio_results
     except Exception as e:  # pylint: disable=broad-except
       logging.error(
-          '[swap_encryption] Gate 1 FAILED — fio workload error: %s', e
+          '[swap_encryption] fio workload error: %s', e
       )
-      logging.error('[swap_encryption] Skipping Tiers 2 and 3 (no swap device)')
+      logging.error('[swap_encryption] Skipping remaining workloads (no swap device)')
       return results
 
-    if not tier1_results:
+    if not fio_results:
       logging.info(
-          '[swap_encryption] Gate 1 produced no samples '
+          '[swap_encryption] fio produced no samples '
           '(loop-device skip or parse error) — '
-          'continuing to Tier 2; degradation gate will assess'
+          'continuing to remaining workloads; degradation check will assess'
       )
   else:
     logging.info(
-        '[swap_encryption] Skipping Tier 1 (fio) — not selected by '
+        '[swap_encryption] Skipping fio — not selected by '
         '--swap_encryption_workloads=%s',
         ','.join(_WORKLOADS.value),
     )
 
+  # ── stress-ng CPU overhead + I/O interference ───────────
+  if _WorkloadSelected('cpu_overhead'):
+    logging.info('[swap_encryption] ── CPU Overhead ──')
+    try:
+      results += _workloads.RunCpuOverhead(
+          daemonset, base_metadata, degraded_reasons
+      )
+    except Exception as e:  # pylint: disable=broad-except
+      logging.error(
+          '[swap_encryption] cpu_overhead error: %s', e
+      )
+
+  if _WorkloadSelected('io_interference'):
+    logging.info('[swap_encryption] ── I/O Interference ──')
+    try:
+      results += _workloads.RunIoInterference(daemonset, base_metadata)
+    except Exception as e:  # pylint: disable=broad-except
+      logging.error(
+          '[swap_encryption] io_interference workload error: %s', e
+      )
+
+  # ── Application Workloads ───────────────────────────────
   if _WorkloadSelected('redis'):
     logging.info('[swap_encryption] Workload: redis benchmark')
-    results += _workloads.RunRedis(daemonset, base_metadata)
-
+    results += _workloads.RunRedis(
+        daemonset,
+        base_metadata,
+        redis_memory_mb=_workloads._REDIS_MAXMEMORY_MB.value,  # pylint: disable=protected-access
+        dataset_mb=_workloads._REDIS_DATASET_MB.value,  # pylint: disable=protected-access
+    )
   # ── Kernel build under memory constraint ───────────────────────────────────
   if _WorkloadSelected('kernel_build'):
     logging.info('[swap_encryption] Workload: kernel build under memory cap')
@@ -528,9 +586,9 @@ def Run(spec: _BenchmarkSpec) -> list[sample.Sample]:  # pylint: disable=invalid
 
   # ── Cost estimate ─────────────────────────────────────────────────────────
   if _COLLECT_COST.value:
-    _elapsed = time.time() - t_run_start
+    pass
 
-  # ── Final degradation gate ────────────────────────────────────────────────
+  # ── Final degradation check ────────────────────────────────────────────────
   if daemonset.pod_name and daemonset.pod_name != original_pod:
     degraded_reasons.append(
         f'benchmark pod was replaced during the run ({original_pod} →'
@@ -552,23 +610,23 @@ def Run(spec: _BenchmarkSpec) -> list[sample.Sample]:  # pylint: disable=invalid
         'OOM kill(s) (rc=137) occurred during the run on pod(s)'
         f' {", ".join(daemonset.oom_events)} — a workload exceeded memory and'
         ' was killed by the OOM killer (the container may have restarted in'
-        ' so the affected phase(s) produced no or partial data'
+        ' place), so the affected workload(s) produced no or partial data'
     )
 
-  if _WorkloadSelected('fio') and not tier1_results:
+  if _WorkloadSelected('fio') and not fio_results:
     if swap_dev.startswith('/dev/loop'):
       # Expected: COS blocks device-mapper from pod namespaces on single-disk
-      # nodes. Tier 2/3 results are still valid; do NOT mark run as degraded.
+      # nodes. Remaining results are still valid; do NOT mark run as degraded.
       logging.info(
-          '[swap_encryption] Gate 1 (fio) skipped — loop device %s has no'
-          ' dm-crypt support from inside a pod. Tier 2/3 results are'
+          '[swap_encryption] fio skipped — loop device %s has no'
+          ' dm-crypt support from inside a pod. Remaining results are'
           ' valid. Use c4-*-lssd or --swap_encryption_add_swap_disk for'
           ' fio data.',
           swap_dev,
       )
     else:
       degraded_reasons.append(
-          'Gate 1 (fio microbenchmarks) produced no samples — the raw'
+          'fio microbenchmarks produced no samples — the raw'
           ' swap device was never characterised'
       )
 
@@ -601,17 +659,26 @@ def Run(spec: _BenchmarkSpec) -> list[sample.Sample]:  # pylint: disable=invalid
 
 
 def Cleanup(spec: _BenchmarkSpec) -> None:  # pylint: disable=invalid-name
-  """Resources in spec.resources are auto-deleted by the PKB framework.
+  """Cleanup phase."""
+  # If run_stage=cleanup is run independently of prepare, spec.resources
+  # won't contain the SwapDaemonSet because it was appended in Prepare(),
+  # not provision (where the state file is written). We instantiate it
+  # here explicitly and call _Delete() to guarantee it's cleaned up.
+  # pylint: disable-next=g-import-not-at-top
+  from perfkitbenchmarker import providers
 
-  Args:
-    spec: The benchmark specification.
-
-  SwapDaemonSet._Delete() runs in-pod teardown (swapoff, dmsetup remove,
-  losetup cleanup, pkill fio/stress-ng) then deletes the DaemonSet.
-  SwapNodePool._Delete() detaches+deletes the swap disk (if any) then
-  deletes the benchmark nodepool.
-  """
-  del spec  # Unused.
+  providers.LoadProvider(spec.container_cluster.CLOUD)
+  daemonset_class = resource.GetResourceClass(
+      _ds_mod.SwapDaemonSet, CLOUD=spec.container_cluster.CLOUD
+  )
+  daemonset = daemonset_class(
+      name=_DS_NAME,
+      namespace=_DS_NAMESPACE,
+      label=_DS_LABEL,
+      nodepool=_BENCHMARK_NODEPOOL,
+  )
+  # pylint: disable-next=protected-access
+  daemonset._Delete()
 
 
 # ---------------------------------------------------------------------------

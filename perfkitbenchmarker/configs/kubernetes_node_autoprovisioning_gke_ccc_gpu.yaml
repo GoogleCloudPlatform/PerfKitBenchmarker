@@ -1,0 +1,19 @@
+kubernetes_node_autoprovisioning:
+  flags:
+    gke_max_cpu: 1000
+    gke_max_memory: 4000
+    gke_max_accelerator: "type=nvidia-l4,count=10"
+    container_cluster_version: "1.33"
+    node_autoprovisioning_platform: "gke_ccc"
+    node_autoprovisioning_worker_label: "cloud.google.com/compute-class=provisioning"
+    node_autoprovisioning_workload: "gpu"
+    gke_autoscaling_profile: optimize-utilization
+  container_cluster:
+    cloud: GCP
+    type: Kubernetes
+    min_vm_count: 0
+    max_vm_count: 20
+    vm_spec:
+      GCP:
+        machine_type: n2-standard-4
+        zone: us-west4-a

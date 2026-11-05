@@ -364,6 +364,111 @@ class EksAutoClusterTest(BaseEksTest):
     cluster = elastic_kubernetes_service.EksAutoCluster(EKS_SPEC)
     self.assertTrue(cluster._IsReady())
 
+  def testSaveNodePoolManifestPinsMachineType(self):
+    spec = container_spec.ContainerClusterSpec(
+        'NAME',
+        cloud='AWS',
+        type='Auto',
+        vm_spec={'AWS': {'machine_type': 'm8i.xlarge', 'zone': 'us-west-1a'}},
+    )
+    cluster = elastic_kubernetes_service.EksAutoCluster(spec)
+    out_path = self.create_tempdir().create_file('np.yaml').full_path
+    cluster.SaveNodePoolManifest('provisioning', out_path)
+    with open(out_path) as f:
+      rendered = f.read()
+    self.assertIn('group: eks.amazonaws.com', rendered)
+    self.assertIn('kind: NodeClass', rendered)
+    self.assertIn('node.kubernetes.io/instance-type', rendered)
+    self.assertIn('"m8i.xlarge"', rendered)
+    self.assertIn('"on-demand"', rendered)
+    self.assertNotIn('eks.amazonaws.com/instance-family', rendered)
+    self.assertIn('consolidationPolicy: WhenEmpty', rendered)
+    self.assertNotIn('WhenEmptyOrUnderutilized', rendered)
+
+  def testSaveNodePoolManifestMachineFamiliesAndDefaultFallback(self):
+    spec = container_spec.ContainerClusterSpec(
+        'NAME',
+        cloud='AWS',
+        type='Auto',
+        machine_families=['m8i', 'c8i'],
+        vm_spec={'AWS': {'zone': 'us-west-1a'}},
+    )
+    cluster = elastic_kubernetes_service.EksAutoCluster(spec)
+    out_path = self.create_tempdir().create_file('np_fam.yaml').full_path
+    cluster.SaveNodePoolManifest('provisioning', out_path)
+    with open(out_path) as f:
+      rendered = f.read()
+    self.assertIn('eks.amazonaws.com/instance-family', rendered)
+    self.assertIn('- "m8i"', rendered)
+    self.assertIn('- "c8i"', rendered)
+    self.assertNotIn('node.kubernetes.io/instance-type', rendered)
+
+    fallback_spec = container_spec.ContainerClusterSpec(
+        'NAME',
+        cloud='AWS',
+        type='Auto',
+        vm_spec={'AWS': {'zone': 'us-west-1a'}},
+    )
+    fallback_cluster = elastic_kubernetes_service.EksAutoCluster(fallback_spec)
+    fallback_path = self.create_tempdir().create_file('np_def.yaml').full_path
+    fallback_cluster.SaveNodePoolManifest('provisioning', fallback_path)
+    with open(fallback_path) as f:
+      fallback_rendered = f.read()
+    self.assertIn('eks.amazonaws.com/instance-family', fallback_rendered)
+    self.assertIn('- "m8i"', fallback_rendered)
+
+  def testSaveNodePoolManifestGpuSpecsAndSpot(self):
+    gpu_fallback_spec = container_spec.ContainerClusterSpec(
+        'NAME',
+        cloud='AWS',
+        type='Auto',
+        vm_spec={
+            'AWS': {
+                'machine_type': 'm5.large',
+                'gpu_type': 'l4',
+                'gpu_count': 1,
+                'zone': 'us-west-1a',
+            }
+        },
+    )
+    with flagsaver.flagsaver(aws_spot_instances=True):
+      cluster = elastic_kubernetes_service.EksAutoCluster(gpu_fallback_spec)
+    out_path = self.create_tempdir().create_file('np_gpu.yaml').full_path
+    cluster.SaveNodePoolManifest('provisioning', out_path)
+    with open(out_path) as f:
+      rendered = f.read()
+    self.assertIn('- "g6"', rendered)
+    self.assertIn('- "g6e"', rendered)
+    self.assertIn('- "g5"', rendered)
+    self.assertIn('"spot"', rendered)
+    self.assertNotIn('m5.large', rendered)
+
+    gpu_pinned_spec = container_spec.ContainerClusterSpec(
+        'NAME',
+        cloud='AWS',
+        type='Auto',
+        vm_spec={'AWS': {'machine_type': 'm5.large', 'zone': 'us-west-1a'}},
+        nodepools={
+            'provisioning': {
+                'vm_spec': {
+                    'AWS': {
+                        'machine_type': 'g6.xlarge',
+                        'gpu_type': 'l4',
+                        'gpu_count': 1,
+                        'zone': 'us-west-1a',
+                    }
+                }
+            }
+        },
+    )
+    gpu_cluster = elastic_kubernetes_service.EksAutoCluster(gpu_pinned_spec)
+    pinned_path = self.create_tempdir().create_file('np_gpu_pin.yaml').full_path
+    gpu_cluster.SaveNodePoolManifest('provisioning', pinned_path)
+    with open(pinned_path) as f:
+      pinned_rendered = f.read()
+    self.assertIn('node.kubernetes.io/instance-type', pinned_rendered)
+    self.assertIn('"g6.xlarge"', pinned_rendered)
+
 
 class InferenceS3StorageTest(BaseEksTest):
   """Tests S3 PV/PVC apply for kubernetes_ai_inference on AWS."""
@@ -449,6 +554,23 @@ class EksKarpenterTest(BaseEksTest):
 
   def testInitEksClusterWorks(self):
     elastic_kubernetes_service.EksKarpenterCluster(EKS_SPEC)
+
+  def testSaveNodePoolManifestWritesYamlAndRaisesForUnknown(self):
+    cluster = elastic_kubernetes_service.EksKarpenterCluster(EKS_SPEC)
+    cluster.nodepools['default'] = mock.Mock()
+    manifest_path = os.path.join(self.create_tempdir().full_path, 'np.yaml')
+    with mock.patch.object(
+        cluster,
+        '_BuildKarpenterNodePoolYaml',
+        return_value=[{'kind': 'NodePool', 'metadata': {'name': 'default'}}],
+    ):
+      cluster.SaveNodePoolManifest('default', manifest_path)
+    with open(manifest_path) as f:
+      content = f.read()
+    self.assertIn('kind: NodePool', content)
+    self.assertIn('name: default', content)
+    with self.assertRaises(ValueError):
+      cluster.SaveNodePoolManifest('nonexistent', manifest_path)
 
   @flagsaver.flagsaver(kubeconfig='/tmp/kubeconfig')
   def testEksYamlCreateFull(self):

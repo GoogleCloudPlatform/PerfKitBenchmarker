@@ -4,7 +4,11 @@
 import unittest
 
 from absl import flags
+from absl.testing import flagsaver
 import mock
+from perfkitbenchmarker import cluster
+from perfkitbenchmarker import data
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import gcp_cluster
@@ -72,6 +76,124 @@ class GcpClusterTest(pkb_common_test_case.PkbCommonTestCase):
          mock.call('chmod 600 ~/.ssh/config')),
         self.cluster.vms[0].RemoteCommand.mock_calls
     )
+
+  @flagsaver.flagsaver(cluster_scheduler='slurm')
+  def testGetClusterClassSlurmTypes(self):
+    with flagsaver.flagsaver(cluster_type='default'):
+      self.assertIs(cluster.GetClusterClass('GCP'), gcp_cluster.GceCluster)
+    with flagsaver.flagsaver(cluster_type='h4d'):
+      self.assertIs(cluster.GetClusterClass('GCP'), gcp_cluster.H4dCluster)
+    with flagsaver.flagsaver(cluster_type='a4'):
+      self.assertIs(cluster.GetClusterClass('GCP'), gcp_cluster.A4Cluster)
+
+  def testSlurmClusterDeployContainerImage(self):
+    self.cluster.TYPE = 'a4'
+    with mock.patch.object(
+        self.cluster, 'InstallSquashImage', autospec=True
+    ) as mock_install:
+      image_path = self.cluster.DeployContainerImage('nccl_cluster')
+      self.assertEqual(image_path, '/opt/apps/a4.sqsh')
+      mock_install.assert_called_once_with(
+          'nccl_cluster', 'a4.sqsh', '/opt/apps', 'nccl_cluster/a4.dockerfile'
+      )
+
+  def testSlurmClusterRunJobSuccess(self):
+    with (
+        mock.patch.object(
+            data, 'ResourcePath', return_value='/path/to/slurm.sh.j2'
+        ),
+        mock.patch.object(
+            vm_util,
+            'ReadAndRenderJinja2Template',
+            return_value='--mpi=pmix ./all_reduce_perf',
+        ) as mock_render,
+        mock.patch.object(
+            self.cluster,
+            'RemoteCommand',
+            return_value=('nccl output', ''),
+        ) as mock_remote,
+    ):
+      stdout, stderr = self.cluster.RunJob(
+          'nccl_cluster',
+          timeout=3600,
+          operation='all_reduce',
+          env_export='export NCCL_DEBUG=INFO;',
+      )
+      self.assertEqual(stdout, 'nccl output')
+      self.assertEqual(stderr, '')
+      mock_render.assert_called_once_with(
+          'nccl_cluster/slurm.sh.j2',
+          trim_spaces=True,
+          operation='all_reduce',
+          env_export='export NCCL_DEBUG=INFO;',
+      )
+      mock_remote.assert_called_once_with(
+          '--mpi=pmix ./all_reduce_perf',
+          login_shell=True,
+          timeout=3600,
+          env='export NCCL_DEBUG=INFO;',
+      )
+
+  def testSlurmClusterRunJobMissingTemplateRaisesUnsupportedConfigError(self):
+    with mock.patch.object(
+        data,
+        'ResourcePath',
+        side_effect=data.ResourceNotFound('missing template'),
+    ):
+      with self.assertRaises(errors.Benchmarks.UnsupportedConfigError):
+        self.cluster.RunJob('unsupported_benchmark')
+
+  def testSlurmClusterMissingHeadnodeRaisesInvalidValue(self):
+    workers_config = {
+        'cloud': 'GCP',
+        'os_type': 'ubuntu2004',
+        'vm_spec': {'GCP': {'machine_type': 'a4-highgpu-8g'}},
+    }
+    spec_without_headnode = TestGceClusterSpec(
+        'test_slurm_no_headnode', workers=workers_config
+    )
+    with self.assertRaises(errors.Config.InvalidValue):
+      cluster.SlurmCluster(spec_without_headnode)
+
+  def testK8sClusterMissingDefaultPoolRaisesInvalidValue(self):
+    workers_config = {
+        'cloud': 'GCP',
+        'os_type': 'ubuntu2004',
+        'vm_spec': {'GCP': {'machine_type': 'a4-highgpu-8g'}},
+    }
+    spec_without_default_pool = TestGceClusterSpec(
+        'test_k8s_no_default_pool', workers=workers_config
+    )
+    with self.assertRaises(errors.Config.InvalidValue):
+      cluster.K8sCluster(spec_without_default_pool)
+
+  def testK8sClusterInit(self):
+    headnode_config = {
+        'cloud': 'GCP',
+        'os_type': 'ubuntu2004',
+        'vm_spec': {'GCP': {'machine_type': 'c3-standard-88'}},
+    }
+    default_pool_config = {
+        'cloud': 'GCP',
+        'os_type': 'ubuntu2004',
+        'vm_spec': {'GCP': {'machine_type': 'e2-standard-16'}},
+    }
+    workers_config = {
+        'cloud': 'GCP',
+        'os_type': 'ubuntu2004',
+        'vm_spec': {'GCP': {'machine_type': 'a4-highgpu-8g'}},
+    }
+    k8s_spec = TestGceClusterSpec(
+        'test_k8s_spec',
+        headnode=headnode_config,
+        default_pool=default_pool_config,
+        workers=workers_config,
+    )
+    k8s_cluster = cluster.K8sCluster(k8s_spec)
+    k8s_cluster.TYPE = 'a4'
+    self.assertFalse(hasattr(k8s_cluster, 'headnode_spec'))
+    self.assertEqual(k8s_cluster.default_pool_machine_type, 'e2-standard-16')
+    self.assertEqual(k8s_cluster.worker_machine_type, 'a4-highgpu-8g')
 
 
 if __name__ == '__main__':

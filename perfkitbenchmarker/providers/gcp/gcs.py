@@ -287,7 +287,9 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
     def _bucket_not_found(stdout, stderr, retcode):
       del stdout  # unused
 
-      return retcode and 'BucketNotFoundException' in stderr
+      return retcode and (
+          'BucketNotFoundException' in stderr or 'not found: 404' in stderr
+      )
 
     vm_util.IssueCommand(
         ['gcloud', 'storage', 'buckets', 'delete', f'gs://{bucket_name}'],

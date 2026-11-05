@@ -1,0 +1,51 @@
+apiVersion: cloud.google.com/v1
+kind: ComputeClass
+metadata:
+  name: {{ class_name }}
+  labels:
+    pkb_benchmark: node-autoprovisioning
+spec:
+  priorities:
+{% for tier in priorities %}
+    -
+{% if tier.get('machine_type') %}
+      machineType: {{ tier.machine_type }}
+{% elif tier.get('machine_family') %}
+      machineFamily: {{ tier.machine_family }}
+{% endif %}
+{% if tier.get('min_cores') %}
+      minCores: {{ tier.min_cores }}
+{% endif %}
+{% if tier.get('min_memory_gb') %}
+      minMemoryGb: {{ tier.min_memory_gb }}
+{% endif %}
+{% if tier.get('spot') is not none %}
+      spot: {{ tier.spot | lower }}
+{% endif %}
+{% if tier.get('max_pods_per_node') %}
+      maxPodsPerNode: {{ tier.max_pods_per_node }}
+{% endif %}
+{% if tier.get('nodepools') %}
+      nodepools:
+{% for np in tier.nodepools %}
+        - {{ np }}
+{% endfor %}
+{% endif %}
+{% if tier.get('gpu_type') %}
+      gpu:
+        type: {{ tier.gpu_type }}
+        count: {{ tier.get('gpu_count', 1) }}
+{% endif %}
+{% endfor %}
+{% if active_migration | default(false) %}
+  activeMigration:
+    optimizeRulePriority: true
+{% endif %}
+{% if max_parallel_image_pulls | default(0) %}
+  nodePoolConfig:
+    nodeSystemConfig:
+      kubeletConfig:
+        maxParallelImagePulls: {{ max_parallel_image_pulls }}
+{% endif %}
+  nodePoolAutoCreation:
+    enabled: {{ node_pool_auto_creation | lower }}

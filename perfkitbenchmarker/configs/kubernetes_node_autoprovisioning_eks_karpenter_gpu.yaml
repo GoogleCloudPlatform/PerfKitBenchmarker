@@ -1,0 +1,31 @@
+kubernetes_node_autoprovisioning:
+  flags:
+    container_cluster_version: "1.33"
+    node_autoprovisioning_platform: "eks_karpenter"
+    node_autoprovisioning_worker_label: "pkb_nodepool=provisioning"
+    node_autoprovisioning_workload: "gpu"
+    node_autoprovisioning_gpu_count: 1
+    gpu_type: l4
+    gpu_count: 1
+  container_cluster:
+    cloud: AWS
+    type: Karpenter
+    min_vm_count: 0
+    max_vm_count: 20
+    vm_spec:
+      AWS:
+        machine_type: m8i.xlarge
+        zone: us-east-2a
+    nodepools:
+      provisioning:
+        # Dynamic nodepool (min != max) so Karpenter autoscales g6 nodes to the
+        # target replica count. Without this, min==max==vm_count makes the
+        # Karpenter NodePool static (replicas=1) and GPU burst (0->10) can only
+        # ever place 1 pod.
+        vm_count: 1
+        min_vm_count: 0
+        max_vm_count: 20
+        vm_spec:
+          AWS:
+            machine_type: g6.xlarge
+            zone: us-east-2a

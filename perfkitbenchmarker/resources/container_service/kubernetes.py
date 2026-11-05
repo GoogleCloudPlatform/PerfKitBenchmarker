@@ -30,16 +30,6 @@ import yaml
 BenchmarkSpec = Any  # benchmark_spec lib imports this module.
 
 
-flags.DEFINE_string(
-    'kubeconfig',
-    None,
-    'Path to kubeconfig to be used by kubectl. '
-    "If unspecified, it will be set to a file in this run's "
-    'temporary directory.',
-)
-
-flags.DEFINE_string('kubectl', 'kubectl', 'Path to kubectl tool')
-
 flags.DEFINE_integer(
     'k8s_get_retry_count',
     18,

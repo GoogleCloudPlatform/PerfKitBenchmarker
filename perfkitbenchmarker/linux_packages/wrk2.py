@@ -25,10 +25,7 @@ from perfkitbenchmarker import sample
 
 WRK2_URL = (
     'https://github.com/giltene/wrk2/archive/'
-    'c4250acb6921c13f8dccfc162d894bd7135a2979.tar.gz'
-)
-WRK2_ARM_URL = (
-    'https://github.com/giltene/wrk2/archive/60490fd5d8dde47cc12553131f940b32d3e02e6b.tar.gz'
+    '60490fd5d8dde47cc12553131f940b32d3e02e6b.tar.gz'
 )
 WRK2_DIR = posixpath.join(linux_packages.INSTALL_DIR, 'wrk2')
 WRK2_PATH = posixpath.join(WRK2_DIR, 'wrk')
@@ -50,13 +47,10 @@ def _Install(vm):
   vm.Install('curl')
   vm.Install('build_tools')
   vm.Install('openssl')
-  wrk2_url = WRK2_URL
-  if vm.is_aarch64:
-    wrk2_url = WRK2_ARM_URL
   vm.RemoteCommand(
       (
           'mkdir -p {0} && curl -L {1} | tar -xzf - -C {0} --strip-components 1'
-      ).format(WRK2_DIR, wrk2_url)
+      ).format(WRK2_DIR, WRK2_URL)
   )
   vm.RemoteCommand('make -C {}'.format(WRK2_DIR))
 

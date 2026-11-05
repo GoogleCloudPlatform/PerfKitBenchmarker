@@ -135,6 +135,8 @@ spec:
         - name: lib-modules
           mountPath: /lib/modules
           readOnly: true
+        - name: host-root
+          mountPath: /host
       volumes:
       - name: scripts
         configMap:
@@ -160,3 +162,6 @@ spec:
         hostPath:
           path: /lib/modules
           type: Directory
+      - name: host-root
+        hostPath:
+          path: /

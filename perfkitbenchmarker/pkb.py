@@ -1420,7 +1420,7 @@ def RunBenchmarkTask(
 
   zone_retry_manager = ZoneRetryManager(_GetMachineTypes(spec))
   # Set the run count.
-  max_run_count = 1 + pkb_flags.MAX_RETRIES.value
+  max_run_count = 1 + zone_retry_manager.max_retries
 
   # Useful format string for debugging.
   benchmark_info = (
@@ -1494,15 +1494,24 @@ class ZoneRetryManager:
   """Encapsulates state and functions for zone retries.
 
   Attributes:
+    max_retries: The maximum number of retries to perform.
     original_zone: If specified, the original zone provided to the benchmark.
     zones_tried: Zones that have already been tried in previous runs.
   """
 
   def __init__(self, machine_types: Collection[str]):
-    self._CheckFlag(machine_types)
+    self.max_retries = pkb_flags.MAX_RETRIES.value
+    self._is_any_zone = False
+    for zone_flag in ['zone', 'zones']:
+      if FLAGS[zone_flag].value:
+        self._zone_flag = zone_flag
+        if self._GetCurrentZoneFlag() == _ANY_ZONE:
+          self._CheckMachineTypesAreSpecified(machine_types)
+          self._is_any_zone = True
     if (
         not pkb_flags.SMART_CAPACITY_RETRY.value
         and not pkb_flags.SMART_QUOTA_RETRY.value
+        and not self._is_any_zone
     ):
       return
     self._machine_types = list(machine_types)
@@ -1523,15 +1532,6 @@ class ZoneRetryManager:
   def _GetCurrentZoneFlag(self):
     return FLAGS[self._zone_flag].value[0]  # pyrefly: ignore[unsupported-operation]
 
-  def _CheckFlag(self, machine_types: Collection[str]) -> None:
-    for zone_flag in ['zone', 'zones']:
-      if FLAGS[zone_flag].value:
-        self._zone_flag = zone_flag
-        if self._GetCurrentZoneFlag() == _ANY_ZONE:
-          self._CheckMachineTypesAreSpecified(machine_types)
-          FLAGS['smart_capacity_retry'].parse(True)
-          FLAGS['smart_quota_retry'].parse(True)
-
   def _SetOriginalZoneAndFlag(self) -> None:
     """Records the flag name and zone value that the benchmark started with."""
     # This is guaranteed to set values due to flag validator.
@@ -1542,9 +1542,9 @@ class ZoneRetryManager:
       self._supported_zones.intersection_update(
           self._utils.GetZonesFromMachineType(machine_type)
       )
-    if self._GetCurrentZoneFlag() == _ANY_ZONE:
-      if pkb_flags.MAX_RETRIES.value < 1:
-        FLAGS['retries'].parse(len(self._supported_zones))
+    if self._is_any_zone:
+      if self.max_retries < 1:
+        self.max_retries = len(self._supported_zones)
       self._ChooseAndSetNewZone(self._supported_zones)
     self._original_zone = self._GetCurrentZoneFlag()
     self._original_region = self._utils.GetRegionFromZone(self._original_zone)
@@ -1558,7 +1558,13 @@ class ZoneRetryManager:
     Args:
       spec: benchmark spec.
     """
-    if (
+    if self._is_any_zone and spec.failed_substatus in {
+        benchmark_status.FailedSubstatus.QUOTA,
+        benchmark_status.FailedSubstatus.UNSUPPORTED,
+        benchmark_status.FailedSubstatus.INSUFFICIENT_CAPACITY,
+    }:
+      self._ChooseAndSetNewZone(self._supported_zones)
+    elif (
         pkb_flags.SMART_QUOTA_RETRY.value
         and spec.failed_substatus == benchmark_status.FailedSubstatus.QUOTA
     ):

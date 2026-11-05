@@ -115,9 +115,12 @@ class ThreadLogContext:
     """
     self._label_list.append(label_extension)
     self._RecalculateLabel()
-    yield
-    self._label_list.pop()
-    self._RecalculateLabel()
+    try:
+      yield
+    # Failed runs such as with --retries would skip popping without finally.
+    finally:
+      self._label_list.pop()
+      self._RecalculateLabel()
 
 
 class _ThreadData(threading.local):

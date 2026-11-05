@@ -44,6 +44,7 @@ from perfkitbenchmarker.resources.container_service import container_cluster
 from perfkitbenchmarker.resources.container_service import kubectl
 from perfkitbenchmarker.resources.container_service import kubernetes_cluster
 from perfkitbenchmarker.resources.container_service import kubernetes_commands
+import yaml
 
 FLAGS = flags.FLAGS
 # GPU types which practically require spot to get.
@@ -52,6 +53,7 @@ _RARE_GPU_TYPES = [
     virtual_machine_spec.GPU_A100,
     virtual_machine_spec.GPU_B200,
 ]
+_EKS_AUTO_GPU_FAMILIES = ('g6', 'g6e', 'g5', 'p4d', 'p5')
 
 
 def RecursivelyUpdateDictionary(
@@ -600,6 +602,41 @@ class EksAutoCluster(BaseEksCluster):
       self._InstallS3CsiAddon()
     if aws_flags.EKS_INSTALL_NEURON_DEVICE_PLUGIN.value:
       self._InstallNeuronDevicePlugin()
+
+  def SaveNodePoolManifest(self, nodepool_name: str, path: str) -> None:
+    """Writes an EKS Auto Mode NodePool manifest for nodepool_name to path."""
+    nodepool = self.nodepools.get(nodepool_name) or self.default_nodepool
+    nodepool_families = (
+        list(nodepool.machine_families)
+        if nodepool is not None and nodepool.machine_families
+        else []
+    )
+    default_mt = nodepool.machine_type if nodepool is not None else None
+    parsed_family = util.GetMachineFamily(default_mt)
+    is_gpu = bool((nodepool is not None and nodepool.gpu_type) or self.gpu_type)
+    machine_type: str | None = None
+    instance_families: list[str] = []
+    if nodepool_families:
+      instance_families = nodepool_families
+    elif is_gpu:
+      if default_mt and parsed_family in _EKS_AUTO_GPU_FAMILIES:
+        machine_type = default_mt
+      else:
+        instance_families = ['g6', 'g6e', 'g5']
+    elif default_mt:
+      machine_type = default_mt
+    else:
+      instance_families = ['m8i']
+    capacity_type = 'spot' if self.use_spot else 'on-demand'
+    rendered = vm_util.ReadAndRenderJinja2Template(
+        'container/karpenter/eks_auto_nodepool.yaml.j2',
+        nodepool_name=nodepool_name,
+        instance_families=instance_families,
+        machine_type=machine_type,
+        capacity_type=capacity_type,
+    )
+    with open(path, 'w') as f:
+      f.write(rendered)
 
   # AWS-stable identifiers for the Mountpoint for S3 CSI driver:
   # https://docs.aws.amazon.com/eks/latest/userguide/s3-csi.html
@@ -1326,8 +1363,10 @@ class EksKarpenterCluster(BaseEksCluster):
     for nodepool in self.nodepools.values():
       self._CreateKarpenterNodePool(nodepool)
 
-  def _CreateKarpenterNodePool(self, nodepool: container.BaseNodePoolConfig):
-    """Creates the Karpenter NodePool and EC2NodeClass."""
+  def _BuildKarpenterNodePoolYaml(
+      self, nodepool: container.BaseNodePoolConfig
+  ) -> list[dict[str, Any]]:
+    """Builds the Karpenter NodePool + EC2NodeClass YAML dicts for nodepool."""
     yaml_nodepool = kubernetes_commands.ConvertManifestToYamlDicts(
         'container/karpenter/nodepool.yaml.j2',
         NODEPOOL_NAME=nodepool.name,
@@ -1367,7 +1406,36 @@ class EksKarpenterCluster(BaseEksCluster):
           1000, math.ceil(nodepool.max_nodes * vcpu_per_node * 1.05)
       )
       yaml_nodepool[0]['spec']['limits'] = {'cpu': cpu_limit}
-    kubernetes_commands.ApplyYaml(yaml_nodepool)
+    return yaml_nodepool
+
+  def _CreateKarpenterNodePool(self, nodepool: container.BaseNodePoolConfig):
+    """Creates the Karpenter NodePool and EC2NodeClass."""
+    kubernetes_commands.ApplyYaml(self._BuildKarpenterNodePoolYaml(nodepool))
+
+  def SaveNodePoolManifest(self, nodepool_name: str, path: str) -> None:
+    """Writes the Karpenter NodePool manifest for nodepool_name to path.
+
+    The saved manifest can later be used to delete+recreate the NodePool for
+    cold-start reset (see MakeKarpenterPoolReset in the benchmark).
+
+    Args:
+      nodepool_name: The name of the nodepool.
+      path: The path to write the manifest to.
+    """
+    nodepool = self.nodepools.get(nodepool_name)
+    if nodepool is None:
+      raise ValueError(
+          f'NodePool {nodepool_name!r} not found; available: '
+          f'{list(self.nodepools)}'
+      )
+    # _BuildKarpenterNodePoolYaml returns RecursiveDict (defaultdict subclass)
+    # which yaml.safe_dump_all cannot serialize; round-trip through JSON to
+    # get plain dicts.
+    plain_dicts = json.loads(
+        json.dumps(self._BuildKarpenterNodePoolYaml(nodepool))
+    )
+    with open(path, 'w') as f:
+      yaml.safe_dump_all(plain_dicts, f, default_flow_style=False)
 
   def _Delete(self):
     """Deletes the control plane and worker nodes."""

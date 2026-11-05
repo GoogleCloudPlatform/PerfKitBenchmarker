@@ -153,6 +153,14 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
       result['auto_node_provisioning_mode'] = True
     return result
 
+  def GetNodeSelectors(self, machine_type: str | None = None) -> dict[str, str]:
+    selectors = super().GetNodeSelectors(machine_type)
+    if FLAGS.azure_aks_auto_node_provisioning:
+      # System pool nodes have kubernetes.azure.com/mode=system; exclude them
+      # so the benchmark pod triggers NAP to provision a fresh user-mode node.
+      selectors['kubernetes.azure.com/mode'] = 'user'
+    return selectors
+
   def _IsAutoscalerEnabled(self, nodepool_config: container.BaseNodePoolConfig):
     """Returns True if the cluster autoscaler is enabled."""
     return (
@@ -188,7 +196,7 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
           # Default /16 supports ~250 nodes; /10 provides ~4M IPs for up to 16k.
           '--pod-cidr',
           '100.64.0.0/10',
-          # Free tier caps at 1k nodes; standard scales upto 5k nodes.
+          # Free tier caps at 1k nodes; standard scales up to 5k nodes.
           '--tier',
           'standard',
           # Standard LB exhausts SNAT ports at ~1k nodes; NAT Gateway required.

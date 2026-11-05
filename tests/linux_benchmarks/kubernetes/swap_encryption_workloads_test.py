@@ -18,8 +18,8 @@ ParseFioJson gains a label parameter and uses io_bytes for zero-direction
 detection.
 """
 
-import unittest
 import json
+import unittest
 from unittest import mock
 
 from perfkitbenchmarker import errors
@@ -195,6 +195,40 @@ class ParseFioJsonTest(pkb_common_test_case.PkbCommonTestCase):
 class RunFioTest(pkb_common_test_case.PkbCommonTestCase):
   """Tests for workloads.RunFio()."""
 
+  def test_fio_pre_and_post_commands_ignore_failures(self):
+    ds = self._make_ds_with_jobs()
+    workloads.RunFio(ds, '/dev/sda', {}, 60)
+
+    mkdir_calls = [
+        c for c in ds.PodExec.call_args_list if c[0][0].startswith('mkdir -p')
+    ]
+    swapoff_calls = [
+        c for c in ds.PodExec.call_args_list if c[0][0].startswith('swapoff ')
+    ]
+    rm_calls = [
+        c for c in ds.PodExec.call_args_list if c[0][0].startswith('rm -f ')
+    ]
+
+    self.assertTrue(mkdir_calls, 'mkdir -p not called')
+    for call in mkdir_calls:
+      self.assertTrue(
+          call[1].get('ignore_failure', False),
+          'mkdir -p must ignore_failure=True',
+      )
+
+    self.assertTrue(swapoff_calls, 'swapoff not called')
+    for call in swapoff_calls:
+      self.assertTrue(
+          call[1].get('ignore_failure', False),
+          'swapoff must ignore_failure=True',
+      )
+
+    self.assertTrue(rm_calls, 'rm -f not called')
+    for call in rm_calls:
+      self.assertTrue(
+          call[1].get('ignore_failure', False), 'rm -f must ignore_failure=True'
+      )
+
   def _make_daemonset(self, fio_output: str = '') -> mock.MagicMock:
     ds = mock.MagicMock()
     # Default: rm succeeds, fio run succeeds, cat returns valid JSON
@@ -341,8 +375,8 @@ class RunKernelBuildTest(pkb_common_test_case.PkbCommonTestCase):
     )
     self.assertAlmostEqual(ratio_sample.value, 2.0)
 
-  def test_cgroup_none_fails_fast(self):
-    """Builds fail fast when cgroup setup fails."""
+  def test_cgroup_none_raises_run_error(self):
+    """Builds raise RunError when cgroup setup fails."""
     ds = self._make_ds(cgroup_mode='CGROUP_NONE')
     with self.assertRaisesRegex(
         errors.Benchmarks.RunError,
@@ -351,7 +385,6 @@ class RunKernelBuildTest(pkb_common_test_case.PkbCommonTestCase):
       workloads.RunKernelBuild(
           ds, self._META, kernel_version='6.1.38', kernel_memory_mb=512
       )
-
 
   def test_zero_unconstrained_time_skips_ratio(self):
     """No ratio sample when unconstrained elapsed is 0 (avoid division)."""
@@ -373,6 +406,32 @@ class RunKernelBuildTest(pkb_common_test_case.PkbCommonTestCase):
     )
     for s in samples:
       self.assertEqual(s.metadata.get('kernel_version'), '5.15.120')
+
+
+class RunRedisTest(pkb_common_test_case.PkbCommonTestCase):
+
+  @mock.patch.object(workloads.memtier.MemtierResult, 'Parse')
+  def test_run_redis_calls_podexec(self, mock_parse):
+    ds = mock.MagicMock()
+
+    def mock_podexec(*args, **_):
+      if 'redis-cli' in args[0]:
+        return ('PONG', '')
+      return ('CGROUPV2', '')
+
+    ds.PodExec.side_effect = mock_podexec
+
+    mock_result = mock.MagicMock()
+    mock_result.GetSamples.return_value = []
+    mock_parse.return_value = mock_result
+
+    workloads.RunRedis(ds, {}, redis_memory_mb=100, dataset_mb=50)
+
+    # Check that PodExec is called multiple times
+    self.assertGreater(ds.PodExec.call_count, 3)
+
+    calls = [c[0][0] for c in ds.PodExec.call_args_list]
+    self.assertTrue(any('memtier_benchmark' in c for c in calls))
 
 
 if __name__ == '__main__':

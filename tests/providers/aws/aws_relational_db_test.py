@@ -116,6 +116,24 @@ class AwsRelationalDbSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
           _COMPONENT, flag_values=FLAGS, **spec
       )
 
+  def testAuroraSnapshotIdentifierFlag(self):
+    FLAGS['aws_aurora_snapshot_identifier'].parse('my-aurora-snapshot')
+    valid_spec = copy.deepcopy(self.minimal_spec)
+    valid_spec['engine'] = 'aurora-postgresql'
+    spec = aws_relational_db_spec.AwsRelationalDbSpec(
+        _COMPONENT, flag_values=FLAGS, **valid_spec
+    )
+    self.assertEqual(spec.aws_aurora_snapshot_identifier, 'my-aurora-snapshot')
+
+  def testAuroraSnapshotIdentifierInvalidEngine(self):
+    FLAGS['aws_aurora_snapshot_identifier'].parse('my-aurora-snapshot')
+    with self.assertRaises(errors.Config.InvalidValue):
+      invalid_spec = copy.deepcopy(self.minimal_spec)
+      invalid_spec['engine'] = 'postgres'
+      aws_relational_db_spec.AwsRelationalDbSpec(
+          _COMPONENT, flag_values=FLAGS, **invalid_spec
+      )
+
 
 class AwsRelationalDbFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
   """Class that tests the flags defined in AwsRelationalDb."""
@@ -281,6 +299,7 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
         'load_machine_type': None,
         'aws_rds_dedicated_log_volume': False,
         'aws_aurora_express_configuration': False,
+        'aws_aurora_snapshot_identifier': None,
     }
     if additional_spec_items:
       spec_dict.update(additional_spec_items)
@@ -341,6 +360,85 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
             ),
         ],
     )
+
+  def testCreateAuroraFromSnapshot(self):
+    fake_output = json.dumps({
+        'DBCluster': {
+            'MasterUsername': 'pkb9681ee6f',
+        }
+    })
+    with self._PatchCriticalObjects(stdout=fake_output) as issue_command:
+      db = self.CreateAuroraDbFromSpec({
+          'aws_aurora_snapshot_identifier': (
+              'bigann-1b-hnsw-m16-efc64-9681ee6f-9262026'
+          ),
+          'zones': ['us-east-1a'],
+          'high_availability': False,
+      })
+      db._Create()
+      command_strings = [
+          ' '.join(call[0][0]) for call in issue_command.call_args_list
+      ]
+      self.assertEqual(db.spec.database_username, 'pkb9681ee6f')
+      self.assertListEqual(
+          command_strings,
+          [
+              (
+                  'aws --output json rds restore-db-cluster-from-snapshot'
+                  ' --db-cluster-identifier=pkb-db-cluster-123'
+                  ' --engine=aurora-postgresql --region=us-east-1'
+                  ' --snapshot-identifier=bigann-1b-hnsw-m16-efc64-9681ee6f-9262026'
+                  ' --engine-version=9.6.2'
+                  ' --db-subnet-group-name=fake_db_subnet'
+                  ' --vpc-security-group-ids=fake_security_group_id'
+                  ' --availability-zones=us-east-1a --storage-type=aurora'
+                  ' --tags'
+              ),
+              (
+                  'aws --output json rds create-db-instance'
+                  ' --db-instance-identifier=pkb-db-instance-123'
+                  ' --db-cluster-identifier=pkb-db-cluster-123'
+                  ' --engine=aurora-postgresql --engine-version=9.6.2'
+                  ' --no-auto-minor-version-upgrade'
+                  ' --db-instance-class=db.t1.micro --region=us-east-1'
+                  ' --availability-zone=us-east-1a --tags'
+              ),
+          ],
+      )
+
+  def testPostCreateAuroraFromSnapshot(self):
+    db = self.CreateAuroraDbFromSpec({
+        'aws_aurora_snapshot_identifier': (
+            'bigann-1b-hnsw-m16-efc64-9681ee6f-9262026'
+        ),
+        'zones': ['us-east-1a'],
+        'high_availability': False,
+    })
+    db.subnets_used_by_db = [mock.Mock(zone='us-east-1a')]
+    mock_issue_command = self.enter_context(
+        mock.patch.object(vm_util, 'IssueCommand')
+    )
+    mock_wait_status = self.enter_context(
+        mock.patch.object(db, '_WaitForStatus')
+    )
+    self.enter_context(
+        mock.patch.object(
+            aws_relational_db.BaseAwsRelationalDb, '_PostCreate'
+        )
+    )
+    db._PostCreate()
+    mock_issue_command.assert_called_once_with([
+        'aws',
+        '--output',
+        'json',
+        'rds',
+        'modify-db-cluster',
+        '--db-cluster-identifier=pkb-db-cluster-123',
+        '--master-user-password=fakepassword',
+        '--apply-immediately',
+        '--region=us-east-1',
+    ])
+    self.assertEqual(mock_wait_status.call_count, 2)
 
   def testCreateAuroraExpress(self):
     fake_output = json.dumps({

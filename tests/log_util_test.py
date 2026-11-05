@@ -40,6 +40,15 @@ class LogUtilTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertEqual(context.label, 'LABEL-A ')
     self.assertEqual(context.label, '')
 
+  def testThreadLogContextExtendLabelException(self):
+    """Verify ThreadLogContext.ExtendLabel cleans up on exception."""
+    context = log_util.ThreadLogContext()
+    self.assertEqual(context.label, '')
+    with self.assertRaises(ValueError):
+      with context.ExtendLabel('LABEL-A'):
+        raise ValueError('Test error')
+    self.assertEqual(context.label, '')
+
   def testThreadLogContextExtendLabelEmptyStrings(self):
     """Verify ThreadLogContext.ExtendLabel behavior with empty strings."""
     context = log_util.ThreadLogContext()

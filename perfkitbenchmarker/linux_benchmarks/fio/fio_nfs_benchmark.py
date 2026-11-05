@@ -36,10 +36,10 @@ fio_nfs:
       disk_spec: *default_500_gb
       vm_count: 1
   flags:
-    fio_working_set_size: 300
+    fio_fill_size: 10G
     data_disk_type: nfs
     data_disk_size: 1024
-    fio_generate_scenarios: rand_4k_read_300G_iodepth-1_numjobs-1,rand_4k_write_300G_iodepth-1_numjobs-1
+    fio_generate_scenarios: rand_4k_read_10G_iodepth-1_numjobs-1,rand_4k_write_10G_iodepth-1_numjobs-1
     fio_runtime: 300
     nfs_version: '4.1'
 """
@@ -54,20 +54,20 @@ def CheckPrerequisites(benchmark_config):
   """Perform flag checks."""
   del benchmark_config  # unused
   if not utils.AgainstNFS():
-    errors.Setup.InvalidFlagConfigurationError(
+    raise errors.Setup.InvalidFlagConfigurationError(
         'fio_nfs_benchmark only supports against NFS target mode.'
     )
   if fio_flags.FIO_FILL_SIZE.value[-1].upper() not in ('K', 'M', 'G'):
-    errors.Setup.InvalidFlagConfigurationError(
+    raise errors.Setup.InvalidFlagConfigurationError(
         'fio_nfs_benchmark requires --fio_fill_size to be set.'
     )
-  if fio_flags.FIO_TARGET_MODE.value:
-    errors.Setup.InvalidFlagConfigurationError(
+  if FLAGS['fio_target_mode'].present:
+    raise errors.Setup.InvalidFlagConfigurationError(
         'fio_nfs_benchmark is only against NFS. Please don\'t use'
         ' --fio_target_mode.'
     )
   if not fio_flags.FIO_GENERATE_SCENARIOS.value:
-    errors.Setup.InvalidFlagConfigurationError(
+    raise errors.Setup.InvalidFlagConfigurationError(
         'fio_nfs_benchmark requires --fio_generate_scenarios.'
     )
   parser = fio_scenario_parser.FioScenarioParser()
@@ -82,6 +82,12 @@ def Prepare(spec: benchmark_spec.BenchmarkSpec):
         'FIO NFS benchmark can\'t have more than one scratch disk.'
     )
   vm.Install('fio')
+  utils.WriteFile(
+      vm,
+      vm.scratch_disks[0],
+      fio_flags.FIO_FILL_SIZE.value,
+      constants.FIO_PATH,
+  )
 
 
 def Run(spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
@@ -92,8 +98,15 @@ def Run(spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
       vm.scratch_disks,
       fio_flags.FIO_GENERATE_SCENARIOS.value,
       benchmark_params,
+      device_path=utils.FIO_TEMP_FILE_NAME,
   )
-  return utils.RunTest(vm, constants.FIO_PATH, job_file_str)
+  metadata = {
+      'fio_fill_size': fio_flags.FIO_FILL_SIZE.value,
+      'fio_fill_block_size': fio_flags.FIO_FILL_BLOCK_SIZE.value,
+  }
+  return utils.RunTest(
+      vm, constants.FIO_PATH, job_file_str, metadata=metadata
+  )
 
 
 def Cleanup(_):

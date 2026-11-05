@@ -422,6 +422,20 @@ class BaseGkeCluster(kubernetes_cluster.KubernetesCluster):
         c['resources']['limits']['google.com/tpu'] = str(self.tpu_count)
         c['resources']['requests']['google.com/tpu'] = str(self.tpu_count)
 
+  def DeleteNodePool(self, name: str, wait: bool = True) -> None:
+    """Deletes a nodepool; ignores failures."""
+    cmd = self._GcloudCommand(
+        'container',
+        'node-pools',
+        'delete',
+        name,
+        '--cluster',
+        self.name,
+    )
+    if not wait:
+      cmd.args.append('--async')
+    cmd.Issue(raise_on_failure=False)
+
 
 class GkeCluster(BaseGkeCluster):
   """Class representing a Google Kubernetes Engine cluster."""
@@ -797,6 +811,7 @@ class GkeCluster(BaseGkeCluster):
         'deployment/kube-dns',
         condition_name='Available',
         namespace='kube-system',
+        timeout=600,
     )
 
   def _GetInstanceGroups(self):
@@ -1314,4 +1329,3 @@ class GkeGclusterCluster(BaseGkeCluster):
         ],
         timeout=self.TIMEOUT,
     )
-

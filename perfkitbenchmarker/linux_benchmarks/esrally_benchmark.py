@@ -129,6 +129,17 @@ def _InstallEsrally(vm, master_nodes, seed_hosts, is_load_generator=False):
   vm.Install('openjdk')
   vm.InstallPackages('python3-pip python3-venv')
   vm.RemoteCommand('python3 -m venv esrally_venv')
+  # Install esrally 2.12.0 without dependencies to patch versions.
+  # esrally does not support python 3.14 (implicitly in 2.12, explicitly in
+  # 2.13). We could downgrade with deadsnake, but this is simpler for now.
+  vm.RemoteCommand(f'{SET_ENV} && pip3 install --no-deps esrally==2.12.0')
+  vm.RemoteCommand(
+      'sed -i'
+      " -e 's/aiohttp==3.10.11/aiohttp>=3.10.11/'"
+      " -e 's/yappi==1.5.1/yappi>=1.7.3/'"
+      " -e 's/zstandard==0.21.0/zstandard>=0.21.0/' "
+      'esrally_venv/lib/python*/site-packages/esrally-2.12.0.dist-info/METADATA'
+  )
   vm.RemoteCommand(f'{SET_ENV} && pip3 install esrally==2.12.0')
   if is_load_generator:
     return

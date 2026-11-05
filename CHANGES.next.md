@@ -303,6 +303,9 @@
     BBQpm@SF.
 -   Add --tpcx_bb_kit_bucket_dir to download the TPCx-BB kit from a folder of
     the preprovisioned data bucket other than tpcx_bb/.
+-   Add kubernetes_glm_sglang benchmark, which serves GLM-5.3 with SGLang on GKE
+    a4-highgpu-8g (8x NVIDIA B200) nodes and measures it with
+    sglang.bench_serving.
 -   Add Oracle Cloud Infrastructure (OCI) as a new provider, supporting VMs
     (Ubuntu 22.04/24.04, Oracle Linux 8/9), VCN networking with firewall rules,
     and block volume scratch disks. (GH-7174 from @gadgilrajeev)
@@ -735,3 +738,10 @@
     `MEMPOOL_CACHE_SIZE` constant in `app/l2p.h`).
 -   Replace deprecated `pkg_resources` usages with `importlib.resources`,
     `importlib.metadata`, and `packaging.requirements`.
+-   Fix MySQL APT install on GnuPG 2.1+ (e.g. Ubuntu 24.04) writing the repo
+    key as a keybox file that apt ignores; use a legacy `gnupg-ring:` keyring.
+-   Update `bigtable_walkthrough/README.md` to note that the PKB docker image is
+    no longer downloadable.
+-   Suppress `not found: 404` errors from `gcloud storage buckets delete` in
+    `GoogleCloudStorageService.DeleteBucket` when tearing down a bucket that was
+    never created.

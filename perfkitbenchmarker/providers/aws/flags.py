@@ -312,6 +312,12 @@ AWS_AURORA_EXPRESS_CONFIGURATION = flags.DEFINE_boolean(
     False,
     'Whether to use express configuration for Aurora cluster creation.',
 )
+AWS_AURORA_SNAPSHOT_IDENTIFIER = flags.DEFINE_string(
+    'aws_aurora_snapshot_identifier',
+    None,
+    'If supplied, restores the Aurora cluster from the specified DB cluster'
+    ' snapshot identifier.',
+)
 AWS_EC2_INSTANCE_PROFILE = flags.DEFINE_string(
     'aws_ec2_instance_profile',
     None,

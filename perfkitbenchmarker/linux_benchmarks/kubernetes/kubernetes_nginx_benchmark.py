@@ -162,7 +162,6 @@ def _MergeNginxConfigs(global_conf_path, server_conf_path, force_http=False):
   )
 
   if (not FLAGS.nginx_use_ssl) or force_http:
-    server_conf = server_conf.replace("ssl on;", "# ssl on;")
     server_conf = server_conf.replace("ssl_certificate", "# ssl_certificate")
     server_conf = server_conf.replace("ssl_ciphers", "# ssl_ciphers")
     server_conf = server_conf.replace("listen 443 ssl", "listen 80")

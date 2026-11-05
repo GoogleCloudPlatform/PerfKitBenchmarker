@@ -1,0 +1,179 @@
+# GLM-5.3 (FP8) on SGLang for kubernetes_glm_sglang: one replica per 8x NVIDIA
+# B200 node. The fetch-weights init container copies the preprovisioned
+# checkpoint from {{ model_uri }} to local NVMe once per node; the sglang
+# container serves it on port {{ service_port }}.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ name }}-scripts
+data:
+  fetch_weights.sh: |
+    {{ fetch_weights_sh | indent(4) }}
+  serve.sh: |
+    {{ serve_sh | indent(4) }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ name }}
+  labels:
+    app: {{ name }}
+spec:
+  replicas: {{ replicas }}
+  # Each replica needs a whole node, so never surge.
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+  # The first start on a fresh node downloads ~750 GB before the server loads.
+  progressDeadlineSeconds: {{ progress_deadline_seconds }}
+  selector:
+    matchLabels:
+      app: {{ name }}
+  template:
+    metadata:
+      labels:
+        app: {{ name }}
+    spec:
+      terminationGracePeriodSeconds: 120
+      # Avoid injecting <SERVICE>_PORT-style env vars into the server.
+      enableServiceLinks: false
+      nodeSelector:
+        pkb_nodepool: {{ nodepool }}
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app: {{ name }}
+              topologyKey: kubernetes.io/hostname
+      initContainers:
+        - name: fetch-weights
+          image: {{ fetch_image }}
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/bash", "/opt/pkb/fetch_weights.sh"]
+          env:
+            - name: MODEL_URI
+              value: "{{ model_uri }}"
+            - name: MODEL_DIR
+              value: "{{ model_dir }}"
+          resources:
+            requests:
+              cpu: "8"
+              memory: 32Gi
+          volumeMounts:
+            - name: model-cache
+              mountPath: /models
+            - name: scripts
+              mountPath: /opt/pkb
+              readOnly: true
+      containers:
+        - name: sglang
+          image: {{ sglang_image }}
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/bash", "/opt/pkb/serve.sh"]
+          env:
+            - name: MODEL_DIR
+              value: "{{ model_dir }}"
+            - name: SERVED_MODEL_NAME
+              value: "{{ served_model_name }}"
+            - name: SERVICE_PORT
+              value: "{{ service_port }}"
+            - name: GPU_COUNT
+              value: "{{ gpu_count }}"
+            - name: SERVING_PROFILE
+              value: "{{ serving_profile }}"
+            - name: HICACHE_SIZE_GB
+              value: "{{ hicache_size_gb }}"
+            # Weights are local; never call out to the Hugging Face Hub.
+            - name: HF_HUB_OFFLINE
+              value: "1"
+            # Keep JIT kernel caches on the node-local disk.
+            - name: XDG_CACHE_HOME
+              value: /models/.cache
+            - name: TRITON_CACHE_DIR
+              value: /models/.cache/triton
+          ports:
+            - name: http
+              containerPort: {{ service_port }}
+              protocol: TCP
+          resources:
+            requests:
+              cpu: "{{ cpu_request }}"
+              memory: {{ memory_request }}
+              nvidia.com/gpu: "{{ gpu_count }}"
+            limits:
+              nvidia.com/gpu: "{{ gpu_count }}"
+          securityContext:
+            capabilities:
+              # IPC_LOCK: pinned host memory (DeepEP, HiCache).
+              # SYS_PTRACE: CUDA IPC handle exchange.
+              add: ["IPC_LOCK", "SYS_PTRACE"]
+          # Loading, CUDA graph capture and kernel JIT can take a while.
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 20
+            timeoutSeconds: 10
+            failureThreshold: 270
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 15
+            timeoutSeconds: 10
+            failureThreshold: 4
+          # /get_model_info answers without waiting on the scheduler, so heavy
+          # prefill batches don't trigger restarts.
+          livenessProbe:
+            httpGet:
+              path: /get_model_info
+              port: http
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 10
+          volumeMounts:
+            - name: model-cache
+              mountPath: /models
+            - name: scripts
+              mountPath: /opt/pkb
+              readOnly: true
+            - name: dshm
+              mountPath: /dev/shm
+      volumes:
+        # /var/lib/kubelet sits on the node's Local SSDs (GKE ephemeral
+        # storage).
+        - name: model-cache
+          hostPath:
+            path: {{ node_cache_dir }}
+            type: DirectoryOrCreate
+        - name: scripts
+          configMap:
+            name: {{ name }}-scripts
+            defaultMode: 0755
+        - name: dshm
+          emptyDir:
+            medium: Memory
+            sizeLimit: {{ shm_size }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ name }}
+  labels:
+    app: {{ name }}
+spec:
+  type: ClusterIP
+  selector:
+    app: {{ name }}
+  ports:
+    - name: http
+      port: {{ service_port }}
+      targetPort: http
+      protocol: TCP

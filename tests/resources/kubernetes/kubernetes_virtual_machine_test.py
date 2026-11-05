@@ -635,6 +635,51 @@ class KubernetesVirtualMachine(BaseKubernetesVirtualMachineTestCase):
           write_mock.call_args[0][0], _EXPECTED_CALL_BODY_UBUNTU_2404
       )
 
+  @mock.patch(
+      'perfkitbenchmarker.resources.container_service.kubernetes_pod_utils.RemoteHostCopy'
+  )
+  def testRemoteHostCopy(self, mock_remote_host_copy):
+    spec = self.create_virtual_machine_spec()
+    vm_class = virtual_machine.GetVmClass(
+        provider_info.GCP, os_types.UBUNTU2404, provider_info.KUBERNETES
+    )
+    kub_vm = vm_class(spec)
+    kub_vm.name = _NAME
+    kub_vm.RemoteHostCopy('file_path', 'remote_path', True, 3)  # pyrefly: ignore[missing-attribute]
+    mock_remote_host_copy.assert_called_once_with(
+        _NAME, '', 'file_path', 'remote_path', True, 3
+    )
+
+  @mock.patch(
+      'perfkitbenchmarker.resources.container_service.kubernetes_pod_utils.PushFile'
+  )
+  def testPushFile(self, mock_push_file):
+    spec = self.create_virtual_machine_spec()
+    vm_class = virtual_machine.GetVmClass(
+        provider_info.GCP, os_types.UBUNTU2404, provider_info.KUBERNETES
+    )
+    kub_vm = vm_class(spec)
+    kub_vm.name = _NAME
+    kub_vm.PushFile('local_path', 'remote_path')  # pyrefly: ignore[missing-attribute]
+    mock_push_file.assert_called_once_with(
+        _NAME, '', 'local_path', 'remote_path'
+    )
+
+  @mock.patch(
+      'perfkitbenchmarker.resources.container_service.kubernetes_pod_utils.PushDataFile'
+  )
+  def testPushDataFile(self, mock_push_data_file):
+    spec = self.create_virtual_machine_spec()
+    vm_class = virtual_machine.GetVmClass(
+        provider_info.GCP, os_types.UBUNTU2404, provider_info.KUBERNETES
+    )
+    kub_vm = vm_class(spec)
+    kub_vm.name = _NAME
+    kub_vm.PushDataFile('data_filename', 'remote_path', True)  # pyrefly: ignore[missing-attribute]
+    mock_push_data_file.assert_called_once_with(
+        _NAME, '', 'data_filename', 'remote_path'
+    )
+
 
 if __name__ == '__main__':
   unittest.main()

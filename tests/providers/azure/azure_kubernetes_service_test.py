@@ -285,6 +285,14 @@ class AzureKubernetesServiceTest(pkb_common_test_case.PkbCommonTestCase):
         mock_cmd.all_commands,
     )
 
+  def testGetNodeSelectorsAutoNodeProvisioning(self):
+    self.assertEqual(self.aks.GetNodeSelectors(), {})
+    with flagsaver.flagsaver(azure_aks_auto_node_provisioning=True):
+      self.assertEqual(
+          self.aks.GetNodeSelectors(),
+          {'kubernetes.azure.com/mode': 'user'},
+      )
+
   def testGetNodePoolNames(self):
     self.MockIssueCommand(
         {

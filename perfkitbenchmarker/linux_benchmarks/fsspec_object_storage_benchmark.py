@@ -42,7 +42,10 @@ FLAGS = flags.FLAGS
 _SCENARIOS = flags.DEFINE_list(
     'fsspec_scenarios',
     [
-        'seq_5M_read_100G_workers-1',
+        'seq_5M_read_5G_files-1_workers-1',
+        'seq_5M_read_5G_files-16_workers-16',
+        'seq_5M_read_5G_files-64_workers-64',
+        'seq_5M_read_5G_files-192_workers-192',
         'rand_4K_read_100G_ops-10000_workers-1',
         'rand_4K_read_10M_files-10000_ops-10000_workers-1',
     ],
@@ -55,7 +58,7 @@ _SCENARIOS = flags.DEFINE_list(
 _CACHE_TYPE = flags.DEFINE_enum(
     'fsspec_cache_type',
     'readahead',
-    ['readahead', 'background', 'none'],
+    ['adaptive', 'readahead', 'background', 'none'],
     'fsspec cache type for sequential reads.',
 )
 _PREFILL_BLOCK_SIZE = flags.DEFINE_string(
@@ -106,6 +109,11 @@ _CLOUD_TO_PACKAGE = {
     'AWS': 's3fs',
     'Azure': 'adlfs',
 }
+_SIZE_UNITS = {'B': 1, 'K': 1024, 'M': 1024**2, 'G': 1024**3, 'T': 1024**4}
+
+
+def _ParseBytes(size_str: str) -> int:
+  return int(size_str[:-1]) * _SIZE_UNITS[size_str[-1].upper()]
 
 
 def GetConfig(user_config: dict[str, Any]) -> dict[str, Any]:
@@ -168,9 +176,14 @@ def Prepare(spec: benchmark_spec.BenchmarkSpec) -> None:
       num_files = int(extras.get('files', 1))
       prepare_files[file_size] = max(prepare_files.get(file_size, 0), num_files)
   for file_size, num_files in prepare_files.items():
+    prefill_bs = (
+        file_size
+        if _ParseBytes(file_size) < _ParseBytes(_PREFILL_BLOCK_SIZE.value)
+        else _PREFILL_BLOCK_SIZE.value
+    )
     prepare_scenario = (
-        f'seq_{_PREFILL_BLOCK_SIZE.value}_read_{file_size}'
-        f'_files-{num_files}_workers-16'
+        f'seq_{prefill_bs}_read_{file_size}'
+        f'_files-{num_files}_workers-64'
     )
     vm.RobustRemoteCommand(
         _GetRunnerEnvAndCmd(vm, mode='prepare', scenario=prepare_scenario)

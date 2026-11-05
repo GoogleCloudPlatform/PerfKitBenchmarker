@@ -267,7 +267,11 @@ flags.DEFINE_string(
 CASSANDRA_COMPACTION_STRATEGY = flags.DEFINE_enum(
     'cassandra_compaction_strategy',
     'SizeTieredCompactionStrategy',  # Cassandra default.
-    ['SizeTieredCompactionStrategy', 'LeveledCompactionStrategy'],
+    [
+        'SizeTieredCompactionStrategy',
+        'LeveledCompactionStrategy',
+        'UnifiedCompactionStrategy',
+    ],
     'Compaction strategy to use for the cassandra server.',
 )
 
@@ -380,10 +384,14 @@ class CassandraCompactionNotCompletedError(Exception):
   """Exception for cassandra compaction not complete."""
 
 
-def GetConfig(user_config):
+def GetConfig(
+    user_config,
+    benchmark_config=BENCHMARK_CONFIG,
+    benchmark_name=BENCHMARK_NAME,
+):
   """Customize the config for the benchmark based on flags."""
   cloud = FLAGS.cloud
-  config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+  config = configs.LoadConfig(benchmark_config, user_config, benchmark_name)
   ConfigureVmSpec(
       config,
       CLIENT_GROUP,
@@ -517,7 +525,25 @@ def GenerateMetadataFromFlags(benchmark_spec, cassandra_vms, client_vms):
       'cassandra_compaction_throughput_mb': (
           CASSANDRA_COMPACTION_THROUGHPUT_MB.value
       ),
+      'compaction_strategy': CASSANDRA_COMPACTION_STRATEGY.value,
+      'is_row_cache_enabled': IS_ROW_CACHE_ENABLED.value,
   })
+  if (
+      FLAGS['cassandra_row_cache_size'].present
+      or cassandra.CASSANDRA_ROW_CACHE_SIZE.value
+      != cassandra.CASSANDRA_ROW_CACHE_SIZE.default
+  ):
+    metadata['row_cache_size'] = cassandra.CASSANDRA_ROW_CACHE_SIZE.value
+  if (
+      FLAGS['cassandra_key_cache_size'].present
+      or cassandra.CASSANDRA_KEY_CACHE_SIZE.value
+      != cassandra.CASSANDRA_KEY_CACHE_SIZE.default
+  ):
+    metadata['key_cache_size'] = cassandra.CASSANDRA_KEY_CACHE_SIZE.value
+  if cassandra.CASSANDRA_DISK_ACCESS_MODE.value:
+    metadata['disk_access_mode'] = cassandra.CASSANDRA_DISK_ACCESS_MODE.value
+  if cassandra.CASSANDRA_JVM_HEAP_SIZE.value:
+    metadata['jvm_heap_size'] = cassandra.CASSANDRA_JVM_HEAP_SIZE.value
 
   if FLAGS.cassandra_stress_command == USER_COMMAND:
     metadata.update({
@@ -617,6 +643,7 @@ def Prepare(benchmark_spec):
       seed_vm,
       replication_factor=FLAGS.cassandra_replication_factor,
       is_row_cache_enabled=IS_ROW_CACHE_ENABLED.value,
+      compaction_strategy=CASSANDRA_COMPACTION_STRATEGY.value,
   )
   for vm in cassandra_vms:
     cassandra.UpdateCassandraConcurrentCompactorCount(
@@ -1309,7 +1336,6 @@ def Cleanup(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
       required to run the benchmark.
   """
-  vm_dict = benchmark_spec.vm_groups
-  cassandra_vms = vm_dict[CASSANDRA_GROUP]
+  cassandra_vms, _ = ParseVmGroups(benchmark_spec.vm_groups)
   background_tasks.RunThreaded(cassandra.Stop, cassandra_vms)
   background_tasks.RunThreaded(cassandra.CleanNode, cassandra_vms)

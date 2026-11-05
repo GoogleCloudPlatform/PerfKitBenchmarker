@@ -62,14 +62,20 @@ def parse_scenario(scenario_str: str) -> ScenarioSpec:
   pattern, bs, operation, fs = tokens[:4]
   extras = dict(extra.split('-', 1) for extra in tokens[4:])
   num_files = int(extras.get('files', 1))
+  block_bytes = int(bs[:-1]) * _SIZE_UNITS[bs[-1].upper()]
+  file_bytes = int(fs[:-1]) * _SIZE_UNITS[fs[-1].upper()]
+  if file_bytes < block_bytes:
+    raise ValueError(
+        f'file_size ({fs}) must be >= block_size ({bs}) in {scenario_str}'
+    )
   return ScenarioSpec(
       raw=scenario_str,
       pattern=pattern,
       block_size_str=bs,
-      block_bytes=int(bs[:-1]) * _SIZE_UNITS[bs[-1].upper()],
+      block_bytes=block_bytes,
       operation=operation,
       file_size_str=fs,
-      file_bytes=int(fs[:-1]) * _SIZE_UNITS[fs[-1].upper()],
+      file_bytes=file_bytes,
       num_files=num_files,
       num_ops=int(extras.get('ops', max(10000, num_files))),
       num_workers=int(extras.get('workers', 1)),
@@ -123,15 +129,19 @@ def _dataset_uris(proto: str, bucket: str, spec: ScenarioSpec) -> list[str]:
 
 
 def _stream_write_file(
-    fs: fsspec.AbstractFileSystem, uri: str, total_bytes: int, block_bytes: int
+    fs: fsspec.AbstractFileSystem,
+    uri: str,
+    total_bytes: int,
+    block_bytes: int,
+    chunk_buf: bytes | None = None,
 ) -> None:
   """Streams a file of total_bytes to uri using an in-memory block buffer."""
-  chunk_size = min(total_bytes, block_bytes)
-  chunk_buf = os.urandom(chunk_size)
+  if chunk_buf is None:
+    chunk_buf = os.urandom(block_bytes)
   remaining = total_bytes
   with fs.open(uri, 'wb', block_size=block_bytes) as f:
     while remaining > 0:
-      to_write = min(remaining, chunk_size)
+      to_write = min(remaining, block_bytes)
       f.write(chunk_buf[:to_write])
       remaining -= to_write
 
@@ -177,19 +187,17 @@ def prepare_dataset(
 ) -> None:
   """Populates the bucket with the scenario dataset using fsspec directly."""
   uris = _dataset_uris(proto, args.bucket, spec)
+  # Warm up the async session on the main thread before spawning workers.
+  fs.exists(uris[0])
 
-  if spec.num_files == 1:
-    _stream_write_file(fs, uris[0], spec.file_bytes, spec.block_bytes)
-  else:
-    payload = os.urandom(spec.file_bytes)
-    # Warm up the async session on the main thread before spawning workers.
-    fs.exists(uris[0])
-
-    def _upload_one(uri: str) -> None:
-      fs.pipe_file(uri, payload)
-
-    with futures.ThreadPoolExecutor(max_workers=spec.num_workers) as pool:
-      list(pool.map(_upload_one, uris))
+  payload = os.urandom(spec.block_bytes)
+  upload_fn = lambda uri: _stream_write_file(
+      fs, uri, spec.file_bytes, spec.block_bytes, payload
+  )
+  with futures.ThreadPoolExecutor(
+      max_workers=min(spec.num_workers, len(uris))
+  ) as pool:
+    list(pool.map(upload_fn, uris))
 
 
 def _warm_or_clear_metadata_cache(
@@ -213,21 +221,19 @@ def run_seq_read(
     proto: str,
     args: argparse.Namespace,
     spec: ScenarioSpec,
+    cache_type: str,
 ) -> list[dict[str, Any]]:
-  """Runs sequential read for either single large file or N sharded files."""
+  """Runs sequential read across spec.num_files in spec.block_bytes chunks."""
   uris = _dataset_uris(proto, args.bucket, spec)
   _warm_or_clear_metadata_cache(
       fs, proto, args.bucket, spec, args.enable_metadata_cache
   )
 
-  if spec.num_files == 1:
+  def _read_file(uri: str) -> tuple[list[float], int]:
     bytes_read = 0
     block_latencies_ms = []
-    start = time.perf_counter()
     with fs.open(
-        uris[0],
-        'rb',
-        block_size=spec.block_bytes,
+        uri, 'rb', block_size=spec.block_bytes, cache_type=cache_type
     ) as f:
       while True:
         t0 = time.perf_counter()
@@ -236,35 +242,23 @@ def run_seq_read(
           break
         block_latencies_ms.append((time.perf_counter() - t0) * 1000.0)
         bytes_read += len(chunk)
-    duration_sec = time.perf_counter() - start
-    return _build_metrics(
-        spec.raw,
-        duration_sec,
-        bytes_read,
-        latencies_ms=block_latencies_ms,
-        latency_name='block_latency',
-    )
+    return block_latencies_ms, bytes_read
 
-  # Multi-file (sharded) sequential reads across spec.num_files objects.
-  def _fetch_one(uri: str) -> tuple[float, int]:
-    t0 = time.perf_counter()
-    with fs.open(
-        uri,
-        'rb',
-        block_size=spec.block_bytes,
-    ) as f:
-      data = f.read()
-    return (time.perf_counter() - t0) * 1000.0, len(data)
-
-  epoch_start = time.perf_counter()
+  start = time.perf_counter()
   with futures.ThreadPoolExecutor(max_workers=spec.num_workers) as pool:
-    results = list(pool.map(_fetch_one, uris))
-  epoch_sec = time.perf_counter() - epoch_start
+    results = list(pool.map(_read_file, uris))
+  duration_sec = time.perf_counter() - start
+  all_latencies_ms = []
+  total_bytes = 0
+  for latencies, nbytes in results:
+    all_latencies_ms.extend(latencies)
+    total_bytes += nbytes
   return _build_metrics(
       spec.raw,
-      epoch_sec,
-      sum(r[1] for r in results),
-      latencies_ms=[r[0] for r in results],
+      duration_sec,
+      total_bytes,
+      latencies_ms=all_latencies_ms,
+      latency_name='block_latency',
   )
 
 
@@ -273,19 +267,19 @@ def run_rand_read(
     proto: str,
     args: argparse.Namespace,
     spec: ScenarioSpec,
+    cache_type: str,
 ) -> list[dict[str, Any]]:
   """Runs random byte-range reads of spec.block_bytes across spec.file_bytes."""
   uris = _dataset_uris(proto, args.bucket, spec)
   _warm_or_clear_metadata_cache(
       fs, proto, args.bucket, spec, args.enable_metadata_cache
   )
-  read_bytes = min(spec.block_bytes, spec.file_bytes)
 
   rng = random.Random(42)
   tasks = [
       (
           uris[rng.randrange(len(uris))],
-          rng.randint(0, max(0, spec.file_bytes - read_bytes)),
+          rng.randint(0, spec.file_bytes - spec.block_bytes),
       )
       for _ in range(spec.num_ops)
   ]
@@ -297,7 +291,7 @@ def run_rand_read(
   def _get_thread_file(uri: str) -> Any:
     f = getattr(thread_local, 'file', None)
     if f is None:
-      f = fs.open(uri, 'rb')
+      f = fs.open(uri, 'rb', block_size=spec.block_bytes, cache_type=cache_type)
       thread_local.file = f
       with opened_files_lock:
         opened_files.append(f)
@@ -309,13 +303,15 @@ def run_rand_read(
       f = _get_thread_file(uri)
       t0 = time.perf_counter()
       f.seek(offset)
-      chunk = f.read(read_bytes)
+      chunk = f.read(spec.block_bytes)
       return (time.perf_counter() - t0) * 1000.0, len(chunk)
 
     t0 = time.perf_counter()
-    with fs.open(uri, 'rb') as f:
+    with fs.open(
+        uri, 'rb', block_size=spec.block_bytes, cache_type=cache_type
+    ) as f:
       f.seek(offset)
-      chunk = f.read(read_bytes)
+      chunk = f.read(spec.block_bytes)
     return (time.perf_counter() - t0) * 1000.0, len(chunk)
 
   start = time.perf_counter()
@@ -380,9 +376,9 @@ def main() -> None:
   if spec.operation == 'write':
     raw_metrics = run_write(fs, proto, args, spec)
   elif spec.pattern == 'rand':
-    raw_metrics = run_rand_read(fs, proto, args, spec)
+    raw_metrics = run_rand_read(fs, proto, args, spec, cache_type)
   else:
-    raw_metrics = run_seq_read(fs, proto, args, spec)
+    raw_metrics = run_seq_read(fs, proto, args, spec, cache_type)
   base_meta = {
       'fsspec_version': fsspec.__version__,
       'backend_version': backend_version,

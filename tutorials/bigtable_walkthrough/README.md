@@ -36,8 +36,11 @@ Please check out the
 [PKB README](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/blob/master/README.md)
 for a detailed introduction.
 
-**PKB docker image update**: we have updated the docker image for
-[Task 5](#task-5-run-the-benchmarks), using the latest PKB code on 2023/02/08.
+> **Note**: The docker image (`gcr.io/cloud-bigtable-ecosystem/pkb:latest`) is
+> no longer downloadable due to the vulnerability issue. Feel free to reach out
+> (e.g., by filing an issue on
+> [GitHub](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/issues)) if
+> you need to do the benchmarking.
 
 ### Bigtable benchmarking overview
 
@@ -347,6 +350,12 @@ sed -i "s/test_project/${PROJECT_ID}/g" ~/pkb_configs/runner.yaml
 > [config template](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/tree/master/tutorials/bigtable_walkthrough/batch_configs/templates/runner_config.yaml).
 
 ## Task 5: Run the benchmarks
+
+> **Note**: The docker image (`gcr.io/cloud-bigtable-ecosystem/pkb:latest`) is
+> no longer downloadable due to the vulnerability issue. Feel free to reach out
+> (e.g., by filing an issue on
+> [GitHub](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/issues)) if
+> you need to do the benchmarking.
 
 1.  Check your config folder which should have the following files:
 

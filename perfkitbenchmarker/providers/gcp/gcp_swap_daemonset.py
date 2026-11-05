@@ -15,6 +15,7 @@
 """GCP-specific Swap DaemonSet resource."""
 
 import logging
+import posixpath
 import textwrap
 
 from perfkitbenchmarker import errors
@@ -264,7 +265,7 @@ class GcpSwapDaemonSet(swap_daemonset.SwapDaemonSet):
     )
     lssd_out, _ = self.PodExec(
         textwrap.dedent("""
-        for d in $(lsblk -dno NAME,ROTA | awk '$2==0{print $1}')
+        for d in $(lsblk -dno NAME,ROTA,TYPE | awk '$2==0 && $3=="disk"{print $1}')
         do
           if lsblk -no TYPE "/dev/$d" 2>/dev/null | grep -q '^part$'; then continue; fi
           if lsblk -no MOUNTPOINT "/dev/$d" 2>/dev/null | grep -q '[^[:space:]]'; then continue; fi
@@ -276,9 +277,9 @@ class GcpSwapDaemonSet(swap_daemonset.SwapDaemonSet):
     devices = [d.strip() for d in lssd_out.strip().splitlines() if d.strip()]
     if not devices:
       logging.info(
-          '[swap_encryption] No clean local SSD — falling back to hyperdisk'
+          '[swap_encryption] No clean local SSD — falling back to stateful-loop'
       )
-      self._SetupGkeHyperdiskSwap(enable_dmcrypt, swap_size_gb)
+      self._SetupGkeLssdStatefulLoopSwap(enable_dmcrypt)
       return
     device_list = ' '.join(devices)
     n = len(devices)
@@ -394,7 +395,24 @@ class GcpSwapDaemonSet(swap_daemonset.SwapDaemonSet):
     Args:
       enable_dmcrypt: Whether to apply dm-crypt.
     """
-    img_path = '/mnt/stateful_partition/pkb_swap.img'
+    mount_out, _ = self.PodExec(
+        textwrap.dedent("""
+        LSSD_MOUNT=""
+        for d in $(lsblk -dno NAME,MODEL | grep -i 'local\\|nvme' | grep -v 'nvme0' | awk '{print $1}'); do
+          M=$(lsblk -no MOUNTPOINT "/dev/$d" 2>/dev/null | grep '[^[:space:]]' | head -1)
+          if [ -n "$M" ]; then LSSD_MOUNT="$M"; break; fi
+        done
+        if [ -z "$LSSD_MOUNT" ]; then
+          if [ -d "/host/mnt/stateful_partition" ]; then LSSD_MOUNT="/mnt/stateful_partition"
+          elif [ -d "/host/var/lib/containerd" ]; then LSSD_MOUNT="/var/lib/containerd"
+          else LSSD_MOUNT="/var/lib/kubelet"; fi
+        fi
+        echo "$LSSD_MOUNT"
+        """),
+        ignore_failure=True,
+    )
+    base_dir = '/host' + (mount_out.strip() or '/mnt/stateful_partition')
+    img_path = posixpath.join(base_dir, 'pkb_swap.img')
     self.PodExec(
         textwrap.dedent(f"""
     swapoff -a 2>/dev/null || true
@@ -405,7 +423,7 @@ class GcpSwapDaemonSet(swap_daemonset.SwapDaemonSet):
         ignore_failure=True,
     )
     size_out, _ = self.PodExec(
-        "df -P /mnt/stateful_partition | awk 'NR==2{print $4}'",
+        f"df -P {base_dir} | awk 'NR==2{{print $4}}'",
         ignore_failure=True,
     )
     avail_kb = int(size_out.strip() or '0')
@@ -417,6 +435,7 @@ class GcpSwapDaemonSet(swap_daemonset.SwapDaemonSet):
     )
     self.PodExec(
         textwrap.dedent(f"""
+    mkdir -p {base_dir} 2>/dev/null || true
     fallocate -l {swap_gb}G {img_path} 2>/dev/null || \\
       dd if=/dev/zero of={img_path} bs=1G count={swap_gb}
     chmod 600 {img_path}

@@ -83,6 +83,11 @@ class ClickhouseTest(pkb_common_test_case.PkbCommonTestCase):
     })
     db._WaitForDeployment()
     self.assertTrue(mock_cmd.func_to_mock.called)
+    for replica in range(db.num_replicas):
+      self.assertIn(
+          f'statefulset.apps/chi-pkb-123-pkb-123-0-{replica}',
+          mock_cmd.all_commands,
+      )
 
   def testDelete(self):
     mock_cmd = self.MockIssueCommand({})

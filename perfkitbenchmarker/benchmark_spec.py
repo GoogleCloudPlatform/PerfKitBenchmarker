@@ -411,7 +411,10 @@ class BenchmarkSpec:
     cluster_class = cluster.GetClusterClass(cloud)
     self.cluster = cluster_class(self.config.cluster)
     self.resources.append(self.cluster)
-    self.vms_to_boot.update(self.cluster.ExportVmGroupsForUnmanagedProvision())
+    if isinstance(self.cluster, cluster.SlurmCluster):
+      self.vms_to_boot.update(
+          self.cluster.ExportVmGroupsForUnmanagedProvision()
+      )
 
   def ConstructContainerRegistry(self):
     """Create the container registry."""
@@ -1183,7 +1186,10 @@ class BenchmarkSpec:
         ]
       vm_util.GenerateSSHConfig(sshable_vms, sshable_vm_groups)
     if self.cluster:
-      if self.cluster.unmanaged:
+      if (
+          isinstance(self.cluster, cluster.SlurmCluster)
+          and self.cluster.unmanaged
+      ):
         self.cluster.ImportVmGroups(
             self.vm_groups['headnode'][0], self.vm_groups['workers']
         )

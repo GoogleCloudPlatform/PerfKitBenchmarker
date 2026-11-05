@@ -149,6 +149,10 @@ class KubernetesCluster(container_cluster.BaseContainerCluster):
     """Gets the node selectors section of a yaml for the provider."""
     return {}
 
+  def SaveNodePoolManifest(self, nodepool_name: str, path: str) -> None:
+    """Writes the provider's nodepool manifest for nodepool_name to path."""
+    raise NotImplementedError
+
   def ModifyPodSpecPlacementYaml(
       self,
       yaml_dicts: list[dict[str, Any]],
