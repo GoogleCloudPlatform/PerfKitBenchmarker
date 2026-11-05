@@ -111,6 +111,12 @@ _TUNE_APF_WORKLOAD_LOW = flags.DEFINE_boolean(
     ' queueLengthLimit/seats.',
 )
 SANDBOX_NAME = 'agent-sandbox'
+# Stable pod label added to every sandbox pod template. It is the selector for
+# the load runner NetworkPolicy; user-supplied template labels may vary.
+SANDBOX_POD_LABEL_KEY = 'pkb-agent-sandbox'
+SANDBOX_POD_LABEL_VALUE = 'true'
+SANDBOX_RUNTIME_PORT = 8888
+LOAD_RUNNER_NETWORK_POLICY_NAME = 'agent-sandbox-allow-load-runner'
 
 
 def _ManifestSortKey(doc: dict[str, Any]) -> int:
@@ -235,6 +241,7 @@ class K8sAgentSandbox(agent_sandbox.BaseAgentSandbox):
         'agent_sandbox_manifest_repo': self.spec.manifest_repo,
         'agent_sandbox_node_taint': self.spec.sandbox_node_taint,
         'agent_sandbox_tune_apf_workload_low': self.spec.tune_apf_workload_low,
+        'agent_sandbox_workload_transport': self.spec.workload_transport,
     })
     if self.spec.controller:
       metadata.update({
@@ -270,6 +277,13 @@ class K8sAgentSandbox(agent_sandbox.BaseAgentSandbox):
           'agent_sandbox_image': self.spec.sandbox_template.image,
           'agent_sandbox_cpu_request': self.spec.sandbox_template.cpu_request,
           'agent_sandbox_cpu_limit': self.spec.sandbox_template.cpu_limit,
+          'agent_sandbox_memory_request': (
+              self.spec.sandbox_template.memory_request
+          ),
+          'agent_sandbox_memory_limit': self.spec.sandbox_template.memory_limit,
+          'agent_sandbox_network_policy_management': (
+              self.spec.sandbox_template.network_policy_management
+          ),
           'agent_sandbox_termination_grace_period_seconds': (
               self.spec.sandbox_template.termination_grace_period_seconds
           ),
@@ -604,7 +618,8 @@ class K8sAgentSandbox(agent_sandbox.BaseAgentSandbox):
       tolerations: list[dict[str, str]],
   ) -> None:
     """Applies the SandboxTemplate rendered from the template spec."""
-    labels = template_spec.labels or {'sandbox': 'python-sandbox-bench'}
+    labels = dict(template_spec.labels or {'sandbox': 'python-sandbox-bench'})
+    labels[SANDBOX_POD_LABEL_KEY] = SANDBOX_POD_LABEL_VALUE
     limits: dict[str, str] = {'ephemeral-storage': '256Mi'}
     if template_spec.cpu_limit != 'none':
       limits['cpu'] = template_spec.cpu_limit or template_spec.cpu_request
@@ -638,7 +653,7 @@ class K8sAgentSandbox(agent_sandbox.BaseAgentSandbox):
         'nodeSelector': node_selector,
         'tolerations': tolerations,
     }
-    if template_spec.runtime_class:
+    if template_spec.runtime_class and template_spec.runtime_class != 'none':
       pod_spec['runtimeClassName'] = template_spec.runtime_class
     if template_spec.termination_grace_period_seconds is not None:
       pod_spec['terminationGracePeriodSeconds'] = (
@@ -662,6 +677,41 @@ class K8sAgentSandbox(agent_sandbox.BaseAgentSandbox):
         'kind': 'SandboxTemplate',
         'metadata': {'name': SANDBOX_NAME, 'namespace': self.spec.namespace},
         'spec': spec_body,
+    }
+    kubernetes_commands.ApplyYaml([manifest])
+
+  def ApplyLoadRunnerNetworkPolicy(
+      self, load_runner_labels: dict[str, str]
+  ) -> None:
+    """Admits the load runner pods to the sandbox runtime port.
+
+    The Managed NetworkPolicy only admits the Sandbox Router, and
+    NetworkPolicies
+    are additive, so direct HTTP from the load runner needs its own allow rule.
+
+    Args:
+      load_runner_labels: Pod labels that identify the load runner pods.
+    """
+    manifest = {
+        'apiVersion': 'networking.k8s.io/v1',
+        'kind': 'NetworkPolicy',
+        'metadata': {
+            'name': LOAD_RUNNER_NETWORK_POLICY_NAME,
+            'namespace': self.spec.namespace,
+        },
+        'spec': {
+            'podSelector': {
+                'matchLabels': {SANDBOX_POD_LABEL_KEY: SANDBOX_POD_LABEL_VALUE}
+            },
+            'policyTypes': ['Ingress'],
+            'ingress': [{
+                'from': [{'podSelector': {'matchLabels': load_runner_labels}}],
+                'ports': [{
+                    'protocol': 'TCP',
+                    'port': SANDBOX_RUNTIME_PORT,
+                }],
+            }],
+        },
     }
     kubernetes_commands.ApplyYaml([manifest])
 

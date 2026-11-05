@@ -14,8 +14,12 @@
 
 """Tests for the agent_sandbox load generator."""
 
+import email.message
+import json
 import threading
 import unittest
+from unittest import mock
+import urllib.error
 
 from perfkitbenchmarker.data.agent_sandbox import agent_sandbox_loadgen
 from tests import pkb_common_test_case
@@ -334,6 +338,33 @@ class LoadGeneratorRunTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertLen(prepare_threads, 1)
     self.assertStartsWith(prepare_threads[0], 'claim-hold')
 
+  def testPrepareErrorRecordedAndSkipsExecute(self):
+    driver = self._make_driver()
+    execute_calls = []
+
+    class _FailingPrepareExecutor(agent_sandbox_loadgen.WorkloadExecutor):
+
+      def prepare(self, claim_name, status):
+        del claim_name, status
+        raise ValueError('no pod IP')
+
+      def execute(self, claim_name, status, prepared):
+        del status, prepared
+        execute_calls.append(claim_name)
+
+    lg = agent_sandbox_loadgen.LoadGenerator(
+        driver=driver,
+        ready_timeout=5.0,
+        max_concurrent=4,
+        workload_executor=_FailingPrepareExecutor(),
+    )
+    shape = agent_sandbox_loadgen.resolve_run_shape(qps=10.0, total=1)
+    records = lg.run(shape)
+
+    self.assertLen(records, 1)
+    self.assertEqual(records[0].error, 'ValueError')
+    self.assertEmpty(execute_calls)
+
 
 class _FakeDriver(agent_sandbox_loadgen.ClaimDriver):
   """Minimal in-memory fake for ClaimDriver.
@@ -416,6 +447,245 @@ class ClaimDriverReadyTest(pkb_common_test_case.PkbCommonTestCase):
         driver.served_warm({'sandbox': {'name': 'agent-sandbox-1-xyz'}})
     )
     self.assertFalse(driver.served_warm({'sandbox': {'name': 'claim-0'}}))
+
+
+class _FakeHttpResponse:
+  """Minimal urlopen() response usable as a context manager."""
+
+  def __init__(self, body, status=200):
+    self.status = status
+    self._body = body
+
+  def __enter__(self):
+    return self
+
+  def __exit__(self, *exc_info):
+    return False
+
+  def read(self):
+    return self._body
+
+
+class HttpExecExecutorTest(pkb_common_test_case.PkbCommonTestCase):
+
+  def _make_executor(self, core_api=None, resolve_pod_annotation=False):
+    return agent_sandbox_loadgen.HttpExecExecutor(
+        custom_objects_api=mock.Mock(),
+        namespace='ns',
+        workload_duration=20.0,
+        core_v1_api=core_api,
+        resolve_pod_annotation=resolve_pod_annotation,
+        sleeper=lambda _: None,
+    )
+
+  def testPrepareRetriesUntilPodIpAssigned(self):
+    core_api = mock.Mock()
+    pod_no_ip = mock.Mock()
+    pod_no_ip.status.pod_ip = None
+    pod_ready = mock.Mock()
+    pod_ready.status.pod_ip = '10.1.2.9'
+    core_api.read_namespaced_pod.side_effect = [pod_no_ip, pod_ready]
+    executor = self._make_executor(core_api)
+
+    prepared = executor.prepare('claim-0', {'sandbox': {'name': 'sb-0'}})
+
+    self.assertEqual(prepared, '10.1.2.9')
+    self.assertEqual(core_api.read_namespaced_pod.call_count, 2)
+
+  def testPrepareReadsPodIp(self):
+    core_api = mock.Mock()
+    core_api.read_namespaced_pod.return_value.status.pod_ip = '10.1.2.3'
+    executor = self._make_executor(core_api)
+
+    prepared = executor.prepare('claim-0', {'sandbox': {'name': 'sb-0'}})
+
+    self.assertEqual(prepared, '10.1.2.3')
+    core_api.read_namespaced_pod.assert_called_once_with('sb-0', 'ns')
+
+  def testPrepareResolvesPodNameLikeStreamExec(self):
+    core_api = mock.Mock()
+    core_api.read_namespaced_pod.return_value.status.pod_ip = '10.1.2.3'
+    executor = self._make_executor(core_api, resolve_pod_annotation=True)
+    executor._co.get_namespaced_custom_object.return_value = {
+        'metadata': {'annotations': {'agents.x-k8s.io/pod-name': 'pod-x'}}
+    }
+
+    executor.prepare('claim-0', {'sandbox': {'name': 'sb-0'}})
+
+    core_api.read_namespaced_pod.assert_called_once_with('pod-x', 'ns')
+
+  def testPrepareWithoutBoundSandboxReturnsNone(self):
+    core_api = mock.Mock()
+    executor = self._make_executor(core_api)
+
+    self.assertIsNone(executor.prepare('claim-0', {}))
+    core_api.read_namespaced_pod.assert_not_called()
+
+  def testPrepareRaisesWhenPodHasNoIp(self):
+    core_api = mock.Mock()
+    core_api.read_namespaced_pod.return_value.status.pod_ip = None
+    executor = self._make_executor(core_api)
+
+    with self.assertRaisesRegex(RuntimeError, 'no IP'):
+      executor.prepare('claim-0', {'sandbox': {'name': 'sb-0'}})
+
+  @mock.patch.object(agent_sandbox_loadgen.urllib.request, 'urlopen')
+  def testExecutePostsCommandToPodIp(self, mock_urlopen):
+    mock_urlopen.return_value = _FakeHttpResponse(
+        json.dumps({'stdout': 'iterations=1', 'exit_code': 0}).encode()
+    )
+
+    self._make_executor().execute('claim-0', None, '10.1.2.3')
+
+    request = mock_urlopen.call_args[0][0]
+    self.assertEqual(request.full_url, 'http://10.1.2.3:8888/execute')
+    self.assertEqual(request.get_method(), 'POST')
+    self.assertEqual(mock_urlopen.call_args[1]['timeout'], 80.0)
+    body = json.loads(request.data)
+    self.assertEqual(body['timeout_seconds'], 50.0)
+    self.assertTrue(body['command'].startswith("python3 -c 'import time\n"))
+    self.assertIn('while time.monotonic() - start < 20.0', body['command'])
+
+  @mock.patch.object(agent_sandbox_loadgen.urllib.request, 'urlopen')
+  def testExecuteBracketsIpv6PodIp(self, mock_urlopen):
+    mock_urlopen.return_value = _FakeHttpResponse(
+        json.dumps({'stdout': 'iterations=1', 'exit_code': 0}).encode()
+    )
+
+    self._make_executor().execute('claim-0', None, 'fd00::1')
+
+    request = mock_urlopen.call_args[0][0]
+    self.assertEqual(request.full_url, 'http://[fd00::1]:8888/execute')
+
+  @mock.patch.object(agent_sandbox_loadgen.urllib.request, 'urlopen')
+  def testExecuteRaisesOnHttpError(self, mock_urlopen):
+    mock_urlopen.side_effect = urllib.error.HTTPError(
+        'http://10.1.2.3:8888/execute',
+        403,
+        'Forbidden',
+        email.message.Message(),
+        None,
+    )
+
+    with self.assertRaises(urllib.error.HTTPError) as cm:
+      self._make_executor().execute('claim-0', None, '10.1.2.3')
+    self.assertEqual(cm.exception.code, 403)
+    self.assertIn('claim=claim-0', cm.exception.__notes__)
+    self.assertEqual(mock_urlopen.call_count, 1)
+
+  @mock.patch.object(agent_sandbox_loadgen.urllib.request, 'urlopen')
+  def testExecuteRetriesTransientConnectionRefused(self, mock_urlopen):
+    mock_urlopen.side_effect = [
+        urllib.error.URLError('connection refused'),
+        _FakeHttpResponse(json.dumps({'exit_code': 0}).encode()),
+    ]
+
+    self._make_executor().execute('claim-0', None, '10.1.2.3')
+
+    self.assertEqual(mock_urlopen.call_count, 2)
+
+  @mock.patch.object(agent_sandbox_loadgen.urllib.request, 'urlopen')
+  def testExecuteRaisesOnUrlErrorAndTimeout(self, mock_urlopen):
+    mock_urlopen.side_effect = urllib.error.URLError('connection refused')
+    with self.assertRaisesRegex(
+        urllib.error.URLError, 'connection refused'
+    ) as cm:
+      self._make_executor().execute('claim-0', None, '10.1.2.3')
+    self.assertIn('claim=claim-0', cm.exception.__notes__)
+    self.assertEqual(mock_urlopen.call_count, 3)
+
+    mock_urlopen.reset_mock()
+    mock_urlopen.side_effect = TimeoutError('timed out')
+    with self.assertRaisesRegex(TimeoutError, 'timed out') as cm:
+      self._make_executor().execute('claim-0', None, '10.1.2.3')
+    self.assertIn('claim=claim-0', cm.exception.__notes__)
+    self.assertEqual(mock_urlopen.call_count, 1)
+
+  @mock.patch.object(agent_sandbox_loadgen.urllib.request, 'urlopen')
+  def testExecuteRaisesOnNon2xxStatus(self, mock_urlopen):
+    mock_urlopen.return_value = _FakeHttpResponse(b'{}', status=302)
+
+    with self.assertRaisesRegex(RuntimeError, 'HTTP 302') as cm:
+      self._make_executor().execute('claim-0', None, '10.1.2.3')
+    self.assertIn('claim=claim-0', cm.exception.__notes__)
+
+  @mock.patch.object(agent_sandbox_loadgen.urllib.request, 'urlopen')
+  def testExecuteRaisesOnNonzeroExitCode(self, mock_urlopen):
+    mock_urlopen.return_value = _FakeHttpResponse(
+        json.dumps({'stderr': 'boom', 'exit_code': 1}).encode()
+    )
+
+    with self.assertRaisesRegex(RuntimeError, 'exited with 1') as cm:
+      self._make_executor().execute('claim-0', None, '10.1.2.3')
+    self.assertIn('claim=claim-0', cm.exception.__notes__)
+
+  @mock.patch.object(agent_sandbox_loadgen.urllib.request, 'urlopen')
+  def testExecuteRaisesOnMissingExitCode(self, mock_urlopen):
+    mock_urlopen.return_value = _FakeHttpResponse(
+        json.dumps({'stdout': 'ok'}).encode()
+    )
+
+    with self.assertRaisesRegex(RuntimeError, 'missing exit_code') as cm:
+      self._make_executor().execute('claim-0', None, '10.1.2.3')
+    self.assertIn('claim=claim-0', cm.exception.__notes__)
+
+  @mock.patch.object(agent_sandbox_loadgen.urllib.request, 'urlopen')
+  def testExecuteRaisesOnNonJsonBody(self, mock_urlopen):
+    mock_urlopen.return_value = _FakeHttpResponse(b'<html>')
+
+    with self.assertRaises(json.JSONDecodeError) as cm:
+      self._make_executor().execute('claim-0', None, '10.1.2.3')
+    self.assertIn('claim=claim-0', cm.exception.__notes__)
+
+  def testExecuteRaisesWithoutPodIp(self):
+    with self.assertRaisesRegex(RuntimeError, 'no sandbox pod IP') as cm:
+      self._make_executor().execute('claim-0', None, None)
+    self.assertIn('claim=claim-0', cm.exception.__notes__)
+
+
+class MainWorkloadTransportTest(pkb_common_test_case.PkbCommonTestCase):
+
+  def _run_main(self, extra_args):
+    patches = {
+        name: mock.patch.object(agent_sandbox_loadgen, name)
+        for name in ('config', 'k8s_client', 'K8sClientFactory', 'ClaimDriver')
+    }
+    with mock.patch.object(
+        agent_sandbox_loadgen, 'LoadGenerator'
+    ) as mock_generator, mock.patch.object(
+        agent_sandbox_loadgen, 'open', mock.mock_open(), create=True
+    ):
+      mock_generator.return_value.run.return_value = []
+      mock_generator.return_value.peak_concurrency = 0
+      with patches['config'], patches['k8s_client'], patches[
+          'K8sClientFactory'
+      ], patches['ClaimDriver']:
+        agent_sandbox_loadgen.main(
+            ['--namespace', 'ns', '--qps', '1', '--total', '1']
+            + ['--output', '/dev/null']
+            + extra_args
+        )
+    return mock_generator.call_args[1]['workload_executor']
+
+  def testDefaultTransportIsExec(self):
+    executor = self._run_main(['--workload-duration', '5'])
+    self.assertIsInstance(executor, agent_sandbox_loadgen.StreamExecExecutor)
+
+  def testHttpTransport(self):
+    executor = self._run_main(
+        ['--workload-duration', '5', '--workload-transport', 'http']
+    )
+    self.assertIsInstance(executor, agent_sandbox_loadgen.HttpExecExecutor)
+
+  def testZeroWorkloadDurationLeavesExecutorNone(self):
+    executor = self._run_main(
+        ['--workload-duration', '0', '--workload-transport', 'http']
+    )
+    self.assertIsNone(executor)
+
+  def testInvalidTransportRejected(self):
+    with self.assertRaises(SystemExit):
+      self._run_main(['--workload-transport', 'grpc'])
 
 
 if __name__ == '__main__':

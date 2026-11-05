@@ -17,6 +17,7 @@ from unittest import mock
 
 from absl import flags
 from absl.testing import absltest
+from absl.testing import flagsaver
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
@@ -57,11 +58,15 @@ class AgentSandboxBenchmarkTest(absltest.TestCase):
     self.mock_spec = mock.MagicMock(spec=benchmark_spec.BenchmarkSpec)
     self.mock_sandbox = mock.MagicMock()
     self.mock_sandbox.spec.namespace = 'default'
+    self.mock_sandbox.spec.workload_transport = 'exec'
     self.mock_sandbox.spec.sandbox_warmpool.replicas = 0
     self.mock_sandbox.spec.sandbox_template.runtime_class = 'gvisor-sandbox'
     self.mock_sandbox.GetResourceMetadata.return_value = {
         'agent_sandbox_manifest_ref': 'v1.0.4',
     }
+    self.mock_sandbox.GetWarmpoolNames.return_value = []
+    self.mock_sandbox.ScrapeControlPlaneMetrics.return_value = {}
+    self.mock_sandbox.ScrapeControllerMetrics.return_value = ''
     self.mock_spec.agent_sandbox = self.mock_sandbox
     self.mock_spec.container_cluster = mock.MagicMock()
     self.mock_spec.container_cluster.GetResourceMetadata.return_value = {}
@@ -79,16 +84,16 @@ class AgentSandboxBenchmarkTest(absltest.TestCase):
         ),  # Logs
     ]
 
+  @flagsaver.flagsaver(
+      agent_sandbox_benchmark_target_qps=5.0,
+      agent_sandbox_benchmark_target_duration=30.0,
+  )
   def testRun_ModifiesYamlAndApplies(self):
     # Build a mock yaml parsing logic to return a template (resembling
     # what read-modify-apply expects)
     mock_yaml_doc = {'spec': {'template': {'spec': {'containers': [{}]}}}}
     self.mock_convert.return_value = [mock_yaml_doc]
     self.mock_apply_yaml.return_value = ['job.batch/agent-sandbox-load-runner']
-
-    # Set some flags for the run
-    FLAGS.agent_sandbox_benchmark_target_qps = 5.0
-    FLAGS.agent_sandbox_benchmark_target_duration = 30.0
 
     samples = agent_sandbox_benchmark.Run(self.mock_spec)
 
@@ -115,6 +120,11 @@ class AgentSandboxBenchmarkTest(absltest.TestCase):
     )
     self.assertIn('workload_duration', samples[0].metadata)
 
+  @flagsaver.flagsaver(
+      agent_sandbox_benchmark_target_qps=100.0,
+      agent_sandbox_benchmark_target_duration=60.0,
+      agent_sandbox_load_runner_parallelism=2,
+  )
   def testRun_MultiPodParallelismAndControlPlaneMetrics(self):
     mock_yaml_doc = {'spec': {'template': {'spec': {'containers': [{}]}}}}
     self.mock_convert.return_value = [mock_yaml_doc]
@@ -156,13 +166,7 @@ class AgentSandboxBenchmarkTest(absltest.TestCase):
         ),
     ]
 
-    FLAGS.agent_sandbox_benchmark_target_qps = 100.0
-    FLAGS.agent_sandbox_benchmark_target_duration = 60.0
-    FLAGS.agent_sandbox_load_runner_parallelism = 2
-    try:
-      samples = agent_sandbox_benchmark.Run(self.mock_spec)
-    finally:
-      FLAGS.agent_sandbox_load_runner_parallelism = 1
+    samples = agent_sandbox_benchmark.Run(self.mock_spec)
 
     applied_doc = self.mock_apply_yaml.call_args[0][0][0]
     self.assertEqual(applied_doc['spec']['parallelism'], 2)
@@ -185,6 +189,85 @@ class AgentSandboxBenchmarkTest(absltest.TestCase):
     self.assertEqual(samples[0].metadata['cp_gomaxprocs_pre'], 4.0)
     self.assertEqual(samples[0].metadata['cp_gomaxprocs_post'], 4.0)
     self.assertFalse(samples[0].metadata['cp_resized_mid_run'])
+
+  def testRun_WorkloadTransportDefaultsToExec(self):
+    self.mock_convert.return_value = [
+        {'spec': {'template': {'spec': {'containers': [{}]}}}}
+    ]
+
+    samples = agent_sandbox_benchmark.Run(self.mock_spec)
+
+    script_arg = self.mock_apply_yaml.call_args[0][0][0]['spec']['template'][
+        'spec'
+    ]['containers'][0]['args'][0]
+    self.assertIn('--workload-transport exec', script_arg)
+    self.assertEqual(samples[0].metadata['workload_transport'], 'exec')
+    self.mock_sandbox.ApplyLoadRunnerNetworkPolicy.assert_not_called()
+
+  def testRun_WorkloadTransportHttpPassedToRunnerAndMetadata(self):
+    self.mock_sandbox.spec.workload_transport = 'http'
+    self.mock_convert.return_value = [
+        {'spec': {'template': {'spec': {'containers': [{}]}}}}
+    ]
+
+    samples = agent_sandbox_benchmark.Run(self.mock_spec)
+
+    script_arg = self.mock_apply_yaml.call_args[0][0][0]['spec']['template'][
+        'spec'
+    ]['containers'][0]['args'][0]
+    self.assertIn('--workload-transport http', script_arg)
+    self.assertEqual(samples[0].metadata['workload_transport'], 'http')
+    self.mock_sandbox.ApplyLoadRunnerNetworkPolicy.assert_not_called()
+
+  def _RunWithControlPlane(self, cp_pre, cp_post):
+    self.mock_convert.return_value = [
+        {'spec': {'template': {'spec': {'containers': [{}]}}}}
+    ]
+    self.mock_sandbox.ScrapeControlPlaneMetrics.side_effect = [cp_pre, cp_post]
+    return agent_sandbox_benchmark.Run(self.mock_spec)[0].metadata
+
+  def testRun_ProcessRestartAloneIsNotAResize(self):
+    metadata = self._RunWithControlPlane(
+        {
+            'gomaxprocs': 4.0,
+            'nominal_limit_seats': 100.0,
+            'process_start_time': 1000.0,
+        },
+        {
+            'gomaxprocs': 4.0,
+            'nominal_limit_seats': 100.0,
+            'process_start_time': 2000.0,
+        },
+    )
+
+    self.assertFalse(metadata['cp_resized_mid_run'])
+    self.assertTrue(metadata['cp_process_start_changed'])
+    self.assertEqual(metadata['cp_process_start_time_pre'], 1000.0)
+    self.assertEqual(metadata['cp_process_start_time_post'], 2000.0)
+
+  def testRun_GomaxprocsChangeIsAResize(self):
+    metadata = self._RunWithControlPlane(
+        {'gomaxprocs': 4.0, 'process_start_time': 1000.0},
+        {'gomaxprocs': 8.0, 'process_start_time': 1000.0},
+    )
+
+    self.assertTrue(metadata['cp_resized_mid_run'])
+    self.assertFalse(metadata['cp_process_start_changed'])
+
+  def testRun_NominalSeatsChangeIsAResize(self):
+    metadata = self._RunWithControlPlane(
+        {'gomaxprocs': 4.0, 'nominal_limit_seats': 100.0},
+        {'gomaxprocs': 4.0, 'nominal_limit_seats': 200.0},
+    )
+
+    self.assertTrue(metadata['cp_resized_mid_run'])
+    self.assertNotIn('cp_process_start_changed', metadata)
+
+  def testRun_NoControlPlaneMetricsOmitsResizeKeys(self):
+    metadata = self._RunWithControlPlane({}, {})
+
+    self.assertNotIn('cp_resized_mid_run', metadata)
+    self.assertNotIn('cp_process_start_changed', metadata)
 
   def testRun_FailedJobWithoutPodChecksQuota(self):
     mock_yaml_doc = {'spec': {'template': {'spec': {'containers': [{}]}}}}
@@ -221,6 +304,19 @@ class AgentSandboxBenchmarkTest(absltest.TestCase):
         'agent_sandbox/load_runner_rbac.yaml.j2',
         namespace='default',
     )
+    self.mock_sandbox.ApplyLoadRunnerNetworkPolicy.assert_not_called()
+
+  def testPrepare_HttpTransportAppliesLoadRunnerNetworkPolicy(self):
+    self.mock_sandbox.spec.workload_transport = 'http'
+    self.enterContext(
+        mock.patch.object(kubernetes_commands, 'ApplyManifest', autospec=True)
+    )
+    with mock.patch('builtins.open', mock.mock_open(read_data='print(1)')):
+      agent_sandbox_benchmark.Prepare(self.mock_spec)
+
+    self.mock_sandbox.ApplyLoadRunnerNetworkPolicy.assert_called_once_with(
+        {'app': 'agent-sandbox-load-runner'}
+    )
 
 
 class AgentSandboxBenchmarkConfigTest(absltest.TestCase):
@@ -252,6 +348,7 @@ class AgentSandboxBenchmarkConfigTest(absltest.TestCase):
         cluster_cfg['nodepools']['sandbox']['vm_spec']['Azure']['machine_type'],
         'Standard_D16s_v5',
     )
+    self.assertTrue(config['flags']['azure_aks_standard_tier'])
 
 
 if __name__ == '__main__':

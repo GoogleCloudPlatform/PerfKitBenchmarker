@@ -1,4 +1,17 @@
 #!/bin/bash
+# Copyright 2026 PerfKitBenchmarker Authors. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 set -euxo pipefail
 
 : "${GVISOR_VERSION:?must be set}"
@@ -64,16 +77,25 @@ if [ ! -f "${CONFIG}" ]; then
   mkdir -p "$(dirname "${CONFIG}")"
   nsenter -t 1 -m -u -i -n -p -- containerd config default > "${CONFIG}"
 fi
-if ! grep -q 'containerd\.runtimes\.runsc' "${CONFIG}"; then
-  # containerd v2+ uses config version 3 where the CRI runtime plugin moved
-  # from io.containerd.grpc.v1.cri to io.containerd.cri.v1.runtime.
-  # Appending to the wrong section is silently ignored, leaving runsc
-  # unconfigured even though the binary is installed.
-  if grep -q 'version = 3' "${CONFIG}"; then
-    CRI_PLUGIN='io.containerd.cri.v1.runtime'
-  else
-    CRI_PLUGIN='io.containerd.grpc.v1.cri'
-  fi
+# Determine the active CRI plugin namespace.
+# containerd v2+ uses config version 3 (or version 2 with io.containerd.cri.v1.runtime)
+# where the CRI runtime plugin moved from io.containerd.grpc.v1.cri to io.containerd.cri.v1.runtime.
+# Appending to the wrong section is silently ignored, leaving runsc unconfigured.
+if grep -qE '^version = 3([[:space:]]|$)' "${CONFIG}" || grep -qE '^\[plugins\."io\.containerd\.cri\.v1\.runtime"(\.containerd)?\]' "${CONFIG}"; then
+  CRI_PLUGIN='io.containerd.cri.v1.runtime'
+  WRONG_PLUGIN='io.containerd.grpc.v1.cri'
+else
+  CRI_PLUGIN='io.containerd.grpc.v1.cri'
+  WRONG_PLUGIN='io.containerd.cri.v1.runtime'
+fi
+
+# Clean up any stale or mismatched 2-line runsc configurations
+if grep -q "^\[plugins\.\"${WRONG_PLUGIN}\"\.containerd\.runtimes\.runsc\]" "${CONFIG}"; then
+  sed -i "/^\[plugins\.\"${WRONG_PLUGIN}\"\.containerd\.runtimes\.runsc\]/,+1d" "${CONFIG}"
+  NEEDS_RESTART=1
+fi
+
+if ! grep -q "^\[plugins\.\"${CRI_PLUGIN}\"\.containerd\.runtimes\.runsc\]" "${CONFIG}"; then
   cat >>"${CONFIG}" <<TOML
 
 [plugins."${CRI_PLUGIN}".containerd.runtimes.runsc]

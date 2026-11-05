@@ -123,14 +123,18 @@ agent_sandbox:
             zone: eastus2
   agent_sandbox:
     type: Kubernetes
+  flags:
+    azure_aks_standard_tier: True
 """
 
 # K8s object names for the in-pod load runner.
 _LOAD_RUNNER_CONFIGMAP = 'agent-sandbox-load-runner-script'
 _LOAD_RUNNER_JOB = 'agent-sandbox-load-runner'
+_LOAD_RUNNER_POD_LABELS = {'app': 'agent-sandbox-load-runner'}
 _LOAD_RUNNER_RBAC_MANIFEST = 'agent_sandbox/load_runner_rbac.yaml.j2'
 _LOAD_RUNNER_JOB_MANIFEST = 'agent_sandbox/load_runner_job.yaml.j2'
 _RESULTS_SENTINEL = '---RESULTS---'
+_CP_RESIZE_KEYS = ('gomaxprocs', 'nominal_limit_seats')
 
 
 def GetConfig(user_config: dict[str, Any]) -> dict[str, Any]:
@@ -145,6 +149,16 @@ def GetConfig(user_config: dict[str, Any]) -> dict[str, Any]:
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
   config['container_cluster']['cloud'] = FLAGS.cloud
   return config
+
+
+def _GetWorkloadTransport(
+    sandbox: k8s_agent_sandbox.K8sAgentSandbox | None,
+) -> str:
+  """Returns the configured workload transport ('exec' or 'http')."""
+  if sandbox is not None and sandbox.spec is not None:
+    if sandbox.spec.workload_transport in ('exec', 'http'):
+      return sandbox.spec.workload_transport
+  return 'exec'
 
 
 def _CreateLoadgenConfigMap(namespace: str) -> None:
@@ -200,6 +214,8 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
       _LOAD_RUNNER_RBAC_MANIFEST,
       namespace=namespace,
   )
+  if _GetWorkloadTransport(sandbox) == 'http':
+    sandbox.ApplyLoadRunnerNetworkPolicy(_LOAD_RUNNER_POD_LABELS)
 
 
 def _DeployLoadRunnerJob(
@@ -246,6 +262,7 @@ def _DeployLoadRunnerJob(
         _DEFAULT_MAX_CONCURRENT, estimated_concurrency
     )
   ready_timeout = _READY_TIMEOUT.value or _DEFAULT_READY_TIMEOUT
+  workload_transport = _GetWorkloadTransport(sandbox)
 
   load_runner_args: list[str] = [
       '--namespace',
@@ -254,6 +271,8 @@ def _DeployLoadRunnerJob(
       str(effective_max_concurrent),
       '--workload-duration',
       str(_WORKLOAD_DURATION.value),
+      '--workload-transport',
+      workload_transport,
       '--ready-timeout',
       str(ready_timeout),
       '--output',
@@ -262,11 +281,9 @@ def _DeployLoadRunnerJob(
   if parallelism > 1:
     load_runner_args.extend(['--claim-prefix', '"claim-${HOSTNAME:-0}"'])
   if sandbox is not None:
-    get_pools = getattr(sandbox, 'GetWarmpoolNames', None)
-    if callable(get_pools):
-      pool_names = get_pools()
-      if isinstance(pool_names, (list, tuple)) and pool_names:
-        load_runner_args.extend(['--template-name', ','.join(pool_names)])
+    pool_names = sandbox.GetWarmpoolNames()
+    if pool_names:
+      load_runner_args.extend(['--template-name', ','.join(pool_names)])
   if pod_qps is not None:
     load_runner_args.extend(['--qps', str(pod_qps)])
   if pod_total is not None:
@@ -403,6 +420,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   assert sandbox is not None
   spec = sandbox.spec
   namespace = spec.namespace
+  workload_transport = _GetWorkloadTransport(sandbox)
 
   shape: agent_sandbox_metrics.RunShape = (
       agent_sandbox_metrics.resolve_run_shape(
@@ -414,31 +432,34 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
       )
   )
 
-  scrape_cp_fn = getattr(sandbox, 'ScrapeControlPlaneMetrics', None)
-  cp_pre = scrape_cp_fn() if callable(scrape_cp_fn) else {}
-  if not isinstance(cp_pre, dict):
-    cp_pre = {}
+  cp_pre = sandbox.ScrapeControlPlaneMetrics()
 
   _DeployLoadRunnerJob(namespace, shape, sandbox=sandbox)
   logs_out = _WaitForJobAndFetchLogs(benchmark_spec, namespace, shape)
   records, peak_concurrency = _ParseJobOutput(logs_out)
 
-  cp_post = scrape_cp_fn() if callable(scrape_cp_fn) else {}
-  if not isinstance(cp_post, dict):
-    cp_post = {}
+  cp_post = sandbox.ScrapeControlPlaneMetrics()
 
   metadata: dict[str, Any] = {
       'target_qps': shape.qps,
       'duration': shape.duration,
       'total_claims': shape.total,
       'workload_duration': _WORKLOAD_DURATION.value,
+      'workload_transport': workload_transport,
       'load_runner_parallelism': _LOAD_RUNNER_PARALLELISM.value or 1,
   }
   for phase, cp_data in (('pre', cp_pre), ('post', cp_post)):
     for k, v in cp_data.items():
       metadata[f'cp_{k}_{phase}'] = v
+  # process_start_time flips between replicas behind a load balancer, so only
+  # a change in sizing signals a resize.
+  resize_keys = [k for k in _CP_RESIZE_KEYS if k in cp_pre and k in cp_post]
+  if resize_keys:
+    metadata['cp_resized_mid_run'] = any(
+        cp_pre[k] != cp_post[k] for k in resize_keys
+    )
   if 'process_start_time' in cp_pre and 'process_start_time' in cp_post:
-    metadata['cp_resized_mid_run'] = (
+    metadata['cp_process_start_changed'] = (
         cp_pre['process_start_time'] != cp_post['process_start_time']
     )
   metadata.update(sandbox.GetResourceMetadata())
@@ -446,15 +467,13 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   samples = agent_sandbox_metrics.build_samples(
       records, peak_concurrency, metadata
   )
-  scrape_fn = getattr(sandbox, 'ScrapeControllerMetrics', None)
-  if callable(scrape_fn):
-    prom_text = scrape_fn()
-    if isinstance(prom_text, str) and prom_text:
-      samples.extend(
-          agent_sandbox_metrics.parse_controller_prometheus_metrics(
-              prom_text, metadata
-          )
-      )
+  prom_text = sandbox.ScrapeControllerMetrics()
+  if prom_text:
+    samples.extend(
+        agent_sandbox_metrics.parse_controller_prometheus_metrics(
+            prom_text, metadata
+        )
+    )
   return samples
 
 
