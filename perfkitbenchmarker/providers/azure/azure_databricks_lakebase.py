@@ -34,6 +34,7 @@ from perfkitbenchmarker import relational_db_spec
 from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
+from perfkitbenchmarker.providers.azure import flags as azure_flags
 from perfkitbenchmarker.providers.azure import util
 import requests
 
@@ -57,31 +58,6 @@ DATABRICKS_CONF_FILE = '.databrickscfg'
 HTTP_TIMEOUT_SECONDS = 60
 OPERATION_POLL_INTERVAL_SECONDS = 5
 OPERATION_TIMEOUT_SECONDS = 600
-
-LAKEBASE_PROJECT_ID = flags.DEFINE_string(
-    'lakebase_project_id',
-    None,
-    'Custom or existing Azure Databricks Lakebase project ID. Defaults to '
-    'pkb-<run_uri>.',
-)
-LAKEBASE_ENDPOINT_ID = flags.DEFINE_string(
-    'lakebase_endpoint_id',
-    None,
-    'Optional Lakebase compute endpoint ID.',
-)
-LAKEBASE_MIN_CU = flags.DEFINE_float(
-    'lakebase_min_cu',
-    None,
-    'Minimum compute capacity in Lakebase Compute Units (CU). One CU has ~2 '
-    'GiB of RAM. If only one of lakebase_min_cu or lakebase_max_cu is '
-    'specified, both are set to the same value.',
-)
-LAKEBASE_MAX_CU = flags.DEFINE_float(
-    'lakebase_max_cu',
-    None,
-    'Maximum compute capacity in Lakebase Compute Units (CU). One CU has ~2 '
-    'GiB of RAM. Must satisfy max_cu - min_cu <= 16.',
-)
 
 _NONE_OK = {'default': None, 'none_ok': True}
 # JSON fields whose values must never be logged.
@@ -138,10 +114,10 @@ class AzureDatabricksLakebaseSpec(relational_db_spec.RelationalDbSpec):
     """Modifies config options based on runtime flag values."""
     super()._ApplyFlags(config_values, flag_values)
     for flag_name in (
-        'lakebase_project_id',
-        'lakebase_endpoint_id',
-        'lakebase_min_cu',
-        'lakebase_max_cu',
+        azure_flags.LAKEBASE_PROJECT_ID.name,
+        azure_flags.LAKEBASE_ENDPOINT_ID.name,
+        azure_flags.LAKEBASE_MIN_CU.name,
+        azure_flags.LAKEBASE_MAX_CU.name,
     ):
       if flag_values[flag_name].present:
         config_values[flag_name] = flag_values[flag_name].value
