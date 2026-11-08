@@ -495,6 +495,22 @@ GCE_PROVISIONING_MODEL = flags.DEFINE_enum(
     'Provisioning model for GCE VM instances.',
 )
 
+GCE_MAX_RUN_DURATION = flags.DEFINE_integer(
+    'gce_max_run_duration',
+    None,
+    'Maximum lifetime of each GCE VM instance in seconds, enforced by GCE '
+    'independently of PKB. When it elapses, GCE applies '
+    '--gce_instance_termination_action. GCE accepts it only at creation.',
+    lower_bound=30,
+)
+
+GCE_INSTANCE_TERMINATION_ACTION = flags.DEFINE_enum(
+    'gce_instance_termination_action',
+    'DELETE',
+    ['DELETE', 'STOP'],
+    'What GCE does to an instance when --gce_max_run_duration elapses.',
+)
+
 # Flags required by dataflow_template provider
 flags.DEFINE_string(
     'dpb_dataflow_template_gcs_location',

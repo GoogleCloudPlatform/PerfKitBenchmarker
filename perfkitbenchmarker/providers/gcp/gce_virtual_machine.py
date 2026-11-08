@@ -920,6 +920,12 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     if gcp_flags.GCE_PROVISIONING_MODEL.value:
       cmd.flags['provisioning-model'] = gcp_flags.GCE_PROVISIONING_MODEL.value
 
+    if gcp_flags.GCE_MAX_RUN_DURATION.value:
+      cmd.flags['max-run-duration'] = f'{gcp_flags.GCE_MAX_RUN_DURATION.value}s'
+      cmd.flags['instance-termination-action'] = (
+          gcp_flags.GCE_INSTANCE_TERMINATION_ACTION.value
+      )
+
     cmd.flags['labels'] = util.MakeFormattedDefaultTags()
 
     return cmd
@@ -1374,6 +1380,12 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     if gcp_flags.GCE_PROVISIONING_MODEL.value:
       result['provisioning_model'] = gcp_flags.GCE_PROVISIONING_MODEL.value
+
+    if gcp_flags.GCE_MAX_RUN_DURATION.value:
+      result['max_run_duration'] = gcp_flags.GCE_MAX_RUN_DURATION.value
+      result['instance_termination_action'] = (
+          gcp_flags.GCE_INSTANCE_TERMINATION_ACTION.value
+      )
 
     return result
 
