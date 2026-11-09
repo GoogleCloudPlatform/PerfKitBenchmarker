@@ -121,6 +121,11 @@ AZURE_NIC_COUNT = flags.DEFINE_integer(
     'Number of NICs to attach to the VM. Defaults to 1. Flag azure_subnet_id'
     ' must be None if greater than 1.',
 )
+AZURE_NIC_MTU = flags.DEFINE_integer(
+    'azure_nic_mtu',
+    None,
+    'MTU to configure on VM network interfaces (in bytes).',
+)
 AZURE_SUBNET_ID = flags.DEFINE_string(
     'azure_subnet_id',
     None,

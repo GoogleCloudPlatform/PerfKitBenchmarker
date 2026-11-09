@@ -626,8 +626,8 @@ fio_remote_ssd_max_iops:
   name: fio
   flags:
     fio_generate_scenarios: rand_8k_read_100%,rand_8k_write_100%
-    fio_io_depths: 256
-    fio_num_jobs: 16
+    fio_io_depths: 128
+    fio_num_jobs: 32
     fio_runtime: 300
     fio_target_mode: against_device_without_fill
   vm_groups:

@@ -242,6 +242,7 @@ class AzureVmSpec(virtual_machine_spec.BaseVmSpec):
     boot_disk_size: None or int. The size of the boot disk in GB.
     boot_disk_type: string or None. The type of the boot disk.
     low_priority: boolean. True if the VM should be low-priority, else False.
+    nic_mtu: int | None. MTU in bytes to configure on VM network interfaces.
   """
 
   CLOUD = provider_info.AZURE
@@ -250,6 +251,7 @@ class AzureVmSpec(virtual_machine_spec.BaseVmSpec):
     self.boot_disk_type: str | None = None
     super().__init__(*args, **kwargs)
     self.low_priority: bool
+    self.nic_mtu: int | None
     if isinstance(
         self.machine_type,
         custom_virtual_machine_spec.AzurePerformanceTierSpec,
@@ -288,6 +290,8 @@ class AzureVmSpec(virtual_machine_spec.BaseVmSpec):
       )
     if flag_values['azure_low_priority_vms'].present:
       config_values['low_priority'] = flag_values.azure_low_priority_vms
+    if flag_values['azure_nic_mtu'].present:
+      config_values['nic_mtu'] = flag_values.azure_nic_mtu
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -311,6 +315,7 @@ class AzureVmSpec(virtual_machine_spec.BaseVmSpec):
         'boot_disk_size': (option_decoders.IntDecoder, {'default': None}),
         'boot_disk_type': (option_decoders.StringDecoder, {'default': None}),
         'low_priority': (option_decoders.BooleanDecoder, {'default': False}),
+        'nic_mtu': (option_decoders.IntDecoder, {'default': None}),
     })
     return result
 
@@ -755,6 +760,7 @@ class AzureVirtualMachine(
   low_priority: bool
   low_priority_status_code: int | None
   spot_early_termination: bool
+  nic_mtu: int | None
 
   def __init__(self, vm_spec):
     """Initialize an Azure virtual machine.
@@ -774,6 +780,7 @@ class AzureVirtualMachine(
     self.availability_zone = util.GetAvailabilityZoneFromZone(self.zone)
     self.use_dedicated_host = vm_spec.use_dedicated_host
     self.num_vms_per_host = vm_spec.num_vms_per_host
+    self.nic_mtu = vm_spec.nic_mtu
     self.network = azure_network.AzureNetwork.GetNetwork(vm_spec)
     self.firewall = azure_network.AzureFirewall.GetFirewall()
     if azure_disk.HasTempDrive(self.machine_type):
@@ -1239,6 +1246,29 @@ class AzureVirtualMachine(
     """Set up all scratch disks of the current VM."""
     self.create_disk_strategy.GetSetupDiskStrategy().SetUpDisk()
 
+  def _ConfigureNetworkMtu(self) -> None:
+    """Configures MTU on Azure Linux VM network interfaces."""
+    if self.nic_mtu is None:
+      return
+    if not isinstance(self, linux_virtual_machine.BaseLinuxMixin):
+      raise NotImplementedError(
+          'Configuring nic_mtu is only supported on Linux VMs.'
+      )
+    mtu_paths = ' '.join(
+        f'/sys/class/net/eth{i}/mtu' for i in range(max(len(self.nics), 1))
+    )
+    self.RemoteCommand(f'echo {self.nic_mtu} | sudo tee {mtu_paths}')
+    # Invalidates the cached network device MTUs.
+    self._network_device_mtus = None
+
+  def PrepareVMEnvironment(self):
+    super().PrepareVMEnvironment()
+    self._ConfigureNetworkMtu()
+
+  def _AfterReboot(self):
+    self._ConfigureNetworkMtu()
+    super()._AfterReboot()
+
   def SetDiskSpec(self, disk_spec, disk_count):
     """Sets Disk Specs of the current VM. Calls before the VM is created."""
     self.create_disk_strategy = azure_disk_strategies.GetCreateDiskStrategy(
@@ -1309,6 +1339,8 @@ class AzureVirtualMachine(
     result['preemptible'] = self.low_priority
     if self.use_dedicated_host:
       result['num_vms_per_host'] = self.num_vms_per_host
+    if self.nic_mtu is not None:
+      result['nic_mtu'] = self.nic_mtu
     return result
 
   def _UpdateInterruptibleVmStatusThroughMetadataService(self):
