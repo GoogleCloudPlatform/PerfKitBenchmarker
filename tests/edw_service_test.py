@@ -15,12 +15,16 @@
 
 import builtins
 import copy
+import json
+from typing import Any
 import unittest
 from unittest import mock
 from absl import flags
 from absl.testing import flagsaver
 from absl.testing import parameterized
+from perfkitbenchmarker import edw_ai_extract_lib
 from perfkitbenchmarker import edw_service
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
 from tests import pkb_common_test_case
 
@@ -288,6 +292,194 @@ class EdwServiceTest(pkb_common_test_case.PkbCommonTestCase):
     # Act / Assert
     with self.assertRaises(RuntimeError):
       client.TryExecuteQuery('test_query')
+
+  def testGetAiExtractClientInterfaceUnsupportedService(self) -> None:
+    spec = benchmark_config_spec._EdwServiceSpec(
+        'NAME', db=_PKB_CLUSTER_DATABASE
+    )
+    service = FakeEdwService(spec)
+    with self.assertRaisesRegex(NotImplementedError, 'AI extract'):
+      service.GetAiExtractClientInterface()
+
+
+class _FakeAiExtractSchema:
+  """Minimal schema stub satisfying AiExtractSchema."""
+
+  def NestedTemplate(self) -> dict[str, Any]:
+    return {'name': 'string'}
+
+  def GeminiResponseSchema(self) -> dict[str, Any]:
+    return {'type': 'OBJECT'}
+
+  def SnowflakeResponseFormat(self) -> dict[str, Any]:
+    return {'schema': {'type': 'object'}}
+
+  def SnowflakeResponseToCanonical(
+      self, response: dict[str, Any]
+  ) -> dict[str, Any]:
+    return dict(response)
+
+  def DatabricksSchema(self) -> dict[str, Any]:
+    return {'name': 'string'}
+
+  def DatabricksResponseToCanonical(
+      self, response: dict[str, Any]
+  ) -> dict[str, Any]:
+    return dict(response)
+
+
+class _FakeSqlQueryClient(edw_service.EdwClientInterface):
+  """Fake SQL query client recording executed statements."""
+
+  def __init__(self, fetched_rows: dict[str, list[Any]]):
+    super().__init__()
+    self.client_vm = ClientVm()
+    self.provisioned_with = None
+    self.prepared_with = None
+    self.queries: list[tuple[str, bool]] = []
+    self._fetched_rows = fetched_rows
+
+  def SetProvisionedAttributes(self, benchmark_spec: Any) -> None:
+    self.provisioned_with = benchmark_spec
+
+  def Prepare(self, package_name: str) -> None:
+    self.prepared_with = package_name
+
+  def ExecuteQuery(
+      self, query_name: str, print_results: bool = False
+  ) -> tuple[float, dict[str, Any]]:
+    self.queries.append((query_name, print_results))
+    if query_name.endswith('_extract.sql'):
+      return 12.5, {'query_id': 'qid-extract'}
+    if query_name.endswith('_fetch.sql'):
+      return 1.0, {'query_id': 'qid-fetch', 'query_results': self._fetched_rows}
+    return 0.1, {'query_results': {}}
+
+
+class _FakeSqlAiExtractClient(edw_service.BaseSqlAiExtractClientInterface):
+  """Concrete BaseSqlAiExtractClientInterface for unit testing."""
+
+  system = 'fake_sql'
+  ERROR_KEY = 'error'
+
+  def RenderExtractSql(
+      self,
+      results_table: str,
+      documents: edw_ai_extract_lib.AiExtractDocuments,
+      schema: edw_ai_extract_lib.AiExtractSchema,
+  ) -> str:
+    del schema
+    return f'CREATE TABLE {results_table} AS SELECT {len(documents.doc_ids)};'
+
+  def RenderFetchSql(self, results_table: str) -> str:
+    return f'SELECT DOC_ID, EXTRACTION FROM {results_table};'
+
+  def ResponseToPrediction(
+      self,
+      schema: edw_ai_extract_lib.AiExtractSchema,
+      response: dict[str, Any],
+  ) -> dict[str, Any]:
+    return schema.SnowflakeResponseToCanonical(response)
+
+  def GetMetadata(self) -> dict[str, str]:
+    return {
+        'extract_model': edw_ai_extract_lib.AI_EXTRACT_PLATFORM_DEFAULT_MODEL
+    }
+
+
+class BaseSqlAiExtractClientInterfaceTest(
+    pkb_common_test_case.PkbCommonTestCase
+):
+
+  def setUp(self):
+    super().setUp()
+    self.remote_files: dict[str, str] = {}
+    self.enter_context(
+        mock.patch.object(
+            vm_util,
+            'CreateRemoteFile',
+            autospec=True,
+            side_effect=lambda vm, text, path, write_mode='w': (
+                self.remote_files.__setitem__(path, text)
+            ),
+        )
+    )
+
+  def testDelegatesSetupToQueryClient(self):
+    # Arrange
+    query_client = _FakeSqlQueryClient({})
+    client = _FakeSqlAiExtractClient(query_client, 'run1')
+
+    # Act
+    client.SetProvisionedAttributes('fake_spec')
+    client.Prepare('edw_common')
+
+    # Assert
+    self.assertFalse(client.emits_confidence)
+    self.assertEqual(query_client.provisioned_with, 'fake_spec')
+    self.assertEqual(query_client.prepared_with, 'edw_common')
+
+  def testExtractAndCleanupLifecycle(self):
+    # Arrange
+    rows = {
+        'DOC_ID': ['0001'],
+        'EXTRACTION': [
+            json.dumps({'error': None, 'response': {'name': 'Jane'}})
+        ],
+    }
+    query_client = _FakeSqlQueryClient(rows)
+    client = _FakeSqlAiExtractClient(query_client, 'run1')
+    paystub_docs = edw_ai_extract_lib.AiExtractDocuments(
+        'paystub', 'gs://b/paystub/', {'0001': 'documents/0001.pdf'}
+    )
+    w2_docs = edw_ai_extract_lib.AiExtractDocuments(
+        'w2', 'gs://b/w2/', {'0001': 'documents/0001.pdf'}
+    )
+    schema = _FakeAiExtractSchema()
+
+    # Act
+    first = client.Extract(paystub_docs, schema)
+    client.Extract(paystub_docs, schema)
+    client.Extract(w2_docs, schema)
+    client.Cleanup()
+    client.Cleanup()  # Second call should be a no-op.
+
+    # Assert
+    with self.subTest('extract_result'):
+      self.assertEqual(first.wall_time_sec, 12.5)
+      self.assertEqual(first.usage_metadata, {'query_id': 'qid-extract'})
+      self.assertEqual(first.document_results[0].prediction, {'name': 'Jane'})
+    with self.subTest('executed_queries'):
+      self.assertEqual(
+          query_client.queries,
+          [
+              ('ai_extract_results_run1_paystub_1_extract.sql', False),
+              ('ai_extract_results_run1_paystub_1_fetch.sql', True),
+              ('ai_extract_results_run1_paystub_2_extract.sql', False),
+              ('ai_extract_results_run1_paystub_2_fetch.sql', True),
+              ('ai_extract_results_run1_w2_1_extract.sql', False),
+              ('ai_extract_results_run1_w2_1_fetch.sql', True),
+              ('drop_ai_extract_results_run1_paystub_1.sql', False),
+              ('drop_ai_extract_results_run1_paystub_2.sql', False),
+              ('drop_ai_extract_results_run1_w2_1.sql', False),
+          ],
+      )
+      self.assertEqual(
+          self.remote_files['drop_ai_extract_results_run1_paystub_1.sql'],
+          'DROP TABLE IF EXISTS ai_extract_results_run1_paystub_1;\n',
+      )
+
+  def testExtractChecksCoverage(self):
+    # Arrange
+    query_client = _FakeSqlQueryClient({'DOC_ID': [], 'EXTRACTION': []})
+    client = _FakeSqlAiExtractClient(query_client, 'run1')
+    docs = edw_ai_extract_lib.AiExtractDocuments(
+        'paystub', 'gs://b/paystub/', {'0001': 'documents/0001.pdf'}
+    )
+
+    # Act / Assert
+    with self.assertRaisesRegex(ValueError, "missing=\\['0001'\\]"):
+      client.Extract(docs, _FakeAiExtractSchema())
 
 
 class ConcreteClaudeClientInterface(

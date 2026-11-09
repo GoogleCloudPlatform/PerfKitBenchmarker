@@ -17,6 +17,8 @@ Classes to wrap specific backend services are in the corresponding provider
 directory as a subclass of BaseEdwService.
 """
 
+import abc
+import collections
 import csv
 import dataclasses
 import datetime
@@ -30,6 +32,7 @@ from typing import Any, Dict, List
 from absl import flags
 from absl import logging
 from perfkitbenchmarker import data
+from perfkitbenchmarker import edw_ai_extract_lib
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
@@ -703,6 +706,169 @@ class BaseClaudeConversationalAnalyticsClientInterface(
     return execution_time, metadata
 
 
+class EdwAiExtractClientInterface(abc.ABC):
+  """Client running AI (entity) extraction over documents on an EDW service.
+
+  An AI extract client builds the platform's extraction request for a set of
+  documents and a schema, runs it, and converts the platform output into one
+  edw_ai_extract_lib.AiExtractDocumentResult per document.
+
+  Attributes:
+    system: Identifier of the extraction system, recorded in results.
+    emits_confidence: Whether document results carry confidence labels.
+  """
+
+  system: str
+  emits_confidence: bool
+
+  @abc.abstractmethod
+  def SetProvisionedAttributes(self, benchmark_spec: Any) -> None:
+    """Set attributes that were unknown during initialization (client VM)."""
+
+  @abc.abstractmethod
+  def Prepare(self, package_name: str) -> None:
+    """Prepare the client VM to run extraction.
+
+    Args:
+      package_name: Name of the package defining the preprovisioned data
+        (credentials, etc.) to install on the client VM.
+    """
+
+  @abc.abstractmethod
+  def Extract(
+      self,
+      documents: edw_ai_extract_lib.AiExtractDocuments,
+      schema: edw_ai_extract_lib.AiExtractSchema,
+  ) -> edw_ai_extract_lib.AiExtractResult:
+    """Extract ``schema`` from every document of ``documents``."""
+
+  @abc.abstractmethod
+  def GetMetadata(self) -> dict[str, str]:
+    """Return model identifiers and extraction settings."""
+
+  def Cleanup(self) -> None:
+    """Drop temporary resources created by Extract."""
+
+
+class BaseSqlAiExtractClientInterface(EdwAiExtractClientInterface):
+  """AI extract through SQL: a timed CREATE TABLE AS, then a separate fetch.
+
+  Composes the service's Python query client, which runs the statements and
+  reports query IDs and query results. Result tables are dropped on Cleanup.
+  """
+
+  emits_confidence = False
+  # Name of the platform's per-row error member in the extraction result.
+  ERROR_KEY: str
+
+  def __init__(self, query_client: EdwClientInterface, run_uri: str):
+    self.query_client = query_client
+    self._run_uri = run_uri
+    self._tables: list[str] = []
+    self._extract_counts: collections.Counter[str] = collections.Counter()
+
+  def SetProvisionedAttributes(self, benchmark_spec: Any) -> None:
+    self.query_client.SetProvisionedAttributes(benchmark_spec)
+
+  def Prepare(self, package_name: str) -> None:
+    self.query_client.Prepare(package_name)
+
+  @abc.abstractmethod
+  def RenderExtractSql(
+      self,
+      results_table: str,
+      documents: edw_ai_extract_lib.AiExtractDocuments,
+      schema: edw_ai_extract_lib.AiExtractSchema,
+  ) -> str:
+    """Render the timed SQL statement that runs entity extraction.
+
+    The statement extracts ``schema`` from every document in ``documents``
+    and materializes one row per document into ``results_table`` (e.g. via
+    ``CREATE TABLE <results_table> AS SELECT ...``).
+    """
+
+  @abc.abstractmethod
+  def RenderFetchSql(self, results_table: str) -> str:
+    """Render the SQL query that fetches rows from ``results_table``.
+
+    Executed separately after ``RenderExtractSql`` so result serialization and
+    download are excluded from extraction wall time. Must return uppercase
+    ``DOC_ID`` and JSON-serialized ``EXTRACTION`` columns for
+    ``edw_ai_extract_lib.ParseAiExtractRows``.
+    """
+
+  @abc.abstractmethod
+  def ResponseToPrediction(
+      self,
+      schema: edw_ai_extract_lib.AiExtractSchema,
+      response: dict[str, Any],
+  ) -> dict[str, Any]:
+    """Convert the platform's native response object to a prediction."""
+
+  def _RunSql(
+      self, name: str, sql: str, print_results: bool
+  ) -> tuple[float, dict[str, Any]]:
+    logging.info('Running %s:\n%s', name, sql[:4000])
+    vm_util.CreateRemoteFile(self.query_client.client_vm, sql, name)
+    return self.query_client.ExecuteQuery(name, print_results=print_results)
+
+  def _NextTable(self, dataset_id: str) -> str:
+    """Allocate ``ai_extract_results_<run_uri>_<dataset_id>_<n>``.
+
+    ``n`` counts Extract calls per dataset, i.e. it is the iteration number
+    when each iteration extracts each dataset once.
+
+    Args:
+      dataset_id: Dataset of the documents to extract.
+
+    Returns:
+      The results table name.
+    """
+    self._extract_counts[dataset_id] += 1
+    table = (
+        f'ai_extract_results_{self._run_uri}_{dataset_id}'
+        f'_{self._extract_counts[dataset_id]}'
+    )
+    self._tables.append(table)
+    return table
+
+  def Extract(
+      self,
+      documents: edw_ai_extract_lib.AiExtractDocuments,
+      schema: edw_ai_extract_lib.AiExtractSchema,
+  ) -> edw_ai_extract_lib.AiExtractResult:
+    table = self._NextTable(documents.dataset_id)
+    wall_time, details = self._RunSql(
+        f'{table}_extract.sql',
+        self.RenderExtractSql(table, documents, schema),
+        print_results=False,
+    )
+    _, fetched = self._RunSql(
+        f'{table}_fetch.sql', self.RenderFetchSql(table), print_results=True
+    )
+    results = edw_ai_extract_lib.ParseAiExtractRows(
+        fetched['query_results'],
+        lambda response: self.ResponseToPrediction(schema, response),
+        self.ERROR_KEY,
+    )
+    edw_ai_extract_lib.CheckAiExtractCoverage(results, documents.doc_ids)
+    return edw_ai_extract_lib.AiExtractResult(
+        wall_time_sec=wall_time,
+        document_results=results,
+        usage_metadata={'query_id': details['query_id']},
+        extra_metrics=[],
+    )
+
+  def Cleanup(self) -> None:
+    while self._tables:
+      table = self._tables.pop(0)
+      self._RunSql(
+          f'drop_{table}.sql',
+          f'DROP TABLE IF EXISTS {table};\n',
+          print_results=False,
+      )
+
+
 class EdwService(resource.BaseResource):
   """Object representing a EDW Service."""
 
@@ -1192,6 +1358,10 @@ class EdwService(resource.BaseResource):
     raise NotImplementedError(
         'Conversational Analytics is not supported for this service.'
     )
+
+  def GetAiExtractClientInterface(self) -> EdwAiExtractClientInterface:
+    """Return a new AI extract client interface for this service."""
+    raise NotImplementedError('AI extract is not supported for this service.')
 
   @staticmethod
   def ColsToRows(col_res: dict[str, list[Any]]) -> list[dict[str, Any]]:
