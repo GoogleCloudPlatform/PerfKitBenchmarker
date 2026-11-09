@@ -14,6 +14,7 @@
 
 import inspect
 import os
+import shlex
 from typing import Any
 import unittest
 from unittest import mock
@@ -205,6 +206,9 @@ class AzureDatabricksLakebaseTest(pkb_common_test_case.PkbCommonTestCase):
       ('FromExplicitRange', 8.0, 16.0, 8.0, 16.0, '8-16CU'),
       ('FractionalMinAndMax', 0.5, 0.5, 0.5, 0.5, '0.5CU'),
       ('FractionalMinRange', 0.5, 4.0, 0.5, 4.0, '0.5-4CU'),
+      ('MaxAutoscalingRange', 48.0, 64.0, 48.0, 64.0, '48-64CU'),
+      ('MaxFixedSize', 112.0, 112.0, 112.0, 112.0, '112CU'),
+      ('FixedSizeFromExplicitMinOnly', 112.0, None, 112.0, 112.0, '112CU'),
   )
   @flagsaver.flagsaver
   def testResolveComputeUnits(
@@ -372,6 +376,8 @@ class AzureDatabricksLakebaseTest(pkb_common_test_case.PkbCommonTestCase):
       ('MaxLessThanMin', 16.0, 8.0),
       ('SpreadExceeds16', 8.0, 32.0),
       ('ExceedsMax64', 64.0, 72.0),
+      ('AutoscalingRangeAboveMax64', 100.0, 112.0),
+      ('FixedSizeExceedsMax112', 120.0, 120.0),
   )
   @flagsaver.flagsaver
   def testInvalidComputeUnitsRaisesError(self, min_cu: float, max_cu: float):
@@ -729,6 +735,48 @@ class AzureDatabricksLakebaseTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertIn(
         f'CREATE DATABASE postgres OWNER "{_DUMMY_DB_USERNAME}"', db_cmd[0]
     )
+
+  @flagsaver.flagsaver
+  def testApplyDbFlagsAltersNativeRole(self):
+    FLAGS['db_flags'].parse([
+        'maintenance_work_mem=16GB',
+        'max_parallel_maintenance_workers=28',
+        'max_parallel_workers=28',
+    ])
+    db = self._CreateDbFromYaml()
+    db.endpoint = 'dummy-host.postgres.database.azure.com'
+    mock_vm = mock.Mock()
+    mock_vm.RemoteCommandWithReturnCode.return_value = ('', '', 0)
+    db.client_vm = mock_vm
+
+    db._ApplyDbFlags()
+
+    mock_vm.Install.assert_called_once_with('postgres_client')
+    mock_vm.RemoteCommandWithReturnCode.assert_called_once()
+    cmd, _ = mock_vm.RemoteCommandWithReturnCode.call_args
+    self.assertIn(f'user={_DUMMY_DB_USERNAME}', cmd[0])
+    self.assertIn(f'password={_DUMMY_DB_PASSWORD}', cmd[0])
+    expected_sql = (
+        f'ALTER ROLE "{_DUMMY_DB_USERNAME}" SET maintenance_work_mem ='
+        " '16GB'; "
+        f'ALTER ROLE "{_DUMMY_DB_USERNAME}" SET'
+        " max_parallel_maintenance_workers = '28'; "
+        f'ALTER ROLE "{_DUMMY_DB_USERNAME}" SET max_parallel_workers = \'28\';'
+    )
+    self.assertIn(shlex.quote(expected_sql), cmd[0])
+
+  @parameterized.named_parameters(
+      ('MissingEquals', ['maintenance_work_mem']),
+      ('InvalidGucName', ['bad-flag;DROP=1']),
+  )
+  @flagsaver.flagsaver
+  def testApplyDbFlagsInvalidEntryRaisesError(self, db_flags: list[str]):
+    FLAGS['db_flags'].parse(db_flags)
+    db = self._CreateDbFromYaml()
+    db.client_vm = mock.Mock()
+
+    with self.assertRaises(errors.Config.InvalidValue):
+      db._ApplyDbFlags()
 
 
 if __name__ == '__main__':

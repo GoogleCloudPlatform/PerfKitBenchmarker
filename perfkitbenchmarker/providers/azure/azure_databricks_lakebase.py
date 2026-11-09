@@ -22,6 +22,7 @@ import configparser
 import json
 import logging
 import os
+import re
 import shlex
 import time
 from typing import Any
@@ -48,6 +49,7 @@ DEFAULT_LAKEBASE_CU = 2.0
 MEMORY_MIB_PER_CU = 2048
 MIN_AUTOSCALING_CU = 0.5
 MAX_AUTOSCALING_CU = 64.0
+MAX_FIXED_SIZE_CU = 112.0
 MAX_AUTOSCALING_CU_SPREAD = 16.0
 
 DEFAULT_BRANCH_ID = 'production'
@@ -180,10 +182,13 @@ class AzureDatabricksLakebase(relational_db.BaseRelationalDb):
     else:
       min_cu = max_cu = DEFAULT_LAKEBASE_CU
 
-    if not (MIN_AUTOSCALING_CU <= min_cu <= max_cu <= MAX_AUTOSCALING_CU):
+    max_cu_limit = MAX_FIXED_SIZE_CU if min_cu == max_cu else MAX_AUTOSCALING_CU
+    if not (MIN_AUTOSCALING_CU <= min_cu <= max_cu <= max_cu_limit):
       raise errors.Config.InvalidValue(
           f'Lakebase compute units must satisfy {MIN_AUTOSCALING_CU} <= '
-          f'lakebase_min_cu <= lakebase_max_cu <= {MAX_AUTOSCALING_CU}; got '
+          f'lakebase_min_cu <= lakebase_max_cu <= {MAX_AUTOSCALING_CU} for '
+          'autoscaling computes, or lakebase_min_cu == lakebase_max_cu <= '
+          f'{MAX_FIXED_SIZE_CU} for fixed-size computes; got '
           f'min_cu={min_cu}, max_cu={max_cu}.'
       )
     if (max_cu - min_cu) > MAX_AUTOSCALING_CU_SPREAD:
@@ -609,10 +614,52 @@ class AzureDatabricksLakebase(relational_db.BaseRelationalDb):
           f'Failed to create default postgres database on Lakebase: {stderr}'
       )
 
+  def _ApplyDbFlags(self) -> None:
+    """Applies PostgreSQL GUC flags on the native benchmark role."""
+    if not self.spec.db_flags:
+      return
+    target_user = self.spec.database_username
+    target_password = self.spec.database_password
+    escaped_ident = target_user.replace('"', '""')
+
+    statements = []
+    for flag in self.spec.db_flags:
+      if '=' not in flag:
+        raise errors.Config.InvalidValue(
+            f'Invalid Lakebase db_flags entry {flag!r}; expected key=value.'
+        )
+      name, value = flag.split('=', 1)
+      name = name.strip()
+      value = value.strip()
+      if not name or not re.fullmatch(r'[A-Za-z_][A-Za-z0-9_.]*', name):
+        raise errors.Config.InvalidValue(
+            f'Invalid PostgreSQL GUC name {name!r} in db_flags entry {flag!r}.'
+        )
+      escaped_val = value.replace("'", "''")
+      statements.append(
+          f'ALTER ROLE "{escaped_ident}" SET {name} = \'{escaped_val}\';'
+      )
+
+    self.client_vm.Install('postgres_client')
+    conn_info = shlex.quote(
+        f'host={self.endpoint} port={self.port} '
+        f'user={target_user} password={target_password} '
+        'dbname=postgres sslmode=require'
+    )
+    alter_sql = ' '.join(statements)
+    _, stderr, retcode = self.client_vm.RemoteCommandWithReturnCode(
+        f'psql {conn_info} -v ON_ERROR_STOP=1 -c {shlex.quote(alter_sql)}',
+        ignore_failure=True,
+    )
+    if retcode != 0:
+      raise errors.Resource.CreationError(
+          f'Failed to apply db_flags on Lakebase role {target_user}: {stderr}'
+      )
+
   def _PostCreate(self) -> None:
     """Performs post-creation role and client setup for Lakebase."""
-    super()._PostCreate()
     self._ConfigureNativeDatabaseRole()
+    super()._PostCreate()
 
   def GetResourceMetadata(self) -> dict[str, Any]:
     """Returns metadata associated with the Azure Databricks Lakebase resource."""
