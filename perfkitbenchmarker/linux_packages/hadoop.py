@@ -40,9 +40,8 @@ FLAGS = flags.FLAGS
 
 _VERSION = flags.DEFINE_string(
     'hadoop_version',
-    '3.4.1',
-    'Version of Hadoop. Default is 3.4.1 to get around'
-    ' https://issues.apache.org/jira/projects/INFRA/issues/INFRA-27182.',
+    None,
+    'Version of Hadoop. Defaults to latest. Can be a version prefix like 3.4.',
 )
 _URL_OVERRIDE = flags.DEFINE_string(
     'hadoop_bin_url', None, 'Specify to override url from HADOOP_URL_BASE.'
@@ -108,8 +107,7 @@ DATA_FILES = [
 START_HADOOP_SCRIPT = 'hadoop/start-hadoop.sh.j2'
 
 HADOOP_URL_BASE = 'https://dlcdn.apache.org/hadoop/common'
-HADOOP_STABLE_URL = HADOOP_URL_BASE + '/stable'
-HADOOP_TAR_PATTERN = re.compile(r'hadoop-([0-9.]+)\.t(ar\.)?gz')
+HADOOP_VERSION_DIR_PATTERN = re.compile(r'hadoop-([0-9.]+)/')
 
 HADOOP_DIR = posixpath.join(linux_packages.INSTALL_DIR, 'hadoop')
 HADOOP_BIN = posixpath.join(HADOOP_DIR, 'bin')
@@ -127,8 +125,11 @@ YARN_CMD = posixpath.join(HADOOP_BIN, 'yarn')
 @functools.lru_cache()
 def HadoopVersion() -> version.Version:
   """Get provided or latest stable HadoopVersion."""
+  requested_version = None
   if _VERSION.value:
-    return version.Version(_VERSION.value)
+    requested_version = version.Version(str(_VERSION.value))
+    if len(requested_version.release) >= 3:
+      return requested_version
   if _URL_OVERRIDE.value:
     extracted_version = re.search(
         r'[0-9]+\.[0-9]+\.[0-9]+', _URL_OVERRIDE.value
@@ -140,20 +141,28 @@ def HadoopVersion() -> version.Version:
           'Cannot parse version out of --hadoop_bin_url please pass '
           '--hadoop_version as well.'
       )
-  response = requests.get(HADOOP_STABLE_URL)
+  response = requests.get(HADOOP_URL_BASE)
   if not response.ok:
     raise errors.Setup.MissingExecutableError(
-        'Could not load ' + HADOOP_STABLE_URL
+        'Could not load ' + HADOOP_URL_BASE
     )
   soup = bs4.BeautifulSoup(response.content, 'html.parser')
-  link = soup.find('a', href=HADOOP_TAR_PATTERN)
-  if link:
-    match = re.match(HADOOP_TAR_PATTERN, link['href'])  # pyrefly: ignore[bad-index, no-matching-overload]
+  found_versions = []
+  for link in soup.find_all('a', href=HADOOP_VERSION_DIR_PATTERN):
+    match = re.match(HADOOP_VERSION_DIR_PATTERN, link.get('href'))  # pyrefly: ignore[missing-attribute]
     if match:
-      return version.Version(match.group(1))
-  raise errors.Setup.MissingExecutableError(
-      'Could not find valid hadoop version at ' + HADOOP_STABLE_URL
-  )
+      found_version = version.Version(match.group(1))
+      if (
+          requested_version is None
+          or found_version.release[: len(requested_version.release)]
+          == requested_version.release
+      ):
+        found_versions.append(found_version)
+  if not found_versions:
+    raise errors.Setup.MissingExecutableError(
+        'Could not find valid hadoop versions at ' + HADOOP_URL_BASE
+    )
+  return max(found_versions)
 
 
 def _GetHadoopURL():

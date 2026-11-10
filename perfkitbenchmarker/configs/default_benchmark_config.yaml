@@ -415,9 +415,9 @@ sparksql_tpcds_1t_tuned: &sparksql_tpcds_1t_tuned
     dpb_export_job_stats: True
     hadoop_hdfs_client_readahead: 0
     hadoop_hdfs_replication: 1
-    hadoop_version: 3.4.2
+    hadoop_version: '3.4'
     openjdk_version: 17
-    spark_version: 3.5.8
+    spark_version: '3.5'
     sparksql_readahead_kb: 1024
   dpb_service:
     service_type: unmanaged_spark_cluster
@@ -443,10 +443,10 @@ sparksql_tpcds_1t_tuned_2026:
   <<: *sparksql_tpcds_1t_tuned
   flags:
     <<: *sparksql_tpcds_1t_tuned_flags
-    hadoop_version: 3.5.0
+    hadoop_version: '3.5'
     # Spark 4.2 supports Java 25, but Hadoop 3.5 does not.
     openjdk_version: 21
-    spark_version: 4.2.1
+    spark_version: '4.2'
 
 sysbench_oltp_base: &sysbench_oltp_base
   sysbench_table_size: 50000000
@@ -721,7 +721,7 @@ hadoop_dfsio:
     hadoop_hdfs_replication: 1
     hadoop_map_slots_per_core: 1
     hadoop_reduce_slots_per_core: 1
-    hadoop_version: 3.4.1
+    hadoop_version: '3.4'
     num_cpus_override: 16
     openjdk_version: 11
     yarn_scheduler: org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CapacityScheduler

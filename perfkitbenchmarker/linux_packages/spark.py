@@ -39,7 +39,9 @@ import requests
 FLAGS = flags.FLAGS
 
 _SPARK_VERSION_FLAG = flags.DEFINE_string(
-    'spark_version', None, 'Version of spark. Defaults to latest.'
+    'spark_version',
+    None,
+    'Version of spark. Defaults to latest. Can be a version prefix like 3.5.',
 )
 
 _SHUFFLE_PARTITIONS = flags.DEFINE_integer(
@@ -71,8 +73,11 @@ SPARK_SUBMIT = posixpath.join(SPARK_BIN, 'spark-submit')
 @functools.lru_cache()
 def SparkVersion() -> version.Version:
   """Get passed Spark version or latest available."""
+  requested_version = None
   if _SPARK_VERSION_FLAG.value:
-    return version.Version(_SPARK_VERSION_FLAG.value)
+    requested_version = version.Version(_SPARK_VERSION_FLAG.value)
+    if len(requested_version.release) >= 3:
+      return requested_version
   # Find latest version
   # N.B. requests handles a redirect from spark to spark/.
   response = requests.get(SPARK_DOWNLOADS)
@@ -85,7 +90,13 @@ def SparkVersion() -> version.Version:
   for link in soup.find_all('a', href=SPARK_VERSION_DIR_PATTERN):
     match = re.match(SPARK_VERSION_DIR_PATTERN, link.get('href'))  # pyrefly: ignore[missing-attribute]
     if match:
-      found_versions.append(version.Version(match.group(1)))
+      found_version = version.Version(match.group(1))
+      if (
+          requested_version is None
+          or found_version.release[: len(requested_version.release)]
+          == requested_version.release
+      ):
+        found_versions.append(found_version)
   if not found_versions:
     raise errors.Setup.MissingExecutableError(
         'Could not find valid spark versions at ' + SPARK_DOWNLOADS
