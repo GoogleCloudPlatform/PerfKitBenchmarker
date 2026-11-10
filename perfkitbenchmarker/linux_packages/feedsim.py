@@ -43,17 +43,22 @@ def Run(server: virtual_machine.BaseVirtualMachine) -> list[sample.Sample]:
   output, _ = server.RobustRemoteCommand(
       f'cd {dcperf.DCPERF_DIR} && sudo ./benchpress_cli.py run {job}'
   )
-  report = output.rpartition('Results Report:')[2].strip().splitlines()[0]
-  metrics = json.loads(report)['metrics']
+  report = json.loads(
+      output.rpartition('Results Report:')[2].strip().splitlines()[0]
+  )
+  metrics = report['metrics']
   if metrics['successful_instances'] != int(metrics['spawned_instances']):
     raise errors.Benchmarks.RunError(f'FeedSim instances failed: {metrics}')
   if not metrics['score']:
     raise errors.Benchmarks.RunError(f'FeedSim reported no score: {metrics}')
   overall = metrics['overall']
   metadata = {
+      'dcperf_job': report['benchmark_name'],
+      'dcperf_version': dcperf.DCPERF_VERSION.value,
+      'dcperf_benchmark_args': ' '.join(report['benchmark_args']),
       'target_percentile': metrics['target_percentile'],
       'target_latency_msec': metrics['target_latency_msec'],
-  }
+  } | {f'dcperf_{k}': v for k, v in report['machines'][0].items()}
   return [
       sample.Sample('qps', overall['final_achieved_qps'], 'qps', metadata),
       sample.Sample('latency', overall['average_latency_msec'], 'ms', metadata),
