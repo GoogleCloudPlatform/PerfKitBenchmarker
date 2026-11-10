@@ -13,7 +13,9 @@
 # limitations under the License.
 """Common base class for PKB unittests."""
 
+import multiprocessing
 import pathlib
+import platform
 from typing import Any, Dict
 
 from absl import flags
@@ -40,6 +42,16 @@ from tests import mock_command
 
 FLAGS = flags.FLAGS
 FLAGS.mark_as_parsed()
+
+# Fix multiprocessing on macOS to use 'fork' instead of 'spawn' so that
+# mock.patch()'d state in a test process is visible to any
+# multiprocessing.Process children it starts. Same root cause as issue
+# #5883 / PR #6055, which applied this fix in pkb.py's Main() for real
+# benchmark runs; the unit test suite never calls Main(), so tests that
+# exercise multiprocessing-based code (e.g. throughput_load_driver_test.py)
+# still hit it without this. See issue #7243.
+if platform.system() == 'Darwin':
+  multiprocessing.set_start_method('fork', force=True)
 
 
 # Tests Docker and IB filtered out and having multiple eth with same MTU
