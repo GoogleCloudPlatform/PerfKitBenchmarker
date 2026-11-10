@@ -835,6 +835,102 @@ class TestRunBenchmarks(pkb_common_test_case.PkbCommonTestCase):
         ['c4-standard-16', 'n4-standard-16'],
     )
 
+  def testGetMachineTypesSkipsNonStringFromVmGroups(self):
+    yaml_config = textwrap.dedent("""
+        cluster_boot:
+          vm_groups:
+            custom:
+              vm_spec:
+                GCP:
+                  machine_type:
+                    cpus: 4
+                    memory: 8GiB
+                  zone: us-east5-b
+            client:
+              vm_spec:
+                GCP:
+                  machine_type: n4-standard-16
+                  zone: us-east5-b
+          container_cluster:
+            cloud: GCP
+            type: Kubernetes
+            vm_count: 1
+            vm_spec:
+              GCP:
+                machine_type: c4-standard-16
+                zone: us-east5-b
+        """)
+    test_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
+        yaml_config, 'cluster_boot'
+    )
+    self.assertEqual(
+        pkb._GetMachineTypes(test_spec),
+        ['c4-standard-16', 'n4-standard-16'],
+    )
+
+  def testGetMachineTypesAllCustomReturnsEmpty(self):
+    yaml_config = textwrap.dedent("""
+        cluster_boot:
+          vm_groups:
+            custom:
+              vm_spec:
+                GCP:
+                  machine_type:
+                    cpus: 4
+                    memory: 8GiB
+                  zone: us-east5-b
+        """)
+    test_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
+        yaml_config, 'cluster_boot'
+    )
+    self.assertEqual(pkb._GetMachineTypes(test_spec), [])
+
+  @flagsaver.flagsaver(zone=['zone_1'], smart_capacity_retry=True, retries=1)
+  def testSmartCapacityRetryWithoutMachineTypesUsesAllZones(self):
+    test_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml()
+    test_spec.failed_substatus = (
+        benchmark_status.FailedSubstatus.INSUFFICIENT_CAPACITY
+    )
+    self._MockLoadProviderUtils(gcp_utils)
+    self._MockGcpUtils('GetRegionFromZone', return_value='region_1')
+    self._MockGcpUtils('GetZonesInRegion', return_value={'zone_1', 'zone_2'})
+    mock_get_all_zones = self._MockGcpUtils(
+        'GetAllZones', return_value={'zone_1', 'zone_2'}
+    )
+
+    test_retry_manager = pkb.ZoneRetryManager([])
+    test_retry_manager.HandleSmartRetries(test_spec)
+
+    mock_get_all_zones.assert_called_once()
+    self.assertEqual(test_retry_manager._zones_tried, {'zone_1'})
+    self.assertEqual(FLAGS.zone, ['zone_2'])
+
+  def testRunBenchmarkTaskWithNoneAndStrMachineTypes(self):
+    yaml_config = textwrap.dedent("""
+        cluster_boot:
+          vm_groups:
+            custom:
+              vm_spec:
+                GCP:
+                  machine_type:
+                    cpus: 4
+                    memory: 8GiB
+                  zone: us-east5-b
+            standard:
+              vm_spec:
+                GCP:
+                  machine_type: n4-standard-16
+                  zone: us-east5-b
+        """)
+    test_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
+        yaml_config, 'cluster_boot'
+    )
+    self.enter_context(mock.patch.object(pkb, 'RunBenchmark'))
+
+    benchmark_specs, _ = pkb.RunBenchmarkTask(spec=test_spec)
+
+    self.assertLen(benchmark_specs, 1)
+
   @parameterized.named_parameters(('ZonesFlag', 'zones'), ('ZoneFlag', 'zone'))
   @flagsaver.flagsaver()
   def testConstructContainerClusterUpdatesZoneFromFlags(self, zone_flag):

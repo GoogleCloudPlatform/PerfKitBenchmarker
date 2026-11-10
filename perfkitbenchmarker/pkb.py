@@ -1391,7 +1391,8 @@ def _GetMachineTypes(spec: bm_spec.BenchmarkSpec) -> list[str]:
     return [FLAGS.machine_type]
   results = set()
   for vm_group_spec in spec.vms_to_boot.values():
-    results.add(vm_group_spec.vm_spec.machine_type)
+    if isinstance(vm_group_spec.vm_spec.machine_type, str):
+      results.add(vm_group_spec.vm_spec.machine_type)
   cluster_spec = spec.config.container_cluster
   if cluster_spec:
     if isinstance(cluster_spec.vm_spec.machine_type, str):
@@ -1542,13 +1543,16 @@ class ZoneRetryManager:
   def _SetOriginalZoneAndFlag(self) -> None:
     """Records the flag name and zone value that the benchmark started with."""
     # This is guaranteed to set values due to flag validator.
-    self._supported_zones = self._utils.GetZonesFromMachineType(
-        self._machine_types[0]
-    )
-    for machine_type in self._machine_types[1:]:
-      self._supported_zones.intersection_update(
-          self._utils.GetZonesFromMachineType(machine_type)
+    if self._machine_types:
+      self._supported_zones = self._utils.GetZonesFromMachineType(
+          self._machine_types[0]
       )
+      for machine_type in self._machine_types[1:]:
+        self._supported_zones.intersection_update(
+            self._utils.GetZonesFromMachineType(machine_type)
+        )
+    else:
+      self._supported_zones = self._utils.GetAllZones()
     if self._is_any_zone:
       if self.max_retries < 1:
         self.max_retries = len(self._supported_zones)
