@@ -1510,12 +1510,9 @@ class ZoneRetryManager:
   def __init__(self, machine_types: Collection[str]):
     self.max_retries = pkb_flags.MAX_RETRIES.value
     self._is_any_zone = False
-    for zone_flag in ['zone', 'zones']:
-      if FLAGS[zone_flag].value:
-        self._zone_flag = zone_flag
-        if self._GetCurrentZoneFlag() == _ANY_ZONE:
-          self._CheckMachineTypesAreSpecified(machine_types)
-          self._is_any_zone = True
+    if FLAGS['zone'].value and self._GetCurrentZoneFlag() == _ANY_ZONE:
+      self._CheckMachineTypesAreSpecified(machine_types)
+      self._is_any_zone = True
     if (
         not pkb_flags.SMART_CAPACITY_RETRY.value
         and not pkb_flags.SMART_QUOTA_RETRY.value
@@ -1538,7 +1535,7 @@ class ZoneRetryManager:
       )
 
   def _GetCurrentZoneFlag(self):
-    return FLAGS[self._zone_flag].value[0]  # pyrefly: ignore[unsupported-operation]
+    return FLAGS['zone'].value[0]  # pyrefly: ignore[unsupported-operation]
 
   def _SetOriginalZoneAndFlag(self) -> None:
     """Records the flag name and zone value that the benchmark started with."""
@@ -1610,7 +1607,7 @@ class ZoneRetryManager:
     self._ChooseAndSetNewZone(supported_zones_in_region)
 
   def _ChooseAndSetNewZone(self, possible_zones: Set[str]) -> None:
-    """Saves the current _zone_flag and sets it to a new zone.
+    """Saves the current zone flag and sets it to a new zone.
 
     Args:
       possible_zones: The set of zones to choose from.
@@ -1626,8 +1623,8 @@ class ZoneRetryManager:
     else:
       new_zone = random.choice(tuple(zones_to_try))
     logging.info('Retry using new zone %s', new_zone)
-    FLAGS[self._zone_flag].unparse()
-    FLAGS[self._zone_flag].parse([new_zone])
+    FLAGS['zone'].unparse()
+    FLAGS['zone'].parse([new_zone])
 
 
 def _LogCommandLineFlags():

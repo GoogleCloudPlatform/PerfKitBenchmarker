@@ -567,7 +567,7 @@ class TestRunBenchmarks(pkb_common_test_case.PkbCommonTestCase):
       expected_quota_retry_calls,
       expected_capacity_retry_calls,
   ):
-    FLAGS.zones = ['test_zone']
+    FLAGS.zone = ['test_zone']
     FLAGS.cloud = 'GCP'
     FLAGS.retries = retry_count
     FLAGS.smart_quota_retry = quota_flag_value
@@ -780,10 +780,9 @@ class TestRunBenchmarks(pkb_common_test_case.PkbCommonTestCase):
     self.assertFalse(FLAGS.smart_capacity_retry)
     self.assertFalse(FLAGS.smart_quota_retry)
 
-  @parameterized.named_parameters(('ZonesFlag', 'zones'), ('ZoneFlag', 'zone'))
   @flagsaver.flagsaver(retries=2)
-  def testChooseAndSetNewZone(self, zone_flag):
-    FLAGS[zone_flag].parse(['us-west1-a'])
+  def testChooseAndSetNewZone(self):
+    FLAGS['zone'].parse(['us-west1-a'])
     FLAGS.smart_quota_retry = True
     self._MockGcpUtils('GetZonesFromMachineType', return_value=set())
     test_retry_manager = pkb.ZoneRetryManager(test_machine_type)
@@ -791,12 +790,12 @@ class TestRunBenchmarks(pkb_common_test_case.PkbCommonTestCase):
 
     # us-west1-b is chosen.
     test_retry_manager._ChooseAndSetNewZone(possible_zones)
-    self.assertEqual(FLAGS[zone_flag].value[0], 'us-west1-b')  # pyrefly: ignore[unsupported-operation]
+    self.assertEqual(FLAGS['zone'].value[0], 'us-west1-b')  # pyrefly: ignore[unsupported-operation]
     self.assertEqual(test_retry_manager._zones_tried, {'us-west1-a'})
 
     # All possible zones are exhausted so the original zone is used.
     test_retry_manager._ChooseAndSetNewZone(possible_zones)
-    self.assertEqual(FLAGS[zone_flag].value[0], 'us-west1-a')  # pyrefly: ignore[unsupported-operation]
+    self.assertEqual(FLAGS['zone'].value[0], 'us-west1-a')  # pyrefly: ignore[unsupported-operation]
     self.assertEmpty(test_retry_manager._zones_tried)
 
   def testGetMachineTypesFromContainerCluster(self):
