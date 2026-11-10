@@ -748,3 +748,6 @@
     never created.
 -   Support smart zone retries and failed cluster cleanup for GKE benchmarks in
     PKB.
+-   Fix `throughput_load_driver_test.py` failing on macOS by forcing the
+    `fork` multiprocessing start method for the test suite, matching the fix
+    already applied to real `pkb.py` runs in PR #6055 (GH-7243).
