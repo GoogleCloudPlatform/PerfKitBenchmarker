@@ -44,7 +44,7 @@ _SELECTIONS = flags.DEFINE_string(
     'nvidia_power_selections',
     'power',
     'Choice(s) of data to collect; all or any '
-    'combinations of power, pstate, utilization, '
+    'combinations of power, pstate, utilization, memory, '
     'temperature, clocks, and '
     'clocks_throttle_reasons (or clocks_event_reasons).',
 )
@@ -89,6 +89,18 @@ QUERY_TABLE = {
         'unit': 'percent',
         'type': 'float',
     },
+    'memory.used': {
+        'metric': 'memory_used',
+        'header': ' memory.used [MiB]',
+        'unit': 'MiB',
+        'type': 'float',
+    },
+    'memory.total': {
+        'metric': 'memory_total',
+        'header': ' memory.total [MiB]',
+        'unit': 'MiB',
+        'type': 'float',
+    },
     'temperature.gpu': {
         'metric': 'temperature_gpu',
         'header': ' temperature.gpu',
@@ -131,6 +143,7 @@ QUERY_GROUPS = {
     'power': ['power.draw'],
     'pstate': ['pstate'],
     'utilization': ['utilization.gpu', 'utilization.memory'],
+    'memory': ['memory.used', 'memory.total'],
     'temperature': ['temperature.gpu', 'temperature.memory'],
     'clocks': ['clocks.gr', 'clocks.sm', 'clocks.mem', 'clocks.video'],
     'clocks_throttle_reasons': ['clocks_throttle_reasons.active'],
