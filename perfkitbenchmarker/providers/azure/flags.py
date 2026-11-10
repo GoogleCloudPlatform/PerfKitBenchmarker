@@ -271,3 +271,8 @@ LAKEBASE_MAX_CU = flags.DEFINE_float(
     'Maximum compute capacity in Lakebase Compute Units (CU). One CU has ~2 '
     'GiB of RAM. Must satisfy max_cu - min_cu <= 16.',
 )
+AZURE_AKS_ENABLE_KEDA = flags.DEFINE_boolean(
+    'azure_aks_enable_keda',
+    False,
+    'Whether to enable Managed KEDA on Azure AKS.',
+)
