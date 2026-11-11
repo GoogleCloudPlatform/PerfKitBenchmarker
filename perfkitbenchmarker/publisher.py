@@ -294,6 +294,14 @@ class DefaultMetadataProvider(MetadataProvider):
         # TODO(user): Rename to relational_db.
         new_metadata['managed_relational_db_' + k] = v
 
+    if getattr(benchmark_spec, 'spanner_omni_cluster', None):
+      omni_cluster = benchmark_spec.spanner_omni_cluster
+      for key, value in omni_cluster.GetResourceMetadata().items():
+        # Resource keys are already prefixed with `spanner_omni_`.
+        if not key.startswith('spanner_omni_'):
+          key = 'spanner_omni_' + key
+        new_metadata[key] = value
+
     if benchmark_spec.pinecone:
       pinecone = benchmark_spec.pinecone
       for k, v in pinecone.GetResourceMetadata().items():

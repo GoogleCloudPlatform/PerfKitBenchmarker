@@ -720,3 +720,16 @@ GCP_FIRESTORE_LOCATION = flags.DEFINE_string(
     'Location of the firestore database. See'
     ' https://firebase.google.com/docs/firestore/locations.',
 )
+
+# Spanner Omni on GKE (providers/gcp/spanner_omni_cluster.py). Defined here so
+# they are always registered; applied by GcpSpannerOmniClusterSpec.
+SPANNER_OMNI_LICENSE_SECRET_NAME = flags.DEFINE_string(
+    'spanner_omni_license_secret_name',
+    None,
+    'Secret Manager secret name holding the Spanner Omni license key.',
+)
+SPANNER_OMNI_LICENSE_SECRET_PROJECT = flags.DEFINE_string(
+    'spanner_omni_license_secret_project',
+    None,
+    'GCP project containing the Spanner Omni license key secret.',
+)

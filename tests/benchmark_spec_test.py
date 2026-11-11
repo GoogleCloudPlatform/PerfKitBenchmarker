@@ -20,8 +20,10 @@ from unittest import mock
 
 from absl import flags
 from absl.testing import flagsaver
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import context
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_alias
 from perfkitbenchmarker import pkb  # pylint: disable=unused-import # noqa
 from perfkitbenchmarker import provider_info
@@ -31,6 +33,8 @@ from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.aws import aws_virtual_machine as aws_vm
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine as gce_vm
 from perfkitbenchmarker.providers.gcp import gcp_spanner
+from perfkitbenchmarker.providers.gcp import spanner_omni_cluster as gcp_spanner_omni_cluster
+from perfkitbenchmarker.resources.container_service import container_cluster
 from tests import pkb_common_test_case
 
 flags.DEFINE_integer('benchmark_spec_test_flag', 0, 'benchmark_spec_test flag.')
@@ -65,6 +69,19 @@ cluster_boot:
           machine_type: n1-standard-4
           project: my-project
           zone: us-central1-c
+"""
+SPANNER_OMNI_CONFIG = """
+cluster_boot:
+  vm_groups:
+    clients:
+      vm_spec:
+        GCP:
+          machine_type: n2-standard-32
+          zone: us-central1-a
+          project: my-project
+  spanner_omni_cluster:
+    cloud: GCP
+    database_name: benchbase
 """
 STATIC_VM_CONFIG = """
 static_vms:
@@ -297,6 +314,74 @@ class ConstructSpannerTestCase(_BenchmarkSpecTestCase):
     self.test_bm_spec.ConstructRelationalDb()
 
     self.assertEqual(self.test_bm_spec.relational_db.nodes, 10)  # pyrefly: ignore[missing-attribute]
+
+
+class ConstructSpannerOmniClusterTestCase(_BenchmarkSpecTestCase):
+
+  def _CreateSpec(self):
+    spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(SPANNER_OMNI_CONFIG)
+    spec.ConstructVirtualMachines()
+    spec.container_cluster = mock.create_autospec(
+        container_cluster.BaseContainerCluster, instance=True, spec_set=True
+    )
+    spec.ConstructSpannerOmniCluster()
+    return spec
+
+  def testConstructSpannerOmniCluster(self):
+    spec = self._CreateSpec()
+
+    cluster = spec.spanner_omni_cluster
+    self.assertIsInstance(
+        cluster, gcp_spanner_omni_cluster.GcpSpannerOmniCluster
+    )
+    self.assertIsNone(cluster.client_vm)
+    cluster.SetVms(spec.vm_groups)
+    self.assertIs(cluster.client_vm, spec.vm_groups['clients'][0])
+    self.assertEqual(cluster.database_name, 'benchbase')
+    self.assertIn(cluster, spec.resources)
+
+  def testClientVmGroupIsOnlyRequiredBySetVms(self):
+    spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
+        SPANNER_OMNI_CONFIG.replace('    clients:', '    loaders:')
+    )
+    spec.ConstructVirtualMachines()
+    spec.container_cluster = mock.create_autospec(
+        container_cluster.BaseContainerCluster, instance=True, spec_set=True
+    )
+
+    spec.ConstructSpannerOmniCluster()
+
+    with self.assertRaisesRegex(
+        errors.Config.InvalidValue, "requires the 'clients' vm_group"
+    ):
+      spec.spanner_omni_cluster.SetVms(spec.vm_groups)  # pyrefly: ignore[missing-attribute]
+
+  def testConstructSpannerOmniClusterRequiresContainerCluster(self):
+    spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(SPANNER_OMNI_CONFIG)
+    spec.ConstructVirtualMachines()
+    with self.assertRaisesRegex(
+        errors.Config.InvalidValue,
+        'spanner_omni_cluster requires a container_cluster',
+    ):
+      spec.ConstructSpannerOmniCluster()
+
+  def testCheckPrerequisitesChecksSpannerOmniCluster(self):
+    spec = self._CreateSpec()
+    with mock.patch.object(
+        spec.spanner_omni_cluster, 'CheckPrerequisites', autospec=True
+    ) as mock_check:
+      spec.CheckPrerequisites()
+    mock_check.assert_called_once_with()
+
+  def testDeleteDeletesSpannerOmniCluster(self):
+    spec = self._CreateSpec()
+    with mock.patch.object(
+        spec.spanner_omni_cluster, 'Delete', autospec=True
+    ) as mock_delete, mock.patch.object(
+        background_tasks, 'RunThreaded', autospec=True
+    ):
+      spec.Delete()
+    mock_delete.assert_called_once_with()
 
 
 class ConstructVmsTestCase(_BenchmarkSpecTestCase):
