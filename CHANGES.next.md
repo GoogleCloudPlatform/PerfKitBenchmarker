@@ -748,3 +748,4 @@
     never created.
 -   Support smart zone retries and failed cluster cleanup for GKE benchmarks in
     PKB.
+-   Add support for AWS FSx for NetApp ONTAP volumes.
