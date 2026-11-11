@@ -13,6 +13,18 @@ from google.genai import types
 from vertexai import agent_engines
 
 
+def _is_tool_error(response: dict[str, Any]) -> bool:
+  """Returns whether a tool function_response payload indicates an error."""
+  return bool(
+      response.get("error")
+      or response.get("status") == "ERROR"
+      or response.get("isError")
+      or response.get("is_error")
+      or response.get("structuredContent", {}).get("status", {}).get("state")
+      == "FAILED"
+  )
+
+
 class AdkEndpoint(common_utils.BaseEndpoint):
   """An implementation of BaseEndpoint for ADK framework applications.
 
@@ -113,7 +125,8 @@ class AdkAgentHandler(common_utils.BaseAgentHandler):
       prompt_config: The prompt and session configuration.
 
     Returns:
-      ExecutionResult containing the combined response text and token metrics.
+      ExecutionResult containing the combined response text, token metrics, and
+      tool call counts.
 
     Raises:
       common_utils.ApiError: If the ADK returns an API error event.
@@ -122,6 +135,8 @@ class AdkAgentHandler(common_utils.BaseAgentHandler):
 
     raw_output = []
     token_totals: dict[str, int] = collections.defaultdict(int)
+    tool_calls: dict[str, int] = collections.defaultdict(int)
+    tool_errors: dict[str, int] = collections.defaultdict(int)
 
     async for raw_event in endpoint.stream_execute(prompt_config=prompt_config):
       if isinstance(raw_event, dict):
@@ -132,7 +147,7 @@ class AdkAgentHandler(common_utils.BaseAgentHandler):
           )
         event = adk_event.Event.model_validate(raw_event)
       else:
-        event = raw_event
+        event: adk_event.Event = raw_event
       usage_tokens = None
       if event.usage_metadata:
         usage_tokens = self._extract_usage_tokens(event.usage_metadata)
@@ -141,18 +156,29 @@ class AdkAgentHandler(common_utils.BaseAgentHandler):
 
       self._print_event(event, usage_tokens=usage_tokens)
 
-      # Collect response text for results.json
+      # Collect response text and tool calls for results.json
       if not event.content or not event.content.parts:
         continue
 
       for part in event.content.parts:
         if part.text:
           raw_output.append(part.text)
+        if part.function_call:
+          tool_calls[f"tool_calls_{part.function_call.name}"] += 1
+        if part.function_response and _is_tool_error(
+            part.function_response.response
+        ):
+          tool_errors[f"tool_calls_{part.function_response.name}_error"] += 1
 
+    tool_calls["tool_calls_total"] = sum(tool_calls.values())
+    if tool_errors:
+      tool_errors["tool_calls_total_error"] = sum(tool_errors.values())
+      tool_calls.update(tool_errors)
     response_text = "".join(raw_output)
     return common_utils.ExecutionResult(
         response_text=response_text,
         token_metrics=dict(token_totals),
+        tool_calls=dict(tool_calls),
     )
 
   def _print_event(

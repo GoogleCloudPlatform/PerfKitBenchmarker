@@ -81,6 +81,7 @@ class ExecutionResult:
 
   response_text: str
   token_metrics: dict[str, int] = dataclasses.field(default_factory=dict)
+  tool_calls: dict[str, int] = dataclasses.field(default_factory=dict)
 
 
 class BaseAgentHandler(abc.ABC):
