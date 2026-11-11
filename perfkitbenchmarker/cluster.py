@@ -18,12 +18,14 @@ from collections.abc import Mapping
 import os
 import posixpath
 import re
+import shutil
 import typing
-from typing import Any, Callable, Iterator, List, Tuple
+from typing import Any, Callable, List, Tuple
 import uuid
 
 from absl import flags
 from absl import logging
+import jinja2
 from perfkitbenchmarker import data
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
@@ -33,13 +35,34 @@ from perfkitbenchmarker import static_virtual_machine
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import virtual_machine_spec
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.configs import container_spec as container_spec_lib
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
 from perfkitbenchmarker.configs import vm_group_decoders
+from perfkitbenchmarker.resources.container_service import container_registry
+from perfkitbenchmarker.resources.container_service import kubectl
 from perfkitbenchmarker.resources.container_service import kubernetes_commands
 
 
 FLAGS = flags.FLAGS
+_PREPROVISIONED_CONTAINER_REGISTRY = flags.DEFINE_string(
+    'preprovisioned_container_registry',
+    None,
+    'Optional OCI container registry repository prefix or full image URI '
+    'for K8sCluster workloads. Why: avoids building heavy GPU/HPC Dockerfiles '
+    'on every run and enables fast pulls (e.g. GKE Image Streaming from '
+    'Artifact Registry). Behavior: (1) If set to a repository prefix without '
+    'a tag (e.g. "us-central1-docker.pkg.dev/my-project/my-repo"), '
+    'K8sCluster.DeployContainerImage resolves the image to '
+    '"<prefix>/<benchmark_name>_<cluster_type>:latest" (e.g. '
+    '".../nccl_cluster_a4:latest"). (2) If set to a full image URI with an '
+    'explicit ":<tag>" in the final path component (e.g. '
+    '"us-central1-docker.pkg.dev/my-project/my-repo/custom_nccl:v1"), that '
+    'exact URI is used verbatim. (3) If unset (None), K8sCluster creates an '
+    'ephemeral cloud container registry, builds and pushes '
+    'data/<benchmark_name>/<cluster_type>.dockerfile at runtime, and deletes '
+    'the registry during teardown.',
+)
 TEMPLATE_FILE = flags.DEFINE_string(
     'cluster_template_file',
     None,
@@ -205,6 +228,9 @@ class BaseCluster(resource.BaseResource):
   TYPE = 'default'
   REQUIRED_ATTRS = ['CLOUD', 'SCHEDULER', 'TYPE']
   DEFAULT_TEMPLATE = ''
+  DEFAULT_JOB_TEMPLATE = ''
+  JOB_TEMPLATE_EXT = ''
+  DEFAULT_JOB_ENV: Mapping[str, str] = {}
 
   def __init__(self, cluster_spec: BaseClusterSpec):
     """Initialize BaseCluster class.
@@ -224,6 +250,7 @@ class BaseCluster(resource.BaseResource):
     )
     self.num_workers: int = cluster_spec.workers.vm_count
     self.name: str = f'pkb{FLAGS.run_uri}'[:10]
+    self._config: str = ''
     self._container_images: dict[str, str] = {}
 
   def DeployContainerImage(
@@ -233,6 +260,43 @@ class BaseCluster(resource.BaseResource):
   ) -> str:
     """Prepares a workload container image (.sqsh on Slurm, OCI URI on K8s)."""
     raise NotImplementedError()
+
+  def _PrepareJobTemplateAndContext(
+      self,
+      benchmark_name: str | None,
+      job_name: str,
+      command: str | None,
+      env: Mapping[str, str] | None,
+      **template_vars: Any,
+  ) -> Tuple[str, dict[str, Any]]:
+    """Resolves the job template path and builds the Jinja2 rendering context."""
+    template_name = f'{job_name}{self.JOB_TEMPLATE_EXT}'
+    if benchmark_name and data.ResourceExists(
+        posixpath.join(benchmark_name, template_name)
+    ):
+      template_path = posixpath.join(benchmark_name, template_name)
+    else:
+      # Generic templates are stored in data/cluster/.
+      template_path = posixpath.join('cluster', template_name)
+      if template_path == self.DEFAULT_JOB_TEMPLATE and not command:
+        raise ValueError(
+            'command is required when using default template '
+            f'{self.DEFAULT_JOB_TEMPLATE}.'
+        )
+
+    merged_env = {**self.DEFAULT_JOB_ENV, **(env or {})}
+    context = {
+        'job_name': job_name,
+        'num_workers': self.num_workers,
+        'env': merged_env,
+        'command': command,
+        **template_vars,
+    }
+    if image := template_vars.get('image') or (
+        self._container_images.get(benchmark_name) if benchmark_name else None
+    ):
+      context['image'] = image
+    return template_path, context
 
   def RunJob(
       self,
@@ -247,7 +311,7 @@ class BaseCluster(resource.BaseResource):
     raise NotImplementedError()
 
   def GetResourceMetadata(self) -> dict[str, Any]:
-    return {
+    metadata: dict[str, Any] = {
         'scheduler': self.SCHEDULER,
         'cluster_type': self.TYPE,
         'zone': self.zone,
@@ -256,14 +320,32 @@ class BaseCluster(resource.BaseResource):
         'num_workers': self.num_workers,
         'template': self.template,
     }
+    if self._container_images:
+      metadata['container_images'] = self._container_images
+    return metadata
 
   def __repr__(self):
     return f'<BaseCluster [name={self.name}]>'
 
-  # TODO(yuyanting) Move common logic here after having concrete implementation.
+  def _GetTemplateParameters(self) -> dict[str, Any]:
+    """Returns parameters that will be used to render the cluster config."""
+    raise NotImplementedError()
+
+  def _CreateDependencies(self):
+    """Method that will be called once before _CreateResource() is called.
+
+    Supplying this method is optional. It is intended to allow additional
+    flexibility in creating resource dependencies separately from _Create().
+    """
+    self._RenderClusterConfig()
+
   def _RenderClusterConfig(self):
     """Render the config file that will be used to create the cluster."""
-    pass
+    with open(data.ResourcePath(self.template)) as content:
+      template = jinja2.Template(
+          content.read(), undefined=jinja2.StrictUndefined
+      )
+      self._config = template.render(self._GetTemplateParameters())
 
   def _Create(self):
     pass
@@ -280,7 +362,8 @@ class SlurmCluster(BaseCluster):
   """
 
   SCHEDULER = 'slurm'
-  DEFAULT_JOB_TEMPLATE = 'cluster/slurm_job.sbatch.j2'
+  JOB_TEMPLATE_EXT = '.sbatch.j2'
+  DEFAULT_JOB_TEMPLATE = f'cluster/slurm_job{JOB_TEMPLATE_EXT}'
   DEFAULT_JOB_ENV: Mapping[str, str] = {}
 
   def __init__(self, cluster_spec: BaseClusterSpec):
@@ -350,36 +433,13 @@ class SlurmCluster(BaseCluster):
   ) -> Tuple[str, str]:
     """Renders an sbatch script to the headnode and runs it synchronously."""
     assert self.headnode_vm is not None
-    template_name = f'{job_name}.sbatch.j2'
-    if benchmark_name and data.ResourceExists(
-        posixpath.join(benchmark_name, template_name)
-    ):
-      template_path = posixpath.join(benchmark_name, template_name)
-    else:
-      # Generic templates are stored in data/cluster/.
-      template_path = posixpath.join('cluster', template_name)
-      if template_path == self.DEFAULT_JOB_TEMPLATE and not command:
-        raise ValueError(
-            'command is required when using default Slurm template '
-            f'{self.DEFAULT_JOB_TEMPLATE}.'
-        )
-
     job_dir = self.nfs_path or '.'
     remote_script_path = posixpath.join(job_dir, f'{job_name}.sbatch')
     output_pattern = posixpath.join(job_dir, 'slurm-%j.out')
-    merged_env = {**self.DEFAULT_JOB_ENV, **(env or {})}
-    context = {
-        'job_name': job_name,
-        'num_workers': self.num_workers,
-        'output_path': output_pattern,
-        'env': merged_env,
-        'command': command,
-        **template_vars,
-    }
-    if image := template_vars.get('image') or (
-        self._container_images.get(benchmark_name) if benchmark_name else None
-    ):
-      context['image'] = image
+    template_vars.setdefault('output_path', output_pattern)
+    template_path, context = self._PrepareJobTemplateAndContext(
+        benchmark_name, job_name, command, env, **template_vars
+    )
     self.headnode_vm.RenderTemplate(
         data.ResourcePath(template_path),
         remote_script_path,
@@ -529,6 +589,10 @@ class SlurmCluster(BaseCluster):
     self.worker_vms = workers
     self.vms = [self.headnode_vm] + self.worker_vms
 
+  def _PostCreate(self):
+    super()._PostCreate()
+    self.AuthenticateVM()
+
   def _Create(self):
     pass
 
@@ -615,6 +679,9 @@ class K8sCluster(BaseCluster):
   """
 
   SCHEDULER = 'k8s'
+  JOB_TEMPLATE_EXT = '.yaml.j2'
+  DEFAULT_JOB_TEMPLATE = f'cluster/k8s_job{JOB_TEMPLATE_EXT}'
+  DEFAULT_JOB_ENV: Mapping[str, str] = {}
 
   def __init__(self, cluster_spec: BaseClusterSpec):
     """Initialize K8sCluster class."""
@@ -634,6 +701,14 @@ class K8sCluster(BaseCluster):
     self.kubeconfig: str = FLAGS.kubeconfig
     self.k8s_version: str | None = None
     self.num_nodes: int = self.num_workers
+    self._container_registry: (
+        container_registry.BaseContainerRegistry | None
+    ) = None
+
+  def _DeleteDependencies(self):
+    super()._DeleteDependencies()
+    if self._container_registry is not None:
+      self._container_registry.Delete()
 
   def GetResourceMetadata(self) -> dict[str, Any]:
     metadata = super().GetResourceMetadata()
@@ -644,68 +719,128 @@ class K8sCluster(BaseCluster):
     })
     return metadata
 
-  def ApplyManifest(self, manifest_file: str, **kwargs: Any) -> Iterator[str]:
-    """Applies a rendered Kubernetes manifest.
-
-    Provided for backward compatibility with existing container_cluster
-    benchmarks; ideally, benchmarks should only use RunJob.
-
-    Args:
-      manifest_file: The name of the YAML file or Jinja2 template.
-      **kwargs: Arguments to pass to the Jinja2 template.
-
-    Returns:
-      An iterator of resource names (e.g. 'pod/my-pod') that were created.
-    """
-    return kubernetes_commands.ApplyManifest(manifest_file, **kwargs)
-
-  def WaitForResource(
-      self, resource_name: str, condition_name: str, **kwargs: Any
-  ) -> Tuple[str, str, int]:
-    """Waits for a condition on a Kubernetes resource.
-
-    Provided for backward compatibility with existing container_cluster
-    benchmarks; ideally, benchmarks should only use RunJob.
-
-    Args:
-      resource_name: The resource type/name (e.g. 'deploy/my-deploy').
-      condition_name: The condition to wait for (e.g. 'Available').
-      **kwargs: Additional arguments forwarded to kubernetes_commands.
-
-    Returns:
-      Tuple of (stdout, stderr, retcode).
-    """
-    return kubernetes_commands.WaitForResource(
-        resource_name, condition_name, **kwargs
-    )
-
-  def WaitForSucceeded(
+  def DeployContainerImage(
       self,
-      resource_name: str,
-      namespace: str | None = None,
-      timeout: int = vm_util.DEFAULT_TIMEOUT,
-      raise_on_failure: bool = True,
-  ) -> Tuple[str, str, int]:
-    """Waits for a Kubernetes resource to complete (jsonpath .status.succeeded=1).
+      benchmark_name: str,
+      dockerfile_relpath: str | None = None,
+  ) -> str:
+    """Resolves a preprovisioned OCI image or builds and pushes the Dockerfile.
 
-    Provided for backward compatibility with existing container_cluster
-    benchmarks; ideally, benchmarks should only use RunJob.
+    Resolution follows two paths based on `--preprovisioned_container_registry`:
+    1. Preprovisioned fast path (`--preprovisioned_container_registry` is set):
+       - If the flag value's last path segment includes an explicit `:<tag>`
+         (e.g. `us-central1-docker.pkg.dev/my-proj/my-repo/nccl_a4:v1`), that
+         URI is used verbatim.
+       - Otherwise, the flag value is treated as a registry/repository prefix
+         and resolved to `<prefix>/<benchmark_name>_<self.TYPE>:latest` (e.g.
+         `us-central1-docker.pkg.dev/my-proj/my-repo/nccl_cluster_a4:latest`).
+       - No Dockerfile build or ephemeral registry provisioning takes place.
+    2. Ephemeral build fallback (`--preprovisioned_container_registry` is None):
+       - Stages `dockerfile_relpath` (defaults to
+         `<benchmark_name>/<self.TYPE>.dockerfile` in PKB `data/`) into a
+         temporary build directory.
+       - Lazily creates an ephemeral cloud `BaseContainerRegistry`
+         (e.g. `GoogleArtifactRegistry` on GCP or `ElasticContainerRegistry`
+         on AWS) that is automatically deleted in `_DeleteDependencies()`.
+       - Builds and pushes `<benchmark_name>_<self.TYPE>` via
+         `self._container_registry.GetOrBuild(...)`.
+
+    The resolved OCI image URI is cached in
+    `self._container_images[benchmark_name]` so subsequent
+    `RunJob(benchmark_name, ...)` calls automatically inject `image` into the
+    Kubernetes manifest template context.
 
     Args:
-      resource_name: The resource type/name to wait for.
-      namespace: Optional Kubernetes namespace.
-      timeout: Timeout in seconds.
-      raise_on_failure: Whether to raise on timeout/failure.
+      benchmark_name: Name of the benchmark requesting the image (e.g.
+        'nccl_cluster').
+      dockerfile_relpath: Optional relative path under PKB `data/` to the
+        Dockerfile. Defaults to `<benchmark_name>/<self.TYPE>.dockerfile`.
 
     Returns:
-      Tuple of (stdout, stderr, retcode).
+      The resolved OCI image URI string for use in Kubernetes pod specs.
     """
-    return kubernetes_commands.WaitForSucceeded(
-        resource_name,
-        namespace=namespace,
-        timeout=timeout,
-        raise_on_failure=raise_on_failure,
+    image_name = f'{benchmark_name}_{self.TYPE}'
+    if _PREPROVISIONED_CONTAINER_REGISTRY.value:
+      registry_val = _PREPROVISIONED_CONTAINER_REGISTRY.value.rstrip('/')
+      if ':' in registry_val.split('/')[-1]:
+        image_uri = registry_val
+      else:
+        image_uri = f'{registry_val}/{image_name}:latest'
+      self._container_images[benchmark_name] = image_uri
+      return image_uri
+
+    dockerfile = dockerfile_relpath or posixpath.join(
+        benchmark_name, f'{self.TYPE}.dockerfile'
     )
+    build_dir = os.path.join(vm_util.GetTempDir(), 'docker', image_name)
+    os.makedirs(build_dir, exist_ok=True)
+    shutil.copyfile(
+        data.ResourcePath(dockerfile), os.path.join(build_dir, 'Dockerfile')
+    )
+    if self._container_registry is None:
+      registry_spec = container_spec_lib.ContainerRegistrySpec(
+          'container_registry', flag_values=FLAGS, cloud=self.CLOUD
+      )
+      registry_spec.name = f'pkb{FLAGS.run_uri}'
+      registry_spec.zone = self.zone
+      registry_cls = container_registry.GetContainerRegistryClass(self.CLOUD)
+      self._container_registry = registry_cls(registry_spec)
+      self._container_registry.Create()
+
+    image_uri = self._container_registry.GetOrBuild(image_name, build_dir)
+    self._container_images[benchmark_name] = image_uri
+    return image_uri
+
+  def RunJob(
+      self,
+      benchmark_name: str | None = None,
+      job_name: str = 'k8s_job',
+      command: str | None = None,
+      env: Mapping[str, str] | None = None,
+      timeout: int = 7200,
+      **template_vars: Any,
+  ) -> Tuple[str, str]:
+    """Renders a Kubernetes job manifest and runs it synchronously."""
+    template_path, context = self._PrepareJobTemplateAndContext(
+        benchmark_name, job_name, command, env, **template_vars
+    )
+    if template_path == self.DEFAULT_JOB_TEMPLATE and 'image' not in context:
+      raise ValueError(
+          'image is required when using default template '
+          f'{self.DEFAULT_JOB_TEMPLATE}.'
+      )
+    k8s_job_name = job_name.replace('_', '-')
+    context['job_name'] = k8s_job_name
+    context.setdefault('worker_machine_type', self.worker_machine_type)
+
+    resources: list[str] = []
+    try:
+      resources = list(
+          kubernetes_commands.ApplyManifest(template_path, **context)
+      )
+      condition = kubernetes_commands.WaitForResourceForMultiConditions(
+          f'job/{k8s_job_name}',
+          ['condition=complete', 'condition=failed'],
+          timeout=timeout,
+      )
+      stdout, stderr, _ = kubectl.RunKubectlCommand([
+          'logs',
+          '-l',
+          f'job-name={k8s_job_name},batch.kubernetes.io/job-completion-index=0',
+          '--tail=-1',
+      ])
+      if condition == 'condition=failed':
+        raise errors.VirtualMachine.RemoteCommandError(
+            f'Kubernetes job {k8s_job_name} failed.\n'
+            f'STDOUT: {stdout}\nSTDERR: {stderr}'
+        )
+      return stdout, stderr
+    finally:
+      if resources:
+        kubectl.RunKubectlCommand(
+            ['delete', *resources, '--ignore-not-found=true', '--wait=true'],
+            raise_on_failure=False,
+        )
 
 
 Cluster = typing.TypeVar('Cluster', bound=BaseCluster)

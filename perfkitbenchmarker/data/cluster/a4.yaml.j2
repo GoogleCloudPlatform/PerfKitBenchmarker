@@ -27,9 +27,9 @@ vars:
   base_network_name: $(vars.deployment_name)
 
   #Provisioning models (set to true or fill in reservation name, pick only one)
-  a4h_reservation_name: "" # supply reservation name
+  a4h_reservation_name: "{{ reservation_id or '' }}" # supply reservation name
   a4h_dws_flex_enabled: false
-  a4h_enable_spot_vm: true
+  a4h_enable_spot_vm: {{ enable_spot_vm | lower }}
 
 deployment_groups:
 

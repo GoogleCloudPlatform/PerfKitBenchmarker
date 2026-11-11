@@ -1,0 +1,140 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ job_name }}
+spec:
+  clusterIP: None
+  selector:
+    job-name: {{ job_name }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ job_name }}
+spec:
+  parallelism: {{ num_workers }}
+  completions: {{ num_workers }}
+  completionMode: Indexed
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        job-name: {{ job_name }}
+    spec:
+      subdomain: {{ job_name }}
+      setHostnameAsFQDN: true
+      restartPolicy: Never
+{%- if worker_machine_type is defined and worker_machine_type %}
+      nodeSelector:
+        node.kubernetes.io/instance-type: {{ worker_machine_type }}
+{%- endif %}
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchLabels:
+                job-name: {{ job_name }}
+            topologyKey: kubernetes.io/hostname
+{%- if gpus_per_node is defined and gpus_per_node %}
+      tolerations:
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule
+{%- endif %}
+      volumes:
+      - name: dshm
+        emptyDir:
+          medium: Memory
+{%- if resource_claim_template is defined and resource_claim_template %}
+      resourceClaims:
+      - name: rdma
+        resourceClaimTemplateName: {{ resource_claim_template }}
+{%- endif %}
+      containers:
+      - name: worker
+        image: {{ image }}
+        securityContext:
+          privileged: true
+        env:
+        - name: OMPI_ALLOW_RUN_AS_ROOT
+          value: "1"
+        - name: OMPI_ALLOW_RUN_AS_ROOT_CONFIRM
+          value: "1"
+{%- if env %}
+{%- for key, value in env.items() %}
+        - name: {{ key }}
+          value: "{{ value }}"
+{%- endfor %}
+{%- endif %}
+        volumeMounts:
+        - name: dshm
+          mountPath: /dev/shm
+{%- if (gpus_per_node is defined and gpus_per_node) or (cpus_per_task is defined and cpus_per_task) or (resource_claim_template is defined and resource_claim_template) %}
+        resources:
+{%- if (gpus_per_node is defined and gpus_per_node) or (cpus_per_task is defined and cpus_per_task) %}
+          limits:
+{%- if gpus_per_node is defined and gpus_per_node %}
+            nvidia.com/gpu: {{ gpus_per_node }}
+{%- endif %}
+{%- if cpus_per_task is defined and cpus_per_task %}
+            cpu: {{ cpus_per_task }}
+{%- endif %}
+          requests:
+{%- if gpus_per_node is defined and gpus_per_node %}
+            nvidia.com/gpu: {{ gpus_per_node }}
+{%- endif %}
+{%- if cpus_per_task is defined and cpus_per_task %}
+            cpu: {{ cpus_per_task }}
+{%- endif %}
+{%- endif %}
+{%- if resource_claim_template is defined and resource_claim_template %}
+          claims:
+          - name: rdma
+{%- endif %}
+{%- endif %}
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -e
+{%- if env %}
+{%- for key, value in env.items() %}
+          export {{ key }}="{{ value }}"
+{%- endfor %}
+{%- endif %}
+          mkdir -p /run/sshd
+          /usr/sbin/sshd -p 222
+          if [ "${JOB_COMPLETION_INDEX:-0}" = "0" ]; then
+            cleanup() {
+              for i in $(seq 1 $(({{ num_workers }} - 1))); do
+                ssh -p 222 -o StrictHostKeyChecking=no {{ job_name }}-${i}.{{ job_name }} "touch /tmp/job_done" 2>/dev/null || true
+              done
+            }
+            trap cleanup EXIT
+            rm -f /tmp/hostfile
+            for i in $(seq 0 $(({{ num_workers }} - 1))); do
+              PEER="{{ job_name }}-${i}.{{ job_name }}"
+              until ssh -p 222 -o StrictHostKeyChecking=no -o ConnectTimeout=5 "${PEER}" hostname >/dev/null 2>&1; do
+                sleep 2
+              done
+              echo "${PEER} port=222 slots={{ ntasks_per_node | default(gpus_per_node | default(1)) }}" >> /tmp/hostfile
+            done
+            ENV_ARGS="{% if env %}{% for key in env %}-x {{ key }} {% endfor %}{% endif %}"
+            for var in $(compgen -v | grep -E '^(NCCL_|OMPI_|FI_|CUDA_|LD_LIBRARY_PATH$|PATH$)'); do
+              ENV_ARGS="${ENV_ARGS} -x ${var}"
+            done
+            mpirun \
+              --allow-run-as-root \
+              --hostfile /tmp/hostfile \
+              ${ENV_ARGS} \
+              -mca plm_rsh_no_tree_spawn 1 \
+              --mca orte_keep_fqdn_hostnames 1 \
+              --mca btl self,tcp \
+              --bind-to none \
+              --mca plm_rsh_agent "ssh -q -o LogLevel=ERROR -o StrictHostKeyChecking=no -p 222" \
+              {{ command }}
+          else
+            while [ ! -f /tmp/job_done ]; do
+              sleep 2
+            done
+          fi

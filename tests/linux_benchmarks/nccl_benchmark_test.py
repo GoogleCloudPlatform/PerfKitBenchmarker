@@ -94,7 +94,6 @@ class NcclBenchmarkTest(unittest.TestCase, test_util.SamplesTestMixin):
     benchmark_spec = mock.MagicMock()
     nccl_cluster_benchmark.Prepare(benchmark_spec)
     self.assertTrue(benchmark_spec.always_call_cleanup)
-    benchmark_spec.cluster.AuthenticateVM.assert_called_once_with()
     benchmark_spec.cluster.DeployContainerImage.assert_called_once_with(
         'nccl_cluster'
     )
@@ -201,6 +200,53 @@ class NcclBenchmarkTest(unittest.TestCase, test_util.SamplesTestMixin):
         '  --kill-on-bad-exit=1 \\\n'
         '  ./run.sh',
     )
+
+  def testK8sJobTemplateRender(self):
+    rendered = vm_util.ReadAndRenderJinja2Template(
+        'cluster/k8s_job.yaml.j2',
+        job_name='nccl-job',
+        num_workers=2,
+        worker_machine_type='a4-highgpu-8g',
+        env={'NCCL_DEBUG': 'INFO', 'CUSTOM_VAR': '123'},
+        image='us-docker.pkg.dev/my-proj/nccl_cluster_a4:latest',
+        command='./all_reduce_perf',
+        gpus_per_node=8,
+        resource_claim_template='default-rdma',
+    )
+    self.assertIn(
+        'nodeSelector:\n'
+        '        node.kubernetes.io/instance-type: a4-highgpu-8g',
+        rendered,
+    )
+    self.assertIn('topologyKey: kubernetes.io/hostname', rendered)
+    self.assertIn('key: nvidia.com/gpu', rendered)
+    self.assertIn('nvidia.com/gpu: 8', rendered)
+    self.assertIn('resourceClaimTemplateName: default-rdma', rendered)
+    self.assertIn('ENV_ARGS="-x NCCL_DEBUG -x CUSTOM_VAR "', rendered)
+    self.assertIn('mpirun \\', rendered)
+
+  def testK8sJobTemplateRenderCpuOnly(self):
+    rendered = vm_util.ReadAndRenderJinja2Template(
+        'cluster/k8s_job.yaml.j2',
+        job_name='cpu-job',
+        num_workers=4,
+        worker_machine_type='c3-standard-88',
+        env={},
+        image='us-docker.pkg.dev/my-proj/cpu_bench:latest',
+        command='./cpu_mpi_bench',
+        ntasks_per_node=2,
+        cpus_per_task=44,
+    )
+    self.assertIn(
+        'nodeSelector:\n'
+        '        node.kubernetes.io/instance-type: c3-standard-88',
+        rendered,
+    )
+    self.assertIn('topologyKey: kubernetes.io/hostname', rendered)
+    self.assertIn('cpu: 44', rendered)
+    self.assertIn('slots=2', rendered)
+    self.assertNotIn('nvidia.com/gpu', rendered)
+    self.assertNotIn('tolerations:', rendered)
 
 
 if __name__ == '__main__':

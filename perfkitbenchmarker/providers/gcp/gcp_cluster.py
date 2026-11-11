@@ -14,13 +14,14 @@
 
 """Class to represent a GCE cluster."""
 
+from collections.abc import Mapping
 import os
+from typing import Any, Tuple
 
 from absl import flags as absl_flags
-import jinja2
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import cluster
-from perfkitbenchmarker import data
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import provider_info
@@ -32,6 +33,38 @@ from perfkitbenchmarker.providers.gcp import util
 FLAGS = absl_flags.FLAGS
 _CONFIG_FILE_NAME = 'cluster.yaml'
 _DEPLOY_TIMEOUT = 1800
+
+
+def _DeployGcluster(config: str, config_path: str) -> None:
+  """Writes rendered config and deploys a GCP cluster with Cluster Toolkit."""
+  with open(config_path, 'w') as config_file:
+    config_file.write(config)
+  vm_util.IssueCommand(
+      [
+          flags.GCLUSTER_PATH.value,
+          'deploy',
+          config_path,
+          '--force',
+          '--auto-approve',
+          f'--out={vm_util.GetTempDir()}',
+          '-l',
+          'IGNORE',
+      ],
+      timeout=_DEPLOY_TIMEOUT,
+  )
+
+
+def _DestroyGcluster(cluster_name: str) -> None:
+  """Destroys a GCP cluster provisioned with Cluster Toolkit."""
+  vm_util.IssueCommand(
+      [
+          flags.GCLUSTER_PATH.value,
+          'destroy',
+          f'{vm_util.GetTempDir()}/{cluster_name}',
+          '--auto-approve',
+      ],
+      timeout=600,
+  )
 
 
 class GceClusterSpec(cluster.BaseClusterSpec):
@@ -56,6 +89,10 @@ class GceCluster(cluster.SlurmCluster):
       cluster_spec: cluster.GceClusterSpec object.
     """
     super().__init__(cluster_spec)
+    if FLAGS.gce_preemptible_vms and flags.GCE_RESERVATION_ID.value:
+      raise errors.Config.InvalidValue(
+          'Cannot specify both --gce_preemptible_vms and --gce_reservation_id.'
+      )
     self.project: str = cluster_spec.workers.vm_spec.project  # pyrefly: ignore[missing-attribute]
     self._config_path: str = os.path.join(
         vm_util.GetTempDir(), _CONFIG_FILE_NAME)
@@ -63,14 +100,6 @@ class GceCluster(cluster.SlurmCluster):
         ['cat', vm_util.GetPublicKeyPath()]
     )
     self.nfs_path: str = '/opt/apps'
-
-  def _CreateDependencies(self):
-    """Method that will be called once before _CreateResource() is called.
-
-    Supplying this method is optional. It is intended to allow additional
-    flexibility in creating resource dependencies separately from _Create().
-    """
-    self._RenderClusterConfig()
 
   def _GetTemplateParameters(self):
     """Returns parameters that will be used to render the cluster config."""
@@ -101,31 +130,18 @@ class GceCluster(cluster.SlurmCluster):
         'compute_tags': compute_tags,
         'controller_tags': controller_tags,
         'enabe_spot_vm': FLAGS.gce_preemptible_vms,
+        'enable_spot_vm': FLAGS.gce_preemptible_vms,
+        'reservation_id': flags.GCE_RESERVATION_ID.value,
         'threads_per_core': threads_per_core,
     }
 
-  def _RenderClusterConfig(self):
-    """Render the config file that will be used to create the cluster."""
-    with open(data.ResourcePath(self.template)) as content:
-      template = jinja2.Template(
-          content.read(), undefined=jinja2.StrictUndefined
-      )
-      self._config = template.render(self._GetTemplateParameters())
-
   def _Create(self):
     """Create GCP cluster with cluster toolkit."""
-    with open(self._config_path, 'w') as config_file:
-      config_file.write(self._config)
-    vm_util.IssueCommand([
-        flags.GCLUSTER_PATH.value,
-        'deploy',
-        self._config_path,
-        '--force',
-        '--auto-approve',
-        f'--out={vm_util.GetTempDir()}',
-        '-l',
-        'IGNORE'
-    ], timeout=_DEPLOY_TIMEOUT)
+    _DeployGcluster(self._config, self._config_path)
+
+  def _Delete(self):
+    """Delete GCP cluster with cluster toolkit."""
+    _DestroyGcluster(self.name)
 
   def _PostCreate(self):
     """Post create actions after GCP cluster is created.
@@ -180,15 +196,7 @@ class GceCluster(cluster.SlurmCluster):
             'worker': self.worker_vms,
         },
     )
-
-  def _Delete(self):
-    """Delete GCP cluster with cluster toolkit."""
-    vm_util.IssueCommand([
-        flags.GCLUSTER_PATH.value,
-        'destroy',
-        f'{vm_util.GetTempDir()}/{self.name}',
-        '--auto-approve'
-    ], timeout=600)
+    super()._PostCreate()
 
   def AuthenticateVM(self):
     """Authenticate all VMs in the cluster to access each other."""
@@ -228,3 +236,99 @@ class A4Cluster(GceCluster):
       vm.RemoteCommand('sudo nvidia-smi -pm 1')
 
     background_tasks.RunThreaded(_InstallNVContainerToolkit, self.worker_vms)
+
+
+class GkeK8sCluster(cluster.K8sCluster):
+  """Class representing a GKE cluster provisioned via Cluster Toolkit."""
+
+  CLOUD = provider_info.GCP
+  DEFAULT_TEMPLATE = 'cluster/gke/gke_default.yaml.j2'
+
+  def __init__(self, cluster_spec: GceClusterSpec):
+    super().__init__(cluster_spec)
+    if self.zone and util.IsRegion(self.zone):
+      raise errors.Config.InvalidValue(
+          f'GkeK8sCluster requires a zone, got region {self.zone}.'
+      )
+    if FLAGS.gce_preemptible_vms and flags.GCE_RESERVATION_ID.value:
+      raise errors.Config.InvalidValue(
+          'Cannot specify both --gce_preemptible_vms and --gce_reservation_id.'
+      )
+    self.project: str = (
+        cluster_spec.workers.vm_spec.project  # pyrefly: ignore[missing-attribute]
+        or util.GetDefaultProject()
+    )
+    self._config_path: str = os.path.join(
+        vm_util.GetTempDir(), _CONFIG_FILE_NAME
+    )
+
+  def _GetTemplateParameters(self) -> dict[str, Any]:
+    return {
+        'name': self.name,
+        'zone': self.zone,
+        'region': util.GetRegionFromZone(self.zone),
+        'cluster_availability_type': 'ZONAL',
+        'num_workers': self.num_workers,
+        'worker_machine_type': self.worker_machine_type,
+        'default_pool_machine_type': self.default_pool_machine_type,
+        'project': self.project,
+        'enable_spot_vm': FLAGS.gce_preemptible_vms,
+        'reservation_id': flags.GCE_RESERVATION_ID.value,
+    }
+
+  def _Create(self):
+    """Create GKE cluster with cluster toolkit."""
+    _DeployGcluster(self._config, self._config_path)
+
+  def _Delete(self):
+    """Delete GKE cluster with cluster toolkit."""
+    _DestroyGcluster(self.name)
+
+  def _PostCreate(self):
+    """Configures kubeconfig for the created GKE cluster."""
+    super()._PostCreate()
+    cmd = util.GcloudCommand(
+        self, 'container', 'clusters', 'get-credentials', self.name
+    )
+    env = os.environ.copy()
+    env['KUBECONFIG'] = self.kubeconfig
+    cmd.IssueRetryable(env=env)
+
+
+class A4K8sCluster(GkeK8sCluster):
+  """Class representing a GKE A4 cluster."""
+
+  DEFAULT_TEMPLATE = 'cluster/gke/a4.yaml.j2'
+  TYPE = 'a4'
+  gpus_per_node = 8
+  # All A4 gIB NCCL tuning variables (NCCL_NET=gIB, NCCL_TUNER_CONFIG_PATH,
+  # etc.) are already baked into data/nccl_cluster/a4.dockerfile, which sets
+  # OMPI_MCA_btl_tcp_if_include=enp0s19 and NCCL_SOCKET_IFNAME=enp0s19,enp192s20
+  # for bare-VM/Slurm host NICs. Inside GKE pods, the primary pod network
+  # interface is virtualized as eth0 (while the 8 RDMA NICs attach via DRANET),
+  # so we override those two socket interface variables to eth0 and include the
+  # gIB and GKE NVIDIA driver library paths in LD_LIBRARY_PATH.
+  DEFAULT_JOB_ENV = {
+      'LD_LIBRARY_PATH': '/usr/local/gib/lib64:/usr/local/nvidia/lib64',
+      'OMPI_MCA_btl_tcp_if_include': 'eth0',
+      'NCCL_SOCKET_IFNAME': 'eth0',
+  }
+
+  def RunJob(
+      self,
+      benchmark_name: str | None = None,
+      job_name: str = 'k8s_job',
+      command: str | None = None,
+      env: Mapping[str, str] | None = None,
+      timeout: int = 7200,
+      **template_vars: Any,
+  ) -> Tuple[str, str]:
+    template_vars.setdefault('resource_claim_template', 'default-rdma')
+    return super().RunJob(
+        benchmark_name=benchmark_name,
+        job_name=job_name,
+        command=command,
+        env=env,
+        timeout=timeout,
+        **template_vars,
+    )

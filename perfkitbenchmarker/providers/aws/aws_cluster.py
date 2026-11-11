@@ -6,7 +6,6 @@ import os
 from typing import Any, Tuple
 
 from absl import flags as absl_flags
-import jinja2
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import cluster
 from perfkitbenchmarker import data
@@ -186,14 +185,6 @@ class AWSCluster(cluster.SlurmCluster):
         'preprovisioned_bucket': FLAGS.aws_preprovisioned_data_bucket or '*'
     }
 
-  def _RenderClusterConfig(self):
-    """Render the config file that will be used to create the cluster."""
-    with open(data.ResourcePath(self.template)) as content:
-      template = jinja2.Template(
-          content.read(), undefined=jinja2.StrictUndefined
-      )
-      self._config = template.render(self._GetTemplateParameters())
-
   def _Create(self):
     with open(self._config_path, 'w') as config_file:
       config_file.write(self._config)
@@ -294,6 +285,7 @@ class AWSCluster(cluster.SlurmCluster):
     # race condition.
     _SetupEnvironment(self.headnode_vm)
     background_tasks.RunThreaded(_SetupEnvironment, self.worker_vms)
+    super()._PostCreate()
 
   def _Delete(self):
     vm_util.IssueCommand([

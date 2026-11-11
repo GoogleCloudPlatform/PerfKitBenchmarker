@@ -40,6 +40,17 @@ nccl_cluster:
           zone: us-east-2a
           boot_disk_size: 2000
       vm_count: 1
+    default_pool:
+      vm_spec:
+        GCP:
+          machine_type: e2-standard-8
+          zone: us-central1-a
+          boot_disk_size: 200
+        AWS:
+          machine_type: m7i.2xlarge
+          zone: us-east-2a
+          boot_disk_size: 200
+      vm_count: 1
     workers:
       vm_count: null
       os_type: ubuntu2004
@@ -100,7 +111,6 @@ def Prepare(benchmark_spec):
     benchmark_spec: The benchmark specification
   """
   benchmark_spec.always_call_cleanup = True
-  benchmark_spec.cluster.AuthenticateVM()
   benchmark_spec.cluster.DeployContainerImage(BENCHMARK_NAME)
 
 
