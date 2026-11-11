@@ -29,6 +29,11 @@ class NvidiaPowerTestCase(unittest.TestCase):
     )
     with open(path) as fp:
       self.contents = fp.read()
+    memory_path = os.path.join(
+        os.path.dirname(__file__), '../data', 'nvidia_memory_output.txt'
+    )
+    with open(memory_path) as fp:
+      self.memory_contents = fp.read()
 
   def testParseNvidiaPowerResult(self):
     metadata = {
@@ -149,6 +154,39 @@ class NvidiaPowerTestCase(unittest.TestCase):
       self.assertEqual('1', sample.metadata['nvidia_power_interval'])
       self.assertEqual('default_0', sample.metadata['role'])
     self.assertEqual(len(samples), 91)
+
+  def testParseNvidiaMemoryResult(self):
+    metadata = {
+        'event': 'nvidia_power',
+        'sender': 'run',
+        'nvidia_power_interval': '1',
+        'role': 'default_0',
+    }
+
+    samples = []
+    nvidia_power._NvidiaPowerResults(
+        metadata,
+        csv.DictReader(io.StringIO(self.memory_contents)),
+        samples,
+        ['index', 'timestamp', 'memory.used', 'memory.total'],
+    )
+
+    expected_used = [1024.0, 4096.0, 12288.0, 40960.0, 40960.0, 9216.0]
+
+    used_samples = [s for s in samples if s.metric == 'memory_used']
+    total_samples = [s for s in samples if s.metric == 'memory_total']
+
+    self.assertEqual(len(used_samples), len(expected_used))
+    self.assertEqual(len(total_samples), len(expected_used))
+
+    for sample_, expected_value in zip(used_samples, expected_used):
+      self.assertAlmostEqual(expected_value, sample_.value)
+      self.assertEqual('MiB', sample_.unit)
+      self.assertEqual('nvidia_power', sample_.metadata['event'])
+
+    for sample_ in total_samples:
+      self.assertAlmostEqual(81559.0, sample_.value)
+      self.assertEqual('MiB', sample_.unit)
 
 
 if __name__ == '__main__':
