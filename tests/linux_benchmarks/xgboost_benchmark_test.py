@@ -15,8 +15,9 @@
 
 import os
 import unittest
+from unittest import mock
+
 from absl import flags
-import mock
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import test_util
 from perfkitbenchmarker.linux_benchmarks import xgboost_benchmark

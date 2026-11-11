@@ -1,9 +1,9 @@
 import tempfile
 import unittest
+from unittest import mock
 
 from absl import flags
 from absl.testing import flagsaver
-import mock
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import trino
 from perfkitbenchmarker.resources.container_service import kubernetes_cluster

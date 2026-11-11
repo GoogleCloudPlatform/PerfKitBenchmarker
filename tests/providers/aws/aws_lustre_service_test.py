@@ -15,9 +15,10 @@
 
 import json
 import unittest
+from unittest import mock
+
 from absl import flags
 from absl.testing import parameterized
-import mock
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util

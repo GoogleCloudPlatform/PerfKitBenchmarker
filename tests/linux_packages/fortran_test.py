@@ -1,7 +1,8 @@
 """Tests for Fortran package."""
 
 import unittest
-import mock
+from unittest import mock
+
 from perfkitbenchmarker.linux_packages import fortran
 from tests import pkb_common_test_case
 

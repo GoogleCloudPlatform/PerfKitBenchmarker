@@ -1,7 +1,8 @@
 """Tests for the AWS S3 service."""
 
 import unittest
-import mock
+from unittest import mock
+
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import s3
 from tests import pkb_common_test_case

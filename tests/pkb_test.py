@@ -15,11 +15,11 @@
 import json
 import textwrap
 import unittest
+from unittest import mock
 
 from absl import flags
 from absl.testing import flagsaver
 from absl.testing import parameterized
-import mock
 from perfkitbenchmarker import benchmark_status
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_virtual_machine

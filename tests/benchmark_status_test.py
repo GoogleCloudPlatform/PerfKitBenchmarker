@@ -15,9 +15,9 @@
 
 import os
 import unittest
+from unittest import mock
 
 from absl.testing import parameterized
-import mock
 from perfkitbenchmarker import benchmark_status
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import pkb

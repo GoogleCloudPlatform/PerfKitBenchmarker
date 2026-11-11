@@ -15,8 +15,9 @@
 import textwrap
 import time
 import unittest
+from unittest import mock
+
 from absl import flags
-import mock
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_benchmarks import hammerdbcli_benchmark as linux_hammerdb_benchmark
 from perfkitbenchmarker.linux_packages import hammerdb as linux_hammerdb

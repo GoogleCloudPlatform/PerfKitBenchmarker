@@ -2,10 +2,10 @@
 
 import logging
 import unittest
+from unittest import mock
 
 from absl.testing import parameterized
 import freezegun
-import mock
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample

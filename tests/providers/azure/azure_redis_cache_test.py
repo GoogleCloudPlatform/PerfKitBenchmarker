@@ -14,8 +14,9 @@
 """Tests for perfkitbenchmarker.providers.azure.azure_redis_cache."""
 import inspect
 import unittest
+from unittest import mock
+
 from absl import flags
-import mock
 from perfkitbenchmarker import managed_memory_store
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import vm_util

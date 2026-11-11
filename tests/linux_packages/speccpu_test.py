@@ -15,9 +15,10 @@
 """Tests for speccpu."""
 
 import unittest
+from unittest import mock
+
 from absl import flags
 from absl.testing import flagsaver
-import mock
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import sample

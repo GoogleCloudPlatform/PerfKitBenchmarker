@@ -14,10 +14,10 @@
 """Tests for perfkitbenchmarker.providers.gcp.gcp_dpb_dataproc."""
 
 import unittest
+from unittest import mock
 
 from absl import flags
 from absl.testing import parameterized
-import mock
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util

@@ -1,10 +1,10 @@
 import os
 import tempfile
 import unittest
+from unittest import mock
 
 from absl import flags
 from absl.testing import parameterized
-import mock
 from perfkitbenchmarker import object_storage_service
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.resources.container_service import kubectl

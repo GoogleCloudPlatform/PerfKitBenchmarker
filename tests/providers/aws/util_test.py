@@ -1,8 +1,8 @@
 """Tests for util."""
 
 import unittest
+from unittest import mock
 
-import mock
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import util
 from tests import pkb_common_test_case

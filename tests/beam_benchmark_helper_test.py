@@ -16,8 +16,9 @@
 
 import tempfile
 import unittest
+from unittest import mock
+
 from absl import flags
-import mock
 from perfkitbenchmarker import beam_benchmark_helper
 from perfkitbenchmarker import dpb_constants
 from perfkitbenchmarker import vm_util

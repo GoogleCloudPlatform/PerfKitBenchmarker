@@ -1,7 +1,8 @@
 """Tests for Intel oneAPI package."""
 
 import unittest
-import mock
+from unittest import mock
+
 from perfkitbenchmarker.linux_packages import intel_oneapi_basekit
 from tests import pkb_common_test_case
 

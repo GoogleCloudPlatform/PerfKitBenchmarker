@@ -16,10 +16,11 @@
 import json
 import os
 import unittest
+from unittest import mock
+
 from absl import flags
 from absl.testing import flagsaver
 from absl.testing import parameterized
-import mock
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_util

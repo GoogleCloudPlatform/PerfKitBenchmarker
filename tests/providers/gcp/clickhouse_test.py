@@ -1,8 +1,8 @@
 import unittest
+from unittest import mock
 
 from absl import flags
 from absl.testing import flagsaver
-import mock
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import clickhouse
 from tests import pkb_common_test_case

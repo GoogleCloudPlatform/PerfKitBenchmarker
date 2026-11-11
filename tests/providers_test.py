@@ -16,9 +16,9 @@
 
 import typing
 import unittest
+from unittest import mock
 
 from absl import flags
-import mock
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import requirements

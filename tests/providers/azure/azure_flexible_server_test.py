@@ -3,9 +3,9 @@ import inspect
 import json
 import time
 import unittest
+from unittest import mock
 
 from absl import flags
-import mock
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import relational_db

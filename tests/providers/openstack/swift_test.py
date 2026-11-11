@@ -2,7 +2,8 @@
 
 import os
 import unittest
-import mock
+from unittest import mock
+
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.openstack import swift
 

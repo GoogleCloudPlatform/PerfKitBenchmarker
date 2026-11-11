@@ -15,8 +15,9 @@
 """Tests for Stencil2D benchmark."""
 import os
 import unittest
+from unittest import mock
+
 from absl import flags
-import mock
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker.linux_benchmarks import stencil2d_benchmark
 

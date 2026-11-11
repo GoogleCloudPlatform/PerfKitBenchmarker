@@ -15,9 +15,10 @@
 """Tests for pgbench benchmark."""
 import os
 import unittest
+from unittest import mock
+
 from absl import flags
 from absl.testing import flagsaver
-import mock
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_benchmarks import pgbench_benchmark
 from perfkitbenchmarker.linux_packages import pgbench

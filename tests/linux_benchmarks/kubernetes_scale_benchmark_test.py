@@ -2,9 +2,9 @@
 
 import json
 import unittest
+from unittest import mock
 
 from absl.testing import flagsaver
-import mock
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample

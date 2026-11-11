@@ -15,9 +15,9 @@
 
 
 import os
+from unittest import mock
 
 from absl import flags
-import mock
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.configs import benchmark_config_spec

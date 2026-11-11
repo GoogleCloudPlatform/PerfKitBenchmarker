@@ -1,8 +1,9 @@
 """Tests for perfkitbenchmarker.linux_benchmarks.omb_benchmark."""
 
 import unittest
+from unittest import mock
+
 from absl.testing import flagsaver
-import mock
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import test_util
 from perfkitbenchmarker.linux_benchmarks import omb_benchmark

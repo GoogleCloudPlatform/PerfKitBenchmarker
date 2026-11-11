@@ -1,8 +1,9 @@
 """Tests for pip."""
 
 import unittest
+from unittest import mock
+
 from absl.testing import parameterized
-import mock
 from perfkitbenchmarker.linux_packages import pip
 from perfkitbenchmarker.linux_packages import python
 from tests import pkb_common_test_case

@@ -15,9 +15,9 @@
 
 
 import unittest
+from unittest import mock
 
 from absl import flags
-import mock
 from perfkitbenchmarker.providers.ibmcloud import ibmcloud_network
 from tests import pkb_common_test_case
 

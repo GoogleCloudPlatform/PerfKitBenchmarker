@@ -2,10 +2,10 @@
 
 import pickle
 import unittest
+from unittest import mock
 
 from absl import flags
 from absl.testing import parameterized
-import mock
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import resource
 from tests import pkb_common_test_case

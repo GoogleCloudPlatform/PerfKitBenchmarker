@@ -21,10 +21,11 @@ import inspect
 import json
 import os
 import unittest
+from unittest import mock
+
 from absl import flags
 from google.cloud import monitoring_v3
 from google.cloud.monitoring_v3 import types
-import mock
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import relational_db_spec

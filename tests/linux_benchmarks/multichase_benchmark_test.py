@@ -16,9 +16,9 @@
 
 import functools
 import unittest
+from unittest import mock
 
 from absl.testing import flagsaver
-import mock
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import units
 from perfkitbenchmarker.linux_benchmarks import multichase_benchmark

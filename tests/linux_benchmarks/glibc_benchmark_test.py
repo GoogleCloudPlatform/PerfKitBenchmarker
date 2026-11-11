@@ -16,8 +16,8 @@
 
 import os
 import unittest
+from unittest import mock
 
-import mock
 from perfkitbenchmarker.linux_benchmarks import glibc_benchmark
 from perfkitbenchmarker.linux_packages import glibc
 

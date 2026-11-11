@@ -16,8 +16,8 @@
 import os
 import tempfile
 import unittest
+from unittest import mock
 
-import mock
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import hpcc
 

@@ -2,9 +2,9 @@
 """
 
 import unittest
+from unittest import mock
 
 from absl import flags
-import mock
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import aws_cluster

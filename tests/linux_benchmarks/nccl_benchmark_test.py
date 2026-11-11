@@ -15,7 +15,8 @@
 
 import os
 import unittest
-import mock
+from unittest import mock
+
 from perfkitbenchmarker import cluster
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import test_util

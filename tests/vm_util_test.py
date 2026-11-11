@@ -19,8 +19,9 @@ import subprocess
 import threading
 import time
 import unittest
+from unittest import mock
+
 from absl import flags
-import mock
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
 from tests import pkb_common_test_case

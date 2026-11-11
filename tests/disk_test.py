@@ -14,8 +14,9 @@
 """Tests for perfkitbenchmarker.disk."""
 
 import unittest
+from unittest import mock
+
 from absl import flags
-import mock
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from tests import pkb_common_test_case

@@ -1,8 +1,9 @@
 """Tests for perfkitbenchmarker.providers.openstack.os_virtual_machine_test."""
 
 import unittest
+from unittest import mock
+
 from absl import flags
-import mock
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors

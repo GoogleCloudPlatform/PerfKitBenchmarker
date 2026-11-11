@@ -18,8 +18,8 @@ import itertools
 import random
 import time
 import unittest
+from unittest import mock
 
-import mock
 from perfkitbenchmarker.scripts.object_storage_api_test_scripts import object_storage_api_tests
 
 

@@ -14,9 +14,10 @@
 """Tests for perfkitbenchmarker.linux_packages.gce_hpc_tools."""
 
 import unittest
+from unittest import mock
+
 from absl import flags
 from absl.testing import parameterized
-import mock
 from perfkitbenchmarker.linux_packages import gce_hpc_tools
 from tests import pkb_common_test_case
 

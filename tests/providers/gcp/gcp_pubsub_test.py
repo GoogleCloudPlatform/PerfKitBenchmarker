@@ -1,9 +1,9 @@
 """Tests for gcp_pubsub."""
 
 import unittest
+from unittest import mock
 
 from absl import flags
-import mock
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import gcp_pubsub as pubsub

@@ -2,10 +2,10 @@
 """
 
 import unittest
+from unittest import mock
 
 from absl import flags
 from absl.testing import flagsaver
-import mock
 from perfkitbenchmarker import cluster
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors

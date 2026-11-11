@@ -15,9 +15,10 @@
 
 import json
 import unittest
+from unittest import mock
+
 from absl import flags
 from absl.testing import flagsaver
-import mock
 from perfkitbenchmarker.providers.aws import aws_batch_jobs as ab_jobs
 from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import util as aws_util

@@ -16,8 +16,9 @@
 
 import os
 import unittest
+from unittest import mock
+
 from absl import flags
-import mock
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker.linux_benchmarks import ping_benchmark
 

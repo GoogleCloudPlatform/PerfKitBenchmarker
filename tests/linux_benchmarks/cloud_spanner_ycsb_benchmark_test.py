@@ -14,9 +14,10 @@
 """Tests for cloud_spanner_ycsb_benchmark."""
 import textwrap
 import unittest
+from unittest import mock
+
 from absl import flags
 from absl.testing import flagsaver
-import mock
 from perfkitbenchmarker.linux_benchmarks import cloud_spanner_ycsb_benchmark
 from perfkitbenchmarker.linux_packages import ycsb
 from tests import pkb_common_test_case

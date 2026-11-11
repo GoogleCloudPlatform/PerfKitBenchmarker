@@ -2,8 +2,9 @@
 
 import json
 import unittest
+from unittest import mock
+
 from absl.testing import parameterized
-import mock
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.azure import azure_virtual_machine

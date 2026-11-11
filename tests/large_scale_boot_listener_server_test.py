@@ -15,7 +15,8 @@
 """Test for perfkitbenchmarker/data/large_scale?boot/listener_server.py."""
 
 import unittest
-import mock
+from unittest import mock
+
 from perfkitbenchmarker.data.large_scale_boot import listener_server
 from tests import pkb_common_test_case
 

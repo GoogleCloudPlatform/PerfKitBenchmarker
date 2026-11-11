@@ -15,8 +15,9 @@
 
 import posixpath
 import unittest
+from unittest import mock
+
 from absl import flags
-import mock
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker.linux_packages import maven
 from tests import pkb_common_test_case

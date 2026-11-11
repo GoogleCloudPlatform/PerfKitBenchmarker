@@ -15,12 +15,12 @@
 
 import pathlib
 from typing import Any, Dict
+from unittest import mock
 
 from absl import flags
 from absl.testing import absltest
 from absl.testing import flagsaver
 from absl.testing import parameterized
-import mock
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import command_interface
 from perfkitbenchmarker import configs

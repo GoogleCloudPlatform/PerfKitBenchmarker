@@ -1,11 +1,12 @@
 import datetime
 import inspect
 import unittest
+from unittest import mock
+
 from absl import flags
 from absl.testing import flagsaver
 from google.cloud import monitoring_v3
 from google.cloud.monitoring_v3 import types
-import mock
 from perfkitbenchmarker import errors
 from perfkitbenchmarker.providers.gcp import gcp_alloy_db
 from tests import pkb_common_test_case

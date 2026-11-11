@@ -15,7 +15,8 @@
 
 import os
 import unittest
-import mock
+from unittest import mock
+
 from perfkitbenchmarker import test_util
 from perfkitbenchmarker.linux_packages import nvidia_driver
 

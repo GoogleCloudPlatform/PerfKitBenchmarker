@@ -1,8 +1,8 @@
 import datetime
 import unittest
+from unittest import mock
 
 from absl import flags
-import mock
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import bigquery_slot_resource
 from tests import pkb_common_test_case

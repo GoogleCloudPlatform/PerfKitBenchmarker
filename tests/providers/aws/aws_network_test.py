@@ -16,9 +16,9 @@
 import json
 from typing import List
 import unittest
+from unittest import mock
 
 from absl import flags
-import mock
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import aws_network

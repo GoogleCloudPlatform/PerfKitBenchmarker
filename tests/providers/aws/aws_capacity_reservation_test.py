@@ -2,10 +2,10 @@
 
 import datetime
 import unittest
+from unittest import mock
 
 from absl import flags
 import freezegun
-import mock
 from perfkitbenchmarker import virtual_machine_spec
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import aws_capacity_reservation

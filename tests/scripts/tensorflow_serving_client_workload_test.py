@@ -16,8 +16,8 @@
 import datetime
 import sys
 import unittest
+from unittest import mock
 
-import mock
 import six
 
 # These imports are mocked so that we don't need to add them to the

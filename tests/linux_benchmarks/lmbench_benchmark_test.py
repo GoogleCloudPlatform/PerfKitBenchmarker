@@ -14,8 +14,8 @@
 """Tests for LMBENCH benchmark."""
 import os
 import unittest
+from unittest import mock
 
-import mock
 from perfkitbenchmarker.linux_benchmarks import lmbench_benchmark
 
 

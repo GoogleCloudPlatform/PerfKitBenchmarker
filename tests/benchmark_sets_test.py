@@ -15,8 +15,9 @@
 """Tests for perfkitbenchmarker.benchmark_sets."""
 
 import unittest
+from unittest import mock
+
 from absl import flags
-import mock
 from perfkitbenchmarker import benchmark_sets
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import linux_benchmarks

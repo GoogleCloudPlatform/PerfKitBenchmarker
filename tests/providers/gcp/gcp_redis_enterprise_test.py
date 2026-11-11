@@ -14,8 +14,9 @@
 """Tests for perfkitbenchmarker.providers.gcp.gcp_redis_enterprise."""
 import inspect
 import unittest
+from unittest import mock
+
 from absl import flags
-import mock
 from perfkitbenchmarker import managed_memory_store
 from tests import pkb_common_test_case
 

@@ -2,10 +2,11 @@
 
 import json
 import unittest
+from unittest import mock
 import uuid
+
 from absl import flags
 from absl.testing import parameterized
-import mock
 from perfkitbenchmarker import placement_group
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import vm_util

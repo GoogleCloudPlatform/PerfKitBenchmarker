@@ -17,9 +17,10 @@ import builtins
 import contextlib
 import json
 import unittest
+from unittest import mock
+
 from absl import flags as flgs
 from absl.testing import flagsaver
-import mock
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import provider_info

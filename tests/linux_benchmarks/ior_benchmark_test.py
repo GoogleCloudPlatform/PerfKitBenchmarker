@@ -14,8 +14,9 @@
 """Tests for ior_benchmark."""
 
 import unittest
+from unittest import mock
+
 from absl.testing import flagsaver
-import mock
 
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import hpc_util
