@@ -1,0 +1,2484 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    app.kubernetes.io/name: keda
+    app.kubernetes.io/part-of: keda-operator
+    app.kubernetes.io/version: 2.14.0
+  name: keda
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.14.0
+  labels:
+    app.kubernetes.io/part-of: keda-operator
+    app.kubernetes.io/version: 2.14.0
+  name: cloudeventsources.eventing.keda.sh
+spec:
+  group: eventing.keda.sh
+  names:
+    kind: CloudEventSource
+    listKind: CloudEventSourceList
+    plural: cloudeventsources
+    singular: cloudeventsource
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.conditions[?(@.type=="Active")].status
+      name: Active
+      type: string
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: CloudEventSource defines how a KEDA event will be sent to event
+          sink
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: CloudEventSourceSpec defines the spec of CloudEventSource
+            properties:
+              authenticationRef:
+                description: |-
+                  AuthenticationRef points to the TriggerAuthentication or ClusterTriggerAuthentication object that
+                  is used to authenticate the scaler with the environment
+                properties:
+                  kind:
+                    description: Kind of the resource being referred to. Defaults
+                      to TriggerAuthentication.
+                    type: string
+                  name:
+                    type: string
+                required:
+                - name
+                type: object
+              clusterName:
+                type: string
+              destination:
+                description: Destination defines the various ways to emit events
+                properties:
+                  azureEventGridTopic:
+                    properties:
+                      endpoint:
+                        type: string
+                    required:
+                    - endpoint
+                    type: object
+                  http:
+                    properties:
+                      uri:
+                        type: string
+                    required:
+                    - uri
+                    type: object
+                type: object
+              eventSubscription:
+                description: EventSubscription defines filters for events
+                properties:
+                  excludedEventTypes:
+                    items:
+                      description: CloudEventType contains the list of cloudevent
+                        types
+                      enum:
+                      - keda.scaledobject.ready.v1
+                      - keda.scaledobject.failed.v1
+                      type: string
+                    type: array
+                  includedEventTypes:
+                    items:
+                      description: CloudEventType contains the list of cloudevent
+                        types
+                      enum:
+                      - keda.scaledobject.ready.v1
+                      - keda.scaledobject.failed.v1
+                      type: string
+                    type: array
+                type: object
+            required:
+            - destination
+            type: object
+          status:
+            description: CloudEventSourceStatus defines the observed state of CloudEventSource
+            properties:
+              conditions:
+                description: Conditions an array representation to store multiple
+                  Conditions
+                items:
+                  description: Condition to store the condition state
+                  properties:
+                    message:
+                      description: A human readable message indicating details about
+                        the transition.
+                      type: string
+                    reason:
+                      description: The reason for the condition's last transition.
+                      type: string
+                    status:
+                      description: Status of the condition, one of True, False, Unknown.
+                      type: string
+                    type:
+                      description: Type of condition
+                      type: string
+                  required:
+                  - status
+                  - type
+                  type: object
+                type: array
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.14.0
+  labels:
+    app.kubernetes.io/part-of: keda-operator
+    app.kubernetes.io/version: 2.14.0
+  name: clustertriggerauthentications.keda.sh
+spec:
+  group: keda.sh
+  names:
+    kind: ClusterTriggerAuthentication
+    listKind: ClusterTriggerAuthenticationList
+    plural: clustertriggerauthentications
+    shortNames:
+    - cta
+    - clustertriggerauth
+    singular: clustertriggerauthentication
+  scope: Cluster
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.podIdentity.provider
+      name: PodIdentity
+      type: string
+    - jsonPath: .spec.secretTargetRef[*].name
+      name: Secret
+      type: string
+    - jsonPath: .spec.env[*].name
+      name: Env
+      type: string
+    - jsonPath: .spec.hashiCorpVault.address
+      name: VaultAddress
+      type: string
+    - jsonPath: .status.scaledobjects
+      name: ScaledObjects
+      priority: 1
+      type: string
+    - jsonPath: .status.scaledjobs
+      name: ScaledJobs
+      priority: 1
+      type: string
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: ClusterTriggerAuthentication defines how a trigger can authenticate
+          globally
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: TriggerAuthenticationSpec defines the various ways to authenticate
+            properties:
+              awsSecretManager:
+                description: AwsSecretManager is used to authenticate using AwsSecretManager
+                properties:
+                  credentials:
+                    properties:
+                      accessKey:
+                        properties:
+                          valueFrom:
+                            properties:
+                              secretKeyRef:
+                                properties:
+                                  key:
+                                    type: string
+                                  name:
+                                    type: string
+                                required:
+                                - key
+                                - name
+                                type: object
+                            required:
+                            - secretKeyRef
+                            type: object
+                        required:
+                        - valueFrom
+                        type: object
+                      accessSecretKey:
+                        properties:
+                          valueFrom:
+                            properties:
+                              secretKeyRef:
+                                properties:
+                                  key:
+                                    type: string
+                                  name:
+                                    type: string
+                                required:
+                                - key
+                                - name
+                                type: object
+                            required:
+                            - secretKeyRef
+                            type: object
+                        required:
+                        - valueFrom
+                        type: object
+                      accessToken:
+                        properties:
+                          valueFrom:
+                            properties:
+                              secretKeyRef:
+                                properties:
+                                  key:
+                                    type: string
+                                  name:
+                                    type: string
+                                required:
+                                - key
+                                - name
+                                type: object
+                            required:
+                            - secretKeyRef
+                            type: object
+                        required:
+                        - valueFrom
+                        type: object
+                    required:
+                    - accessKey
+                    - accessSecretKey
+                    type: object
+                  podIdentity:
+                    description: |-
+                      AuthPodIdentity allows users to select the platform native identity
+                      mechanism
+                    properties:
+                      identityAuthorityHost:
+                        description: Set identityAuthorityHost to override the default
+                          Azure authority host. If this is set, then the IdentityTenantID
+                          must also be set
+                        type: string
+                      identityId:
+                        type: string
+                      identityOwner:
+                        description: IdentityOwner configures which identity has to
+                          be used during auto discovery, keda or the scaled workload.
+                          Mutually exclusive with roleArn
+                        enum:
+                        - keda
+                        - workload
+                        type: string
+                      identityTenantId:
+                        description: Set identityTenantId to override the default
+                          Azure tenant id. If this is set, then the IdentityID must
+                          also be set
+                        type: string
+                      provider:
+                        description: PodIdentityProvider contains the list of providers
+                        enum:
+                        - azure
+                        - azure-workload
+                        - gcp
+                        - aws
+                        - aws-eks
+                        - aws-kiam
+                        - none
+                        type: string
+                      roleArn:
+                        description: RoleArn sets the AWS RoleArn to be used. Mutually
+                          exclusive with IdentityOwner
+                        type: string
+                    required:
+                    - provider
+                    type: object
+                  region:
+                    type: string
+                  secrets:
+                    items:
+                      properties:
+                        name:
+                          type: string
+                        parameter:
+                          type: string
+                        versionId:
+                          type: string
+                        versionStage:
+                          type: string
+                      required:
+                      - name
+                      - parameter
+                      type: object
+                    type: array
+                required:
+                - secrets
+                type: object
+              azureKeyVault:
+                description: AzureKeyVault is used to authenticate using Azure Key
+                  Vault
+                properties:
+                  cloud:
+                    properties:
+                      activeDirectoryEndpoint:
+                        type: string
+                      keyVaultResourceURL:
+                        type: string
+                      type:
+                        type: string
+                    required:
+                    - type
+                    type: object
+                  credentials:
+                    properties:
+                      clientId:
+                        type: string
+                      clientSecret:
+                        properties:
+                          valueFrom:
+                            properties:
+                              secretKeyRef:
+                                properties:
+                                  key:
+                                    type: string
+                                  name:
+                                    type: string
+                                required:
+                                - key
+                                - name
+                                type: object
+                            required:
+                            - secretKeyRef
+                            type: object
+                        required:
+                        - valueFrom
+                        type: object
+                      tenantId:
+                        type: string
+                    required:
+                    - clientId
+                    - clientSecret
+                    - tenantId
+                    type: object
+                  podIdentity:
+                    description: |-
+                      AuthPodIdentity allows users to select the platform native identity
+                      mechanism
+                    properties:
+                      identityAuthorityHost:
+                        description: Set identityAuthorityHost to override the default
+                          Azure authority host. If this is set, then the IdentityTenantID
+                          must also be set
+                        type: string
+                      identityId:
+                        type: string
+                      identityOwner:
+                        description: IdentityOwner configures which identity has to
+                          be used during auto discovery, keda or the scaled workload.
+                          Mutually exclusive with roleArn
+                        enum:
+                        - keda
+                        - workload
+                        type: string
+                      identityTenantId:
+                        description: Set identityTenantId to override the default
+                          Azure tenant id. If this is set, then the IdentityID must
+                          also be set
+                        type: string
+                      provider:
+                        description: PodIdentityProvider contains the list of providers
+                        enum:
+                        - azure
+                        - azure-workload
+                        - gcp
+                        - aws
+                        - aws-eks
+                        - aws-kiam
+                        - none
+                        type: string
+                      roleArn:
+                        description: RoleArn sets the AWS RoleArn to be used. Mutually
+                          exclusive with IdentityOwner
+                        type: string
+                    required:
+                    - provider
+                    type: object
+                  secrets:
+                    items:
+                      properties:
+                        name:
+                          type: string
+                        parameter:
+                          type: string
+                        version:
+                          type: string
+                      required:
+                      - name
+                      - parameter
+                      type: object
+                    type: array
+                  vaultUri:
+                    type: string
+                required:
+                - secrets
+                - vaultUri
+                type: object
+              configMapTargetRef:
+                items:
+                  description: AuthConfigMapTargetRef is used to authenticate using
+                    a reference to a config map
+                  properties:
+                    key:
+                      type: string
+                    name:
+                      type: string
+                    parameter:
+                      type: string
+                  required:
+                  - key
+                  - name
+                  - parameter
+                  type: object
+                type: array
+              env:
+                items:
+                  description: |-
+                    AuthEnvironment is used to authenticate using environment variables
+                    in the destination ScaleTarget spec
+                  properties:
+                    containerName:
+                      type: string
+                    name:
+                      type: string
+                    parameter:
+                      type: string
+                  required:
+                  - name
+                  - parameter
+                  type: object
+                type: array
+              gcpSecretManager:
+                properties:
+                  credentials:
+                    properties:
+                      clientSecret:
+                        properties:
+                          valueFrom:
+                            properties:
+                              secretKeyRef:
+                                properties:
+                                  key:
+                                    type: string
+                                  name:
+                                    type: string
+                                required:
+                                - key
+                                - name
+                                type: object
+                            required:
+                            - secretKeyRef
+                            type: object
+                        required:
+                        - valueFrom
+                        type: object
+                    required:
+                    - clientSecret
+                    type: object
+                  podIdentity:
+                    description: |-
+                      AuthPodIdentity allows users to select the platform native identity
+                      mechanism
+                    properties:
+                      identityAuthorityHost:
+                        description: Set identityAuthorityHost to override the default
+                          Azure authority host. If this is set, then the IdentityTenantID
+                          must also be set
+                        type: string
+                      identityId:
+                        type: string
+                      identityOwner:
+                        description: IdentityOwner configures which identity has to
+                          be used during auto discovery, keda or the scaled workload.
+                          Mutually exclusive with roleArn
+                        enum:
+                        - keda
+                        - workload
+                        type: string
+                      identityTenantId:
+                        description: Set identityTenantId to override the default
+                          Azure tenant id. If this is set, then the IdentityID must
+                          also be set
+                        type: string
+                      provider:
+                        description: PodIdentityProvider contains the list of providers
+                        enum:
+                        - azure
+                        - azure-workload
+                        - gcp
+                        - aws
+                        - aws-eks
+                        - aws-kiam
+                        - none
+                        type: string
+                      roleArn:
+                        description: RoleArn sets the AWS RoleArn to be used. Mutually
+                          exclusive with IdentityOwner
+                        type: string
+                    required:
+                    - provider
+                    type: object
+                  secrets:
+                    items:
+                      properties:
+                        id:
+                          type: string
+                        parameter:
+                          type: string
+                        version:
+                          type: string
+                      required:
+                      - id
+                      - parameter
+                      type: object
+                    type: array
+                required:
+                - secrets
+                type: object
+              hashiCorpVault:
+                description: HashiCorpVault is used to authenticate using Hashicorp
+                  Vault
+                properties:
+                  address:
+                    type: string
+                  authentication:
+                    description: VaultAuthentication contains the list of Hashicorp
+                      Vault authentication methods
+                    type: string
+                  credential:
+                    description: Credential defines the Hashicorp Vault credentials
+                      depending on the authentication method
+                    properties:
+                      serviceAccount:
+                        type: string
+                      token:
+                        type: string
+                    type: object
+                  mount:
+                    type: string
+                  namespace:
+                    type: string
+                  role:
+                    type: string
+                  secrets:
+                    items:
+                      description: VaultSecret defines the mapping between the path
+                        of the secret in Vault to the parameter
+                      properties:
+                        key:
+                          type: string
+                        parameter:
+                          type: string
+                        path:
+                          type: string
+                        pkiData:
+                          properties:
+                            altNames:
+                              type: string
+                            commonName:
+                              type: string
+                            format:
+                              type: string
+                            ipSans:
+                              type: string
+                            otherSans:
+                              type: string
+                            ttl:
+                              type: string
+                            uriSans:
+                              type: string
+                          type: object
+                        type:
+                          description: VaultSecretType defines the type of vault secret
+                          type: string
+                      required:
+                      - key
+                      - parameter
+                      - path
+                      type: object
+                    type: array
+                required:
+                - address
+                - authentication
+                - secrets
+                type: object
+              podIdentity:
+                description: |-
+                  AuthPodIdentity allows users to select the platform native identity
+                  mechanism
+                properties:
+                  identityAuthorityHost:
+                    description: Set identityAuthorityHost to override the default
+                      Azure authority host. If this is set, then the IdentityTenantID
+                      must also be set
+                    type: string
+                  identityId:
+                    type: string
+                  identityOwner:
+                    description: IdentityOwner configures which identity has to be
+                      used during auto discovery, keda or the scaled workload. Mutually
+                      exclusive with roleArn
+                    enum:
+                    - keda
+                    - workload
+                    type: string
+                  identityTenantId:
+                    description: Set identityTenantId to override the default Azure
+                      tenant id. If this is set, then the IdentityID must also be
+                      set
+                    type: string
+                  provider:
+                    description: PodIdentityProvider contains the list of providers
+                    enum:
+                    - azure
+                    - azure-workload
+                    - gcp
+                    - aws
+                    - aws-eks
+                    - aws-kiam
+                    - none
+                    type: string
+                  roleArn:
+                    description: RoleArn sets the AWS RoleArn to be used. Mutually
+                      exclusive with IdentityOwner
+                    type: string
+                required:
+                - provider
+                type: object
+              secretTargetRef:
+                items:
+                  description: AuthSecretTargetRef is used to authenticate using a
+                    reference to a secret
+                  properties:
+                    key:
+                      type: string
+                    name:
+                      type: string
+                    parameter:
+                      type: string
+                  required:
+                  - key
+                  - name
+                  - parameter
+                  type: object
+                type: array
+            type: object
+          status:
+            description: TriggerAuthenticationStatus defines the observed state of
+              TriggerAuthentication
+            properties:
+              scaledjobs:
+                type: string
+              scaledobjects:
+                type: string
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.14.0
+  labels:
+    app.kubernetes.io/part-of: keda-operator
+    app.kubernetes.io/version: 2.14.0
+  name: scaledobjects.keda.sh
+spec:
+  group: keda.sh
+  names:
+    kind: ScaledObject
+    listKind: ScaledObjectList
+    plural: scaledobjects
+    shortNames:
+    - so
+    singular: scaledobject
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.scaleTargetKind
+      name: ScaleTargetKind
+      type: string
+    - jsonPath: .spec.scaleTargetRef.name
+      name: ScaleTargetName
+      type: string
+    - jsonPath: .spec.minReplicaCount
+      name: Min
+      type: integer
+    - jsonPath: .spec.maxReplicaCount
+      name: Max
+      type: integer
+    - jsonPath: .spec.triggers[*].type
+      name: Triggers
+      type: string
+    - jsonPath: .spec.triggers[*].authenticationRef.name
+      name: Authentication
+      type: string
+    - jsonPath: .status.conditions[?(@.type=="Ready")].status
+      name: Ready
+      type: string
+    - jsonPath: .status.conditions[?(@.type=="Active")].status
+      name: Active
+      type: string
+    - jsonPath: .status.conditions[?(@.type=="Fallback")].status
+      name: Fallback
+      type: string
+    - jsonPath: .status.conditions[?(@.type=="Paused")].status
+      name: Paused
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: ScaledObject is a specification for a ScaledObject resource
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ScaledObjectSpec is the spec for a ScaledObject resource
+            properties:
+              advanced:
+                description: AdvancedConfig specifies advance scaling options
+                properties:
+                  horizontalPodAutoscalerConfig:
+                    description: HorizontalPodAutoscalerConfig specifies horizontal
+                      scale config
+                    properties:
+                      behavior:
+                        description: |-
+                          HorizontalPodAutoscalerBehavior configures the scaling behavior of the target
+                          in both Up and Down directions (scaleUp and scaleDown fields respectively).
+                        properties:
+                          scaleDown:
+                            description: |-
+                              scaleDown is scaling policy for scaling Down.
+                              If not set, the default value is to allow to scale down to minReplicas pods, with a
+                              300 second stabilization window (i.e., the highest recommendation for
+                              the last 300sec is used).
+                            properties:
+                              policies:
+                                description: |-
+                                  policies is a list of potential scaling polices which can be used during scaling.
+                                  At least one policy must be specified, otherwise the HPAScalingRules will be discarded as invalid
+                                items:
+                                  description: HPAScalingPolicy is a single policy
+                                    which must hold true for a specified past interval.
+                                  properties:
+                                    periodSeconds:
+                                      description: |-
+                                        periodSeconds specifies the window of time for which the policy should hold true.
+                                        PeriodSeconds must be greater than zero and less than or equal to 1800 (30 min).
+                                      format: int32
+                                      type: integer
+                                    type:
+                                      description: type is used to specify the scaling
+                                        policy.
+                                      type: string
+                                    value:
+                                      description: |-
+                                        value contains the amount of change which is permitted by the policy.
+                                        It must be greater than zero
+                                      format: int32
+                                      type: integer
+                                  required:
+                                  - periodSeconds
+                                  - type
+                                  - value
+                                  type: object
+                                type: array
+                                x-kubernetes-list-type: atomic
+                              selectPolicy:
+                                description: |-
+                                  selectPolicy is used to specify which policy should be used.
+                                  If not set, the default value Max is used.
+                                type: string
+                              stabilizationWindowSeconds:
+                                description: |-
+                                  stabilizationWindowSeconds is the number of seconds for which past recommendations should be
+                                  considered while scaling up or scaling down.
+                                  StabilizationWindowSeconds must be greater than or equal to zero and less than or equal to 3600 (one hour).
+                                  If not set, use the default values:
+                                  - For scale up: 0 (i.e. no stabilization is done).
+                                  - For scale down: 300 (i.e. the stabilization window is 300 seconds long).
+                                format: int32
+                                maximum: 3600
+                                minimum: 0
+                                type: integer
+                            type: object
+                          scaleUp:
+                            description: |-
+                              scaleUp is scaling policy for scaling Up.
+                              If not set, the default value is the higher of:
+                                * increase no more than 4 pods per 60 seconds
+                                * double the number of pods per 60 seconds
+                              No stabilization is used.
+                            properties:
+                              policies:
+                                description: |-
+                                  policies is a list of potential scaling polices which can be used during scaling.
+                                  At least one policy must be specified, otherwise the HPAScalingRules will be discarded as invalid
+                                items:
+                                  description: HPAScalingPolicy is a single policy
+                                    which must hold true for a specified past interval.
+                                  properties:
+                                    periodSeconds:
+                                      description: |-
+                                        periodSeconds specifies the window of time for which the policy should hold true.
+                                        PeriodSeconds must be greater than zero and less than or equal to 1800 (30 min).
+                                      format: int32
+                                      type: integer
+                                    type:
+                                      description: type is used to specify the scaling
+                                        policy.
+                                      type: string
+                                    value:
+                                      description: |-
+                                        value contains the amount of change which is permitted by the policy.
+                                        It must be greater than zero
+                                      format: int32
+                                      type: integer
+                                  required:
+                                  - periodSeconds
+                                  - type
+                                  - value
+                                  type: object
+                                type: array
+                                x-kubernetes-list-type: atomic
+                              selectPolicy:
+                                description: |-
+                                  selectPolicy is used to specify which policy should be used.
+                                  If not set, the default value Max is used.
+                                type: string
+                              stabilizationWindowSeconds:
+                                description: |-
+                                  stabilizationWindowSeconds is the number of seconds for which past recommendations should be
+                                  considered while scaling up or scaling down.
+                                  StabilizationWindowSeconds must be greater than or equal to zero and less than or equal to 3600 (one hour).
+                                  If not set, use the default values:
+                                  - For scale up: 0 (i.e. no stabilization is done).
+                                  - For scale down: 300 (i.e. the stabilization window is 300 seconds long).
+                                format: int32
+                                maximum: 3600
+                                minimum: 0
+                                type: integer
+                            type: object
+                        type: object
+                      name:
+                        type: string
+                    type: object
+                  restoreToOriginalReplicaCount:
+                    type: boolean
+                  scalingModifiers:
+                    description: ScalingModifiers describes advanced scaling logic
+                      options like formula
+                    properties:
+                      activationTarget:
+                        type: string
+                      formula:
+                        type: string
+                      metricType:
+                        description: |-
+                          MetricTargetType specifies the type of metric being targeted, and should be either
+                          "Value", "AverageValue", or "Utilization"
+                        type: string
+                      target:
+                        type: string
+                    type: object
+                type: object
+              cooldownPeriod:
+                format: int32
+                type: integer
+              fallback:
+                description: Fallback is the spec for fallback options
+                properties:
+                  failureThreshold:
+                    format: int32
+                    type: integer
+                  replicas:
+                    format: int32
+                    type: integer
+                required:
+                - failureThreshold
+                - replicas
+                type: object
+              idleReplicaCount:
+                format: int32
+                type: integer
+              initialCooldownPeriod:
+                format: int32
+                type: integer
+              maxReplicaCount:
+                format: int32
+                type: integer
+              minReplicaCount:
+                format: int32
+                type: integer
+              pollingInterval:
+                format: int32
+                type: integer
+              scaleTargetRef:
+                description: ScaleTarget holds the reference to the scale target Object
+                properties:
+                  apiVersion:
+                    type: string
+                  envSourceContainerName:
+                    type: string
+                  kind:
+                    type: string
+                  name:
+                    type: string
+                required:
+                - name
+                type: object
+              triggers:
+                items:
+                  description: ScaleTriggers reference the scaler that will be used
+                  properties:
+                    authenticationRef:
+                      description: |-
+                        AuthenticationRef points to the TriggerAuthentication or ClusterTriggerAuthentication object that
+                        is used to authenticate the scaler with the environment
+                      properties:
+                        kind:
+                          description: Kind of the resource being referred to. Defaults
+                            to TriggerAuthentication.
+                          type: string
+                        name:
+                          type: string
+                      required:
+                      - name
+                      type: object
+                    metadata:
+                      additionalProperties:
+                        type: string
+                      type: object
+                    metricType:
+                      description: |-
+                        MetricTargetType specifies the type of metric being targeted, and should be either
+                        "Value", "AverageValue", or "Utilization"
+                      type: string
+                    name:
+                      type: string
+                    type:
+                      type: string
+                    useCachedMetrics:
+                      type: boolean
+                  required:
+                  - metadata
+                  - type
+                  type: object
+                type: array
+            required:
+            - scaleTargetRef
+            - triggers
+            type: object
+          status:
+            description: ScaledObjectStatus is the status for a ScaledObject resource
+            properties:
+              compositeScalerName:
+                type: string
+              conditions:
+                description: Conditions an array representation to store multiple
+                  Conditions
+                items:
+                  description: Condition to store the condition state
+                  properties:
+                    message:
+                      description: A human readable message indicating details about
+                        the transition.
+                      type: string
+                    reason:
+                      description: The reason for the condition's last transition.
+                      type: string
+                    status:
+                      description: Status of the condition, one of True, False, Unknown.
+                      type: string
+                    type:
+                      description: Type of condition
+                      type: string
+                  required:
+                  - status
+                  - type
+                  type: object
+                type: array
+              externalMetricNames:
+                items:
+                  type: string
+                type: array
+              health:
+                additionalProperties:
+                  description: HealthStatus is the status for a ScaledObject's health
+                  properties:
+                    numberOfFailures:
+                      format: int32
+                      type: integer
+                    status:
+                      description: HealthStatusType is an indication of whether the
+                        health status is happy or failing
+                      type: string
+                  type: object
+                type: object
+              hpaName:
+                type: string
+              lastActiveTime:
+                format: date-time
+                type: string
+              originalReplicaCount:
+                format: int32
+                type: integer
+              pausedReplicaCount:
+                format: int32
+                type: integer
+              resourceMetricNames:
+                items:
+                  type: string
+                type: array
+              scaleTargetGVKR:
+                description: GroupVersionKindResource provides unified structure for
+                  schema.GroupVersionKind and Resource
+                properties:
+                  group:
+                    type: string
+                  kind:
+                    type: string
+                  resource:
+                    type: string
+                  version:
+                    type: string
+                required:
+                - group
+                - kind
+                - resource
+                - version
+                type: object
+              scaleTargetKind:
+                type: string
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.14.0
+  labels:
+    app.kubernetes.io/part-of: keda-operator
+    app.kubernetes.io/version: 2.14.0
+  name: triggerauthentications.keda.sh
+spec:
+  group: keda.sh
+  names:
+    kind: TriggerAuthentication
+    listKind: TriggerAuthenticationList
+    plural: triggerauthentications
+    shortNames:
+    - ta
+    - triggerauth
+    singular: triggerauthentication
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.podIdentity.provider
+      name: PodIdentity
+      type: string
+    - jsonPath: .spec.secretTargetRef[*].name
+      name: Secret
+      type: string
+    - jsonPath: .spec.env[*].name
+      name: Env
+      type: string
+    - jsonPath: .spec.hashiCorpVault.address
+      name: VaultAddress
+      type: string
+    - jsonPath: .status.scaledobjects
+      name: ScaledObjects
+      priority: 1
+      type: string
+    - jsonPath: .status.scaledjobs
+      name: ScaledJobs
+      priority: 1
+      type: string
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: TriggerAuthentication defines how a trigger can authenticate
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: TriggerAuthenticationSpec defines the various ways to authenticate
+            properties:
+              awsSecretManager:
+                description: AwsSecretManager is used to authenticate using AwsSecretManager
+                properties:
+                  credentials:
+                    properties:
+                      accessKey:
+                        properties:
+                          valueFrom:
+                            properties:
+                              secretKeyRef:
+                                properties:
+                                  key:
+                                    type: string
+                                  name:
+                                    type: string
+                                required:
+                                - key
+                                - name
+                                type: object
+                            required:
+                            - secretKeyRef
+                            type: object
+                        required:
+                        - valueFrom
+                        type: object
+                      accessSecretKey:
+                        properties:
+                          valueFrom:
+                            properties:
+                              secretKeyRef:
+                                properties:
+                                  key:
+                                    type: string
+                                  name:
+                                    type: string
+                                required:
+                                - key
+                                - name
+                                type: object
+                            required:
+                            - secretKeyRef
+                            type: object
+                        required:
+                        - valueFrom
+                        type: object
+                      accessToken:
+                        properties:
+                          valueFrom:
+                            properties:
+                              secretKeyRef:
+                                properties:
+                                  key:
+                                    type: string
+                                  name:
+                                    type: string
+                                required:
+                                - key
+                                - name
+                                type: object
+                            required:
+                            - secretKeyRef
+                            type: object
+                        required:
+                        - valueFrom
+                        type: object
+                    required:
+                    - accessKey
+                    - accessSecretKey
+                    type: object
+                  podIdentity:
+                    description: |-
+                      AuthPodIdentity allows users to select the platform native identity
+                      mechanism
+                    properties:
+                      identityAuthorityHost:
+                        description: Set identityAuthorityHost to override the default
+                          Azure authority host. If this is set, then the IdentityTenantID
+                          must also be set
+                        type: string
+                      identityId:
+                        type: string
+                      identityOwner:
+                        description: IdentityOwner configures which identity has to
+                          be used during auto discovery, keda or the scaled workload.
+                          Mutually exclusive with roleArn
+                        enum:
+                        - keda
+                        - workload
+                        type: string
+                      identityTenantId:
+                        description: Set identityTenantId to override the default
+                          Azure tenant id. If this is set, then the IdentityID must
+                          also be set
+                        type: string
+                      provider:
+                        description: PodIdentityProvider contains the list of providers
+                        enum:
+                        - azure
+                        - azure-workload
+                        - gcp
+                        - aws
+                        - aws-eks
+                        - aws-kiam
+                        - none
+                        type: string
+                      roleArn:
+                        description: RoleArn sets the AWS RoleArn to be used. Mutually
+                          exclusive with IdentityOwner
+                        type: string
+                    required:
+                    - provider
+                    type: object
+                  region:
+                    type: string
+                  secrets:
+                    items:
+                      properties:
+                        name:
+                          type: string
+                        parameter:
+                          type: string
+                        versionId:
+                          type: string
+                        versionStage:
+                          type: string
+                      required:
+                      - name
+                      - parameter
+                      type: object
+                    type: array
+                required:
+                - secrets
+                type: object
+              azureKeyVault:
+                description: AzureKeyVault is used to authenticate using Azure Key
+                  Vault
+                properties:
+                  cloud:
+                    properties:
+                      activeDirectoryEndpoint:
+                        type: string
+                      keyVaultResourceURL:
+                        type: string
+                      type:
+                        type: string
+                    required:
+                    - type
+                    type: object
+                  credentials:
+                    properties:
+                      clientId:
+                        type: string
+                      clientSecret:
+                        properties:
+                          valueFrom:
+                            properties:
+                              secretKeyRef:
+                                properties:
+                                  key:
+                                    type: string
+                                  name:
+                                    type: string
+                                required:
+                                - key
+                                - name
+                                type: object
+                            required:
+                            - secretKeyRef
+                            type: object
+                        required:
+                        - valueFrom
+                        type: object
+                      tenantId:
+                        type: string
+                    required:
+                    - clientId
+                    - clientSecret
+                    - tenantId
+                    type: object
+                  podIdentity:
+                    description: |-
+                      AuthPodIdentity allows users to select the platform native identity
+                      mechanism
+                    properties:
+                      identityAuthorityHost:
+                        description: Set identityAuthorityHost to override the default
+                          Azure authority host. If this is set, then the IdentityTenantID
+                          must also be set
+                        type: string
+                      identityId:
+                        type: string
+                      identityOwner:
+                        description: IdentityOwner configures which identity has to
+                          be used during auto discovery, keda or the scaled workload.
+                          Mutually exclusive with roleArn
+                        enum:
+                        - keda
+                        - workload
+                        type: string
+                      identityTenantId:
+                        description: Set identityTenantId to override the default
+                          Azure tenant id. If this is set, then the IdentityID must
+                          also be set
+                        type: string
+                      provider:
+                        description: PodIdentityProvider contains the list of providers
+                        enum:
+                        - azure
+                        - azure-workload
+                        - gcp
+                        - aws
+                        - aws-eks
+                        - aws-kiam
+                        - none
+                        type: string
+                      roleArn:
+                        description: RoleArn sets the AWS RoleArn to be used. Mutually
+                          exclusive with IdentityOwner
+                        type: string
+                    required:
+                    - provider
+                    type: object
+                  secrets:
+                    items:
+                      properties:
+                        name:
+                          type: string
+                        parameter:
+                          type: string
+                        version:
+                          type: string
+                      required:
+                      - name
+                      - parameter
+                      type: object
+                    type: array
+                  vaultUri:
+                    type: string
+                required:
+                - secrets
+                - vaultUri
+                type: object
+              configMapTargetRef:
+                items:
+                  description: AuthConfigMapTargetRef is used to authenticate using
+                    a reference to a config map
+                  properties:
+                    key:
+                      type: string
+                    name:
+                      type: string
+                    parameter:
+                      type: string
+                  required:
+                  - key
+                  - name
+                  - parameter
+                  type: object
+                type: array
+              env:
+                items:
+                  description: |-
+                    AuthEnvironment is used to authenticate using environment variables
+                    in the destination ScaleTarget spec
+                  properties:
+                    containerName:
+                      type: string
+                    name:
+                      type: string
+                    parameter:
+                      type: string
+                  required:
+                  - name
+                  - parameter
+                  type: object
+                type: array
+              gcpSecretManager:
+                properties:
+                  credentials:
+                    properties:
+                      clientSecret:
+                        properties:
+                          valueFrom:
+                            properties:
+                              secretKeyRef:
+                                properties:
+                                  key:
+                                    type: string
+                                  name:
+                                    type: string
+                                required:
+                                - key
+                                - name
+                                type: object
+                            required:
+                            - secretKeyRef
+                            type: object
+                        required:
+                        - valueFrom
+                        type: object
+                    required:
+                    - clientSecret
+                    type: object
+                  podIdentity:
+                    description: |-
+                      AuthPodIdentity allows users to select the platform native identity
+                      mechanism
+                    properties:
+                      identityAuthorityHost:
+                        description: Set identityAuthorityHost to override the default
+                          Azure authority host. If this is set, then the IdentityTenantID
+                          must also be set
+                        type: string
+                      identityId:
+                        type: string
+                      identityOwner:
+                        description: IdentityOwner configures which identity has to
+                          be used during auto discovery, keda or the scaled workload.
+                          Mutually exclusive with roleArn
+                        enum:
+                        - keda
+                        - workload
+                        type: string
+                      identityTenantId:
+                        description: Set identityTenantId to override the default
+                          Azure tenant id. If this is set, then the IdentityID must
+                          also be set
+                        type: string
+                      provider:
+                        description: PodIdentityProvider contains the list of providers
+                        enum:
+                        - azure
+                        - azure-workload
+                        - gcp
+                        - aws
+                        - aws-eks
+                        - aws-kiam
+                        - none
+                        type: string
+                      roleArn:
+                        description: RoleArn sets the AWS RoleArn to be used. Mutually
+                          exclusive with IdentityOwner
+                        type: string
+                    required:
+                    - provider
+                    type: object
+                  secrets:
+                    items:
+                      properties:
+                        id:
+                          type: string
+                        parameter:
+                          type: string
+                        version:
+                          type: string
+                      required:
+                      - id
+                      - parameter
+                      type: object
+                    type: array
+                required:
+                - secrets
+                type: object
+              hashiCorpVault:
+                description: HashiCorpVault is used to authenticate using Hashicorp
+                  Vault
+                properties:
+                  address:
+                    type: string
+                  authentication:
+                    description: VaultAuthentication contains the list of Hashicorp
+                      Vault authentication methods
+                    type: string
+                  credential:
+                    description: Credential defines the Hashicorp Vault credentials
+                      depending on the authentication method
+                    properties:
+                      serviceAccount:
+                        type: string
+                      token:
+                        type: string
+                    type: object
+                  mount:
+                    type: string
+                  namespace:
+                    type: string
+                  role:
+                    type: string
+                  secrets:
+                    items:
+                      description: VaultSecret defines the mapping between the path
+                        of the secret in Vault to the parameter
+                      properties:
+                        key:
+                          type: string
+                        parameter:
+                          type: string
+                        path:
+                          type: string
+                        pkiData:
+                          properties:
+                            altNames:
+                              type: string
+                            commonName:
+                              type: string
+                            format:
+                              type: string
+                            ipSans:
+                              type: string
+                            otherSans:
+                              type: string
+                            ttl:
+                              type: string
+                            uriSans:
+                              type: string
+                          type: object
+                        type:
+                          description: VaultSecretType defines the type of vault secret
+                          type: string
+                      required:
+                      - key
+                      - parameter
+                      - path
+                      type: object
+                    type: array
+                required:
+                - address
+                - authentication
+                - secrets
+                type: object
+              podIdentity:
+                description: |-
+                  AuthPodIdentity allows users to select the platform native identity
+                  mechanism
+                properties:
+                  identityAuthorityHost:
+                    description: Set identityAuthorityHost to override the default
+                      Azure authority host. If this is set, then the IdentityTenantID
+                      must also be set
+                    type: string
+                  identityId:
+                    type: string
+                  identityOwner:
+                    description: IdentityOwner configures which identity has to be
+                      used during auto discovery, keda or the scaled workload. Mutually
+                      exclusive with roleArn
+                    enum:
+                    - keda
+                    - workload
+                    type: string
+                  identityTenantId:
+                    description: Set identityTenantId to override the default Azure
+                      tenant id. If this is set, then the IdentityID must also be
+                      set
+                    type: string
+                  provider:
+                    description: PodIdentityProvider contains the list of providers
+                    enum:
+                    - azure
+                    - azure-workload
+                    - gcp
+                    - aws
+                    - aws-eks
+                    - aws-kiam
+                    - none
+                    type: string
+                  roleArn:
+                    description: RoleArn sets the AWS RoleArn to be used. Mutually
+                      exclusive with IdentityOwner
+                    type: string
+                required:
+                - provider
+                type: object
+              secretTargetRef:
+                items:
+                  description: AuthSecretTargetRef is used to authenticate using a
+                    reference to a secret
+                  properties:
+                    key:
+                      type: string
+                    name:
+                      type: string
+                    parameter:
+                      type: string
+                  required:
+                  - key
+                  - name
+                  - parameter
+                  type: object
+                type: array
+            type: object
+          status:
+            description: TriggerAuthenticationStatus defines the observed state of
+              TriggerAuthentication
+            properties:
+              scaledjobs:
+                type: string
+              scaledobjects:
+                type: string
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app.kubernetes.io/name: keda-operator
+    app.kubernetes.io/part-of: keda-operator
+    app.kubernetes.io/version: 2.14.0
+  name: keda-operator
+  namespace: keda
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  labels:
+    app.kubernetes.io/name: keda-operator
+    app.kubernetes.io/part-of: keda-operator
+    app.kubernetes.io/version: 2.14.0
+  name: keda-operator
+  namespace: keda
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - '*'
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: keda-external-metrics-reader
+    app.kubernetes.io/part-of: keda-operator
+    app.kubernetes.io/version: 2.14.0
+  name: keda-external-metrics-reader
+rules:
+- apiGroups:
+  - external.metrics.k8s.io
+  resources:
+  - '*'
+  verbs:
+  - '*'
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: keda-operator
+    app.kubernetes.io/part-of: keda-operator
+    app.kubernetes.io/version: 2.14.0
+  name: keda-operator
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  - configmaps/status
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - '*'
+- apiGroups:
+  - ""
+  resources:
+  - external
+  - pods
+  - secrets
+  - services
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - limitranges
+  verbs:
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - serviceaccounts
+  verbs:
+  - list
+  - watch
+- apiGroups:
+  - '*'
+  resources:
+  - '*'
+  verbs:
+  - get
+- apiGroups:
+  - '*'
+  resources:
+  - '*/scale'
+  verbs:
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - admissionregistration.k8s.io
+  resources:
+  - validatingwebhookconfigurations
+  verbs:
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apiregistration.k8s.io
+  resources:
+  - apiservices
+  verbs:
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  - statefulsets
+  verbs:
+  - list
+  - watch
+- apiGroups:
+  - autoscaling
+  resources:
+  - horizontalpodautoscalers
+  verbs:
+  - '*'
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - '*'
+- apiGroups:
+  - eventing.keda.sh
+  resources:
+  - cloudeventsources
+  - cloudeventsources/status
+  verbs:
+  - '*'
+- apiGroups:
+  - keda.sh
+  resources:
+  - clustertriggerauthentications
+  - clustertriggerauthentications/status
+  verbs:
+  - '*'
+- apiGroups:
+  - keda.sh
+  resources:
+  - scaledjobs
+  - scaledjobs/finalizers
+  - scaledjobs/status
+  verbs:
+  - '*'
+- apiGroups:
+  - keda.sh
+  resources:
+  - scaledobjects
+  - scaledobjects/finalizers
+  - scaledobjects/status
+  verbs:
+  - '*'
+- apiGroups:
+  - keda.sh
+  resources:
+  - triggerauthentications
+  - triggerauthentications/status
+  verbs:
+  - '*'
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  labels:
+    app.kubernetes.io/name: keda-operator
+    app.kubernetes.io/part-of: keda-operator
+    app.kubernetes.io/version: 2.14.0
+  name: keda-operator
+  namespace: keda
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: keda-operator
+subjects:
+- kind: ServiceAccount
+  name: keda-operator
+  namespace: keda
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  labels:
+    app.kubernetes.io/name: keda-auth-reader
+    app.kubernetes.io/part-of: keda-operator
+    app.kubernetes.io/version: 2.14.0
+  name: keda-auth-reader
+  namespace: kube-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: extension-apiserver-authentication-reader
+subjects:
+- kind: ServiceAccount
+  name: keda-operator
+  namespace: keda
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    app.kubernetes.io/name: keda-hpa-controller-external-metrics
+    app.kubernetes.io/part-of: keda-operator
+    app.kubernetes.io/version: 2.14.0
+  name: keda-hpa-controller-external-metrics
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: keda-external-metrics-reader
+subjects:
+- kind: ServiceAccount
+  name: horizontal-pod-autoscaler
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    app.kubernetes.io/name: keda-operator
+    app.kubernetes.io/part-of: keda-operator
+    app.kubernetes.io/version: 2.14.0
+  name: keda-operator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: keda-operator
+subjects:
+- kind: ServiceAccount
+  name: keda-operator
+  namespace: keda
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    app.kubernetes.io/name: keda-system-auth-delegator
+    app.kubernetes.io/part-of: keda-operator
+    app.kubernetes.io/version: 2.14.0
+  name: keda-system-auth-delegator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:auth-delegator
+subjects:
+- kind: ServiceAccount
+  name: keda-operator
+  namespace: keda
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app.kubernetes.io/component: admission-webhooks
+    app.kubernetes.io/created-by: keda
+    app.kubernetes.io/instance: admission-webhooks
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/part-of: keda-operator
+    app.kubernetes.io/version: 2.14.0
+  name: keda-admission-webhooks
+  namespace: keda
+spec:
+  ports:
+  - name: https
+    port: 443
+    protocol: TCP
+    targetPort: 9443
+  - name: metrics
+    port: 8080
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    app: keda-admission-webhooks
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app.kubernetes.io/name: keda-metrics-apiserver
+    app.kubernetes.io/part-of: keda-operator
+    app.kubernetes.io/version: 2.14.0
+  name: keda-metrics-apiserver
+  namespace: keda
+spec:
+  ports:
+  - name: https
+    port: 443
+    targetPort: 6443
+  - name: metrics
+    port: 8080
+    targetPort: 8080
+  selector:
+    app: keda-metrics-apiserver
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app.kubernetes.io/name: keda-operator
+    app.kubernetes.io/part-of: keda-operator
+    app.kubernetes.io/version: 2.14.0
+  name: keda-operator
+  namespace: keda
+spec:
+  ports:
+  - name: metricsservice
+    port: 9666
+    targetPort: 9666
+  - name: metrics
+    port: 8080
+    targetPort: 8080
+  selector:
+    app: keda-operator
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: keda-admission-webhooks
+    app.kubernetes.io/component: admission-webhooks
+    app.kubernetes.io/name: admission-webhooks
+    app.kubernetes.io/part-of: keda-operator
+    app.kubernetes.io/version: 2.14.0
+  name: keda-admission
+  namespace: keda
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: keda-admission-webhooks
+  template:
+    metadata:
+      labels:
+        app: keda-admission-webhooks
+        name: keda-admission-webhooks
+      name: keda-admission-webhooks
+    spec:
+      containers:
+      - args:
+        - --zap-log-level=info
+        - --zap-encoder=console
+        - --zap-time-encoding=rfc3339
+        command:
+        - /keda-admission-webhooks
+        env:
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: WATCH_NAMESPACE
+          value: ""
+        - name: KEDA_HTTP_DEFAULT_TIMEOUT
+          value: ""
+        image: ghcr.io/kedacore/keda-admission-webhooks:2.14.0
+        imagePullPolicy: Always
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 25
+        name: keda-admission-webhooks
+        ports:
+        - containerPort: 9443
+          name: http
+          protocol: TCP
+        - containerPort: 8080
+          name: metrics
+          protocol: TCP
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8081
+          initialDelaySeconds: 20
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 1000Mi
+          requests:
+            cpu: 100m
+            memory: 100Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
+        volumeMounts:
+        - mountPath: /certs
+          name: certificates
+          readOnly: true
+      nodeSelector:
+        kubernetes.io/os: linux
+      securityContext:
+        runAsNonRoot: true
+      serviceAccountName: keda-operator
+      terminationGracePeriodSeconds: 10
+      volumes:
+      - name: certificates
+        secret:
+          defaultMode: 420
+          secretName: kedaorg-certs
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: keda-metrics-apiserver
+    app.kubernetes.io/name: keda-metrics-apiserver
+    app.kubernetes.io/part-of: keda-operator
+    app.kubernetes.io/version: 2.14.0
+  name: keda-metrics-apiserver
+  namespace: keda
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: keda-metrics-apiserver
+  template:
+    metadata:
+      labels:
+        app: keda-metrics-apiserver
+      name: keda-metrics-apiserver
+    spec:
+      containers:
+      - args:
+        - /usr/local/bin/keda-adapter
+        - --secure-port=6443
+        - --logtostderr=true
+        - --stderrthreshold=ERROR
+        - --v=0
+        - --client-ca-file=/certs/ca.crt
+        - --tls-cert-file=/certs/tls.crt
+        - --tls-private-key-file=/certs/tls.key
+        - --cert-dir=/certs
+        env:
+        - name: WATCH_NAMESPACE
+          value: ""
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: KEDA_HTTP_DEFAULT_TIMEOUT
+          value: ""
+        image: ghcr.io/kedacore/keda-metrics-apiserver:2.14.0
+        imagePullPolicy: Always
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 6443
+            scheme: HTTPS
+          initialDelaySeconds: 5
+        name: keda-metrics-apiserver
+        ports:
+        - containerPort: 6443
+          name: https
+        - containerPort: 8080
+          name: http
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 6443
+            scheme: HTTPS
+          initialDelaySeconds: 5
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 1000Mi
+          requests:
+            cpu: 100m
+            memory: 100Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
+        volumeMounts:
+        - mountPath: /tmp
+          name: temp-vol
+        - mountPath: /certs
+          name: certificates
+          readOnly: true
+      nodeSelector:
+        kubernetes.io/os: linux
+      securityContext:
+        runAsNonRoot: true
+      serviceAccountName: keda-operator
+      volumes:
+      - emptyDir: {}
+        name: temp-vol
+      - name: certificates
+        secret:
+          defaultMode: 420
+          secretName: kedaorg-certs
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: keda-operator
+    app.kubernetes.io/component: operator
+    app.kubernetes.io/name: keda-operator
+    app.kubernetes.io/part-of: keda-operator
+    app.kubernetes.io/version: 2.14.0
+  name: keda-operator
+  namespace: keda
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: keda-operator
+  template:
+    metadata:
+      labels:
+        app: keda-operator
+        name: keda-operator
+      name: keda-operator
+    spec:
+      containers:
+      - args:
+        - --leader-elect
+        - --zap-log-level=info
+        - --zap-encoder=console
+        - --zap-time-encoding=rfc3339
+        - --enable-cert-rotation=true
+        command:
+        - /keda
+        env:
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: WATCH_NAMESPACE
+          value: ""
+        - name: KEDA_HTTP_DEFAULT_TIMEOUT
+          value: ""
+        image: ghcr.io/kedacore/keda:2.14.0
+        imagePullPolicy: Always
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 25
+        name: keda-operator
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8081
+          initialDelaySeconds: 20
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 1000Mi
+          requests:
+            cpu: 100m
+            memory: 100Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
+        volumeMounts:
+        - mountPath: /certs
+          name: certificates
+          readOnly: true
+      nodeSelector:
+        kubernetes.io/os: linux
+      securityContext:
+        runAsNonRoot: true
+      serviceAccountName: keda-operator
+      terminationGracePeriodSeconds: 10
+      volumes:
+      - name: certificates
+        secret:
+          defaultMode: 420
+          optional: true
+          secretName: kedaorg-certs
+---
+apiVersion: apiregistration.k8s.io/v1
+kind: APIService
+metadata:
+  labels:
+    app.kubernetes.io/name: v1beta1.external.metrics.k8s.io
+    app.kubernetes.io/part-of: keda-operator
+    app.kubernetes.io/version: 2.14.0
+  name: v1beta1.external.metrics.k8s.io
+spec:
+  group: external.metrics.k8s.io
+  groupPriorityMinimum: 100
+  service:
+    name: keda-metrics-apiserver
+    namespace: keda
+  version: v1beta1
+  versionPriority: 100
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  labels:
+    app.kubernetes.io/component: admission-webhooks
+    app.kubernetes.io/created-by: keda
+    app.kubernetes.io/instance: admission-webhooks
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/part-of: keda-operator
+    app.kubernetes.io/version: 2.14.0
+  name: keda-admission
+webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: keda-admission-webhooks
+      namespace: keda
+      path: /validate-keda-sh-v1alpha1-scaledobject
+  failurePolicy: Ignore
+  matchPolicy: Equivalent
+  name: vscaledobject.kb.io
+  namespaceSelector: {}
+  objectSelector: {}
+  rules:
+  - apiGroups:
+    - keda.sh
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - scaledobjects
+  sideEffects: None
+  timeoutSeconds: 10
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: keda-admission-webhooks
+      namespace: keda
+      path: /validate-keda-sh-v1alpha1-scaledjob
+  failurePolicy: Ignore
+  matchPolicy: Equivalent
+  name: vscaledjob.kb.io
+  namespaceSelector: {}
+  objectSelector: {}
+  rules:
+  - apiGroups:
+    - keda.sh
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - scaledjobs
+  sideEffects: None
+  timeoutSeconds: 10
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: keda-admission-webhooks
+      namespace: keda
+      path: /validate-keda-sh-v1alpha1-triggerauthentication
+  failurePolicy: Ignore
+  matchPolicy: Equivalent
+  name: vstriggerauthentication.kb.io
+  namespaceSelector: {}
+  objectSelector: {}
+  rules:
+  - apiGroups:
+    - keda.sh
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - triggerauthentications
+  sideEffects: None
+  timeoutSeconds: 10
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: keda-admission-webhooks
+      namespace: keda
+      path: /validate-keda-sh-v1alpha1-clustertriggerauthentication
+  failurePolicy: Ignore
+  matchPolicy: Equivalent
+  name: vsclustertriggerauthentication.kb.io
+  namespaceSelector: {}
+  objectSelector: {}
+  rules:
+  - apiGroups:
+    - keda.sh
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - clustertriggerauthentications
+  sideEffects: None
+  timeoutSeconds: 10
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: keda-admission-webhooks
+      namespace: keda
+      path: /validate-eventing-keda-sh-v1alpha1-cloudeventsource
+  failurePolicy: Ignore
+  matchPolicy: Equivalent
+  name: vcloudeventsource.kb.io
+  namespaceSelector: {}
+  objectSelector: {}
+  rules:
+  - apiGroups:
+    - eventing.keda.sh
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - cloudeventsources
+  sideEffects: None
+  timeoutSeconds: 10

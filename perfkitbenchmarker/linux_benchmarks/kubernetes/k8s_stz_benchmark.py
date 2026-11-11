@@ -134,6 +134,18 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
         target_scale=_TARGET_SCALE.value,
     )
 
+  if _DEPLOY_KEDA.value:
+    # Deploy KEDA operator and ScaledObject
+    kubernetes_commands.ApplyManifest('kubernetes_stz/keda_operator.yaml')
+    kubernetes_commands.WaitForRollout(
+        'deployment/keda-operator', namespace='keda'
+    )
+    kubernetes_commands.ApplyManifest(
+        'kubernetes_stz/scaled_object.yaml.j2',
+        benchmark_name=BENCHMARK_NAME.replace('_', '-'),
+        target_scale=_TARGET_SCALE.value,
+    )
+
 
 def _ParseOutput(
     output_string: str, base_metadata: dict[str, Any]
