@@ -34,12 +34,16 @@ k8s_stz:
     vm_spec:
       GCP:
         machine_type: n2-standard-4
+      AWS:
+        machine_type: m6i.xlarge
   vm_groups:
     client_vms:
       os_type: ubuntu2204
       vm_spec:
         GCP:
           machine_type: n2-standard-4
+        AWS:
+          machine_type: m6i.xlarge
       vm_count: 1
 """
 
