@@ -891,3 +891,14 @@ fio_nfs_latency_single_file:
     fio_fill_size: 100G
     fio_generate_scenarios: rand_4k_read_100G_iodepth-1_numjobs-1,rand_4k_write_100G_iodepth-1_numjobs-1
     fio_runtime: 300
+
+fio_nfs_latency_many_files:
+  name: fio_nfs
+  flags:
+    data_disk_size: 1024
+    fio_fill_size: 20000M
+    fio_fill_block_size: 2M
+    fio_generate_scenarios: rand_4k_read_20000M_iodepth-1_numjobs-1,rand_4k_write_20000M_iodepth-1_numjobs-1
+    fio_runtime: 300
+    fio_nr_files: 10000
+    fio_jobfile: fio-fuse.job
