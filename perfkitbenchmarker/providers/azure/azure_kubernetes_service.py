@@ -27,6 +27,7 @@ from perfkitbenchmarker import virtual_machine_spec
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import azure
 from perfkitbenchmarker.providers.azure import azure_network
+from perfkitbenchmarker.providers.azure import flags as azure_flags
 from perfkitbenchmarker.providers.azure import util
 from perfkitbenchmarker.resources.container_service import container
 from perfkitbenchmarker.resources.container_service import container_cluster
@@ -124,6 +125,7 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
     self.resource_group = azure_network.GetResourceGroup(self.region)
     self.node_resource_group = None
     self.name = 'pkbcluster%s' % FLAGS.run_uri
+    self.managed_keda = azure_flags.AZURE_AKS_ENABLE_KEDA.value
     # TODO(pclay): replace with built in service principal once I figure out how
     # to make it work with ACR
     self.cluster_version = FLAGS.container_cluster_version
@@ -198,6 +200,8 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
     use_cilium = (
         FLAGS.azure_aks_auto_node_provisioning or self.enable_network_policy
     )
+    if self.managed_keda:
+      cmd += ['--enable-keda']
     if self.max_total_nodes > 256 or use_cilium:
       cmd += [
           '--network-plugin',

@@ -21,6 +21,7 @@ from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.providers.azure import flags as azure_flags
 from perfkitbenchmarker.providers.gcp import util
 from perfkitbenchmarker.resources.container_service import kubernetes_commands
 
@@ -36,6 +37,8 @@ k8s_stz:
         machine_type: n2-standard-4
       AWS:
         machine_type: m6i.xlarge
+      Azure:
+        machine_type: Standard_D4s_v5
   vm_groups:
     client_vms:
       os_type: ubuntu2204
@@ -44,6 +47,8 @@ k8s_stz:
           machine_type: n2-standard-4
         AWS:
           machine_type: m6i.xlarge
+        Azure:
+          machine_type: Standard_D4s_v5
       vm_count: 1
 """
 
@@ -138,12 +143,15 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
         target_scale=_TARGET_SCALE.value,
     )
 
-  if _DEPLOY_KEDA.value:
-    # Deploy KEDA operator and ScaledObject
-    kubernetes_commands.ApplyManifest('kubernetes_stz/keda_operator.yaml')
-    kubernetes_commands.WaitForRollout(
-        'deployment/keda-operator', namespace='keda'
-    )
+  if _DEPLOY_KEDA.value or azure_flags.AZURE_AKS_ENABLE_KEDA.value:
+    if not azure_flags.AZURE_AKS_ENABLE_KEDA.value:
+      # Deploy OSS KEDA operator only if Managed KEDA is not in use
+      kubernetes_commands.ApplyManifest('kubernetes_stz/keda_operator.yaml')
+      kubernetes_commands.WaitForRollout(
+          'deployment/keda-operator', namespace='keda'
+      )
+
+    # Always deploy the ScaledObject when using KEDA
     kubernetes_commands.ApplyManifest(
         'kubernetes_stz/scaled_object.yaml.j2',
         benchmark_name=BENCHMARK_NAME.replace('_', '-'),
@@ -235,6 +243,8 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
       'deploy_keda': _DEPLOY_KEDA.value,
       'target_scale': _TARGET_SCALE.value,
       'capacity_buffer': _CAPACITY_BUFFER_TYPE.value,
+      'workload_generator': _WORKLOAD_GENERATOR.value,
+      'azure_managed_keda': azure_flags.AZURE_AKS_ENABLE_KEDA.value,
   }
 
   output_string = _RunBenchmarkCommand(client_vm)
