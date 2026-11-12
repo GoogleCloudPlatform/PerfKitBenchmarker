@@ -69,6 +69,7 @@ from perfkitbenchmarker.resources import ai_agent_service
 from perfkitbenchmarker.resources import base_job
 from perfkitbenchmarker.resources import example_resource
 from perfkitbenchmarker.resources import managed_ai_model
+from perfkitbenchmarker.resources import spanner_omni_cluster
 from perfkitbenchmarker.resources.container_service import container_cluster
 from perfkitbenchmarker.resources.container_service import container_registry
 from perfkitbenchmarker.resources.container_service import kubernetes_cluster
@@ -205,6 +206,9 @@ class BenchmarkSpec:
     self.edw_service = None
     self.edw_compute_resource = None
     self.example_resource = None
+    self.spanner_omni_cluster: (
+        spanner_omni_cluster.BaseSpannerOmniCluster | None
+    ) = None
     self.multi_attach_disk = None
     self.nfs_service = None
     self.netapp_service = None
@@ -359,6 +363,7 @@ class BenchmarkSpec:
     self.ConstructEdwService()
     self.ConstructEdwComputeResource()
     self.ConstructExampleResource()
+    self.ConstructSpannerOmniCluster()
     self.ConstructBaseJob()
     self.ConstructVPNService()
     self.ConstructNfsService()
@@ -613,6 +618,29 @@ class BenchmarkSpec:
         self.config.example_resource
     )
     self.resources.append(self.example_resource)
+
+  def ConstructSpannerOmniCluster(self) -> None:
+    """Creates a spanner_omni_cluster object.
+
+    The resource is constructed here and its client VM is attached by
+    `SetVms` in `Provision` once the VMs exist (like `relational_db`). It is
+    created and deleted by the benchmark (so client setup can overlap the
+    multi-hour backup restore); `Delete` removes it as a safety net before the
+    container cluster is torn down.
+    """
+    omni_spec = getattr(self.config, 'spanner_omni_cluster', None)
+    if omni_spec is None:
+      return
+    if self.container_cluster is None:
+      raise errors.Config.InvalidValue(
+          'spanner_omni_cluster requires a container_cluster.'
+      )
+    providers.LoadProvider(omni_spec.cloud)
+    omni_class = spanner_omni_cluster.GetSpannerOmniClusterClass(
+        omni_spec.cloud
+    )
+    self.spanner_omni_cluster = omni_class(omni_spec, self.container_cluster)
+    self.resources.append(self.spanner_omni_cluster)
 
   def ConstructBaseJob(self):
     """Create an instance of the base job.It is also called from pkb.py."""
@@ -1209,6 +1237,9 @@ class BenchmarkSpec:
     if self.non_relational_db:
       self.non_relational_db.SetVms(self.vm_groups)
       self.non_relational_db.Create(restore=should_restore)
+    if self.spanner_omni_cluster:
+      # Created by the benchmark's Prepare; only attach the client VM here.
+      self.spanner_omni_cluster.SetVms(self.vm_groups)
     if hasattr(self, 'key') and self.key:
       self.key.Create()
     if self.tpus:
@@ -1274,6 +1305,8 @@ class BenchmarkSpec:
       self.edw_compute_resource.Delete()
     if self.example_resource:
       self.example_resource.Delete()
+    if getattr(self, 'spanner_omni_cluster', None):
+      self.spanner_omni_cluster.Delete()
     if self.base_job:
       self.base_job.Delete()
     if self.nfs_service:
@@ -1582,3 +1615,5 @@ class BenchmarkSpec:
       self.memory_store.CheckPrerequisites()
     if hasattr(self, 'ai_agent_service') and self.ai_agent_service:
       self.ai_agent_service.CheckPrerequisites()
+    if getattr(self, 'spanner_omni_cluster', None):
+      self.spanner_omni_cluster.CheckPrerequisites()

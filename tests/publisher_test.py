@@ -484,6 +484,17 @@ class DefaultMetadataProviderTestCase(unittest.TestCase):
     expected = self.default_meta | {'project': 'my-project'}
     self._RunTest(self.mock_spec, expected)
 
+  def testAddMetadata_SpannerOmniCluster(self):
+    self.mock_spec.spanner_omni_cluster.GetResourceMetadata.return_value = {
+        'spanner_omni_version': '2026.r5',
+        'db_engine': 'spanner-postgres',
+    }
+    expected = self.default_meta | {
+        'spanner_omni_version': '2026.r5',
+        'spanner_omni_db_engine': 'spanner-postgres',
+    }
+    self._RunTest(self.mock_spec, expected)
+
   @flagsaver.flagsaver(throw_on_metadata_conflict=False)
   def testDontOverrideMetadata(self):
     mock_spec = mock.MagicMock(vm_groups={'default': [self.mock_vm]})
