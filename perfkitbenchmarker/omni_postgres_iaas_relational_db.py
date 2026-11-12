@@ -26,6 +26,7 @@ KB_TO_GB = 1.0 / 1000000
 
 FLAGS = flags.FLAGS
 DEFAULT_OMNI_POSTGRES_VERSION = '15'
+_OMNI_DOCKER_IMAGE = 'google/alloydbomni'
 
 
 class OmniPostgresIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
@@ -100,13 +101,18 @@ class OmniPostgresIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
     super()._SetupLinuxUnmanagedDatabase()
     self.server_vm.Install('docker')
     self.server_vm.RemoteCommand('sudo mkdir /scratch/omni')
+    # Configure host THP/hugepage/max_map_count sysctls and lift Docker's
+    # default 64KB memlock rlimit so AlloyDB Omni can lock hugepages.
+    self.server_vm.RemoteCommand(
+        f'sudo docker run --rm --privileged {_OMNI_DOCKER_IMAGE} setup-host'
+    )
 
     self.server_vm.RemoteCommand(
-        'sudo docker run '
+        'sudo docker run --ulimit memlock=-1:-1'
         f' --shm-size={self.server_vm.total_memory_kb * KB_TO_GB}g'
         ' --name omni -e POSTGRES_PASSWORD=perfkitbenchmarker -v'
         ' /scratch/omni:/var/lib/postgresql/data -p 5432:5432 -d'
-        ' google/alloydbomni'
+        f' {_OMNI_DOCKER_IMAGE}'
         f' -c shared_buffers={self.postgres_shared_buffer_size}GB'
     )
 
