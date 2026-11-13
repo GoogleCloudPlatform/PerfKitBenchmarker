@@ -28,6 +28,10 @@ default_dual_core: &default_dual_core
     machine_type: cx2-4x8
     zone: us-south-1
     image: null
+  OCI:
+    machine_type: VM.Standard.E5.Flex
+    zone: us-ashburn-1
+    image: null
   Kubernetes:
     image: null
 
@@ -86,6 +90,10 @@ default_500_gb: &default_500_gb
     disk_type: standard
     disk_size: 500
     mount_point: /scratch
+  OCI:
+    disk_type: balanced
+    disk_size: 500
+    mount_point: /scratch
 
 
 # TODO(user): update the disk types below as more providers are
@@ -141,5 +149,9 @@ default_50_gb: &default_50_gb
     mount_point: /scratch
   IBMCloud:
     disk_type: standard
+    disk_size: 50
+    mount_point: /scratch
+  OCI:
+    disk_type: balanced
     disk_size: 50
     mount_point: /scratch
