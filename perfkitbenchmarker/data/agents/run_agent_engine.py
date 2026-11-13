@@ -59,11 +59,12 @@ async def run_remote_agent[AgentConfigT](
   endpoint = handler.create_endpoint(deployed_ref)
   execution_result = await handler.execute(endpoint, config)
 
-  # Export results including token metrics and tool calls collected from
-  # execution
+  # Export results including token metrics, tool calls, and custom metrics
+  # collected from execution.
   generic_metrics = {
       **execution_result.token_metrics,
       **execution_result.tool_calls,
+      **execution_result.custom_metrics,
   }
   if config.output_dir:
     handler.export_results(

@@ -101,6 +101,13 @@ class AdkAgentHandler(common_utils.BaseAgentHandler):
   ) -> None:
     """Exports the results and metrics."""
 
+  def extract_custom_metrics(
+      self, session_state: dict[str, Any]
+  ) -> dict[str, Any]:
+    """Extracts agent-specific metrics from the final ADK session state."""
+    del session_state
+    return {}
+
   def _extract_usage_tokens(
       self, usage: types.GenerateContentResponseUsageMetadata
   ) -> dict[str, int]:
@@ -137,6 +144,7 @@ class AdkAgentHandler(common_utils.BaseAgentHandler):
     token_totals: dict[str, int] = collections.defaultdict(int)
     tool_calls: dict[str, int] = collections.defaultdict(int)
     tool_errors: dict[str, int] = collections.defaultdict(int)
+    session_state: dict[str, Any] = {}
 
     async for raw_event in endpoint.stream_execute(prompt_config=prompt_config):
       if isinstance(raw_event, dict):
@@ -148,6 +156,7 @@ class AdkAgentHandler(common_utils.BaseAgentHandler):
         event = adk_event.Event.model_validate(raw_event)
       else:
         event: adk_event.Event = raw_event
+      session_state.update(event.actions.state_delta)
       usage_tokens = None
       if event.usage_metadata:
         usage_tokens = self._extract_usage_tokens(event.usage_metadata)
@@ -179,6 +188,7 @@ class AdkAgentHandler(common_utils.BaseAgentHandler):
         response_text=response_text,
         token_metrics=dict(token_totals),
         tool_calls=dict(tool_calls),
+        custom_metrics=self.extract_custom_metrics(session_state),
     )
 
   def _print_event(
