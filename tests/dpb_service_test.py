@@ -12,6 +12,7 @@ from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import virtual_machine
 from tests import pkb_common_test_case
 
 CLUSTER_SPEC = mock.Mock(
@@ -427,6 +428,132 @@ class DpbServiceTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(job_result.run_time, JOB_RUN_TIME)
     self.assertEqual(job_result.stdout, JOB_STDOUT)
     self.assertEqual(job_result.stderr, JOB_STDERR)
+
+
+class UnmanagedDpbServiceCreateTest(pkb_common_test_case.PkbCommonTestCase):
+
+  def setUp(self):
+    super().setUp()
+    dpb_service.hadoop.HadoopVersion.cache_clear()
+    dpb_service.spark.SparkVersion.cache_clear()
+    self.enter_context(
+        mock.patch.object(resource.BaseResource, '__init__', return_value=None)
+    )
+    self.enter_context(
+        mock.patch.object(
+            dpb_service.gcs, 'GoogleCloudStorageService', autospec=True
+        )
+    )
+    self.enter_context(
+        mock.patch.object(dpb_service.s3, 'S3Service', autospec=True)
+    )
+    self.mock_install_gcs = self.enter_context(
+        mock.patch.object(
+            dpb_service.hadoop, 'InstallGcsConnector', autospec=True
+        )
+    )
+    self.mock_install_aws_sdk = self.enter_context(
+        mock.patch.object(
+            dpb_service.hadoop, 'InstallAwsSdkBundle', autospec=True
+        )
+    )
+    self.mock_hadoop_configure = self.enter_context(
+        mock.patch.object(
+            dpb_service.hadoop, 'ConfigureAndStart', autospec=True
+        )
+    )
+    self.mock_spark_configure = self.enter_context(
+        mock.patch.object(dpb_service.spark, 'ConfigureAndStart', autospec=True)
+    )
+
+  def _CreateSpec(self, cloud: str) -> Any:
+    return mock.Mock(
+        static_dpb_service_instance=None,
+        worker_count=1,
+        version='fake-version',
+        applications=[],
+        worker_group=mock.Mock(
+            cloud=cloud,
+            vm_spec=mock.Mock(
+                machine_type='fake-machine-type', num_local_ssds=0
+            ),
+            disk_spec=mock.Mock(disk_type='pd-ssd', disk_size=42),
+        ),
+    )
+
+  @parameterized.named_parameters(
+      dict(
+          testcase_name='YarnAws',
+          cluster_cls=dpb_service.UnmanagedDpbServiceYarnCluster,
+          cloud='AWS',
+          zone='us-east-1a',
+          expected_package='hadoop',
+      ),
+      dict(
+          testcase_name='YarnGcp',
+          cluster_cls=dpb_service.UnmanagedDpbServiceYarnCluster,
+          cloud='GCP',
+          zone='us-central1-a',
+          expected_package='hadoop',
+      ),
+      dict(
+          testcase_name='SparkAws',
+          cluster_cls=dpb_service.UnmanagedDpbSparkCluster,
+          cloud='AWS',
+          zone='us-east-1a',
+          expected_package='spark',
+      ),
+      dict(
+          testcase_name='SparkGcp',
+          cluster_cls=dpb_service.UnmanagedDpbSparkCluster,
+          cloud='GCP',
+          zone='us-central1-a',
+          expected_package='spark',
+      ),
+  )
+  def testCreateInstallsCloudStorageDependencies(
+      self, cluster_cls, cloud, zone, expected_package
+  ):
+    with flagsaver.flagsaver(
+        run_uri=TEST_RUN_URI,
+        dpb_service_zone=zone,
+        hadoop_version='3.4.3',
+        spark_version='3.5.9',
+    ):
+      cluster = cluster_cls(self._CreateSpec(cloud))
+      master_vm = mock.create_autospec(
+          virtual_machine.BaseVirtualMachine, instance=True, spec_set=True
+      )
+      worker_vm = mock.create_autospec(
+          virtual_machine.BaseVirtualMachine, instance=True, spec_set=True
+      )
+      cluster.vms = {'master_group': [master_vm], 'worker_group': [worker_vm]}
+      cluster._Create()
+
+    master_vm.Install.assert_called_once_with(expected_package)
+    worker_vm.Install.assert_called_once_with(expected_package)
+    expected_vm_calls = [mock.call(worker_vm), mock.call(master_vm)]
+    if cloud == 'AWS':
+      self.mock_install_aws_sdk.assert_has_calls(
+          expected_vm_calls, any_order=True
+      )
+      self.assertEqual(self.mock_install_aws_sdk.call_count, 2)
+      self.mock_install_gcs.assert_not_called()
+    else:
+      self.mock_install_gcs.assert_has_calls(expected_vm_calls, any_order=True)
+      self.assertEqual(self.mock_install_gcs.call_count, 2)
+      self.mock_install_aws_sdk.assert_not_called()
+
+    if expected_package == 'hadoop':
+      self.mock_hadoop_configure.assert_called_once_with(
+          master_vm, [worker_vm], configure_s3=cloud == 'AWS'
+      )
+      self.mock_spark_configure.assert_not_called()
+    else:
+      self.mock_spark_configure.assert_called_once_with(
+          master_vm, [worker_vm], configure_s3=cloud == 'AWS'
+      )
+      self.mock_hadoop_configure.assert_not_called()
 
 
 if __name__ == '__main__':

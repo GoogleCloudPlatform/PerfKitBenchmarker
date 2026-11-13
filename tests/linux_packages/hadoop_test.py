@@ -1,10 +1,13 @@
 """Tests for dbp_service."""
 
 import unittest
+from unittest import mock
 
 from absl.testing import flagsaver
+from absl.testing import parameterized
 from packaging import version
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker.linux_packages import hadoop
 from tests import pkb_common_test_case
 import requests_mock
@@ -111,6 +114,120 @@ class HadoopVersionsTest(pkb_common_test_case.PkbCommonTestCase):
         'https://dlcdn.apache.org/hadoop/common',
     ):
       hadoop.HadoopVersion()
+
+
+HADOOP_PROJECT_POM = """\
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+  <properties>
+    <!-- <aws-java-sdk-v2.version>0.0.0</aws-java-sdk-v2.version> -->
+    <aws-java-sdk-v2.version>2.35.4</aws-java-sdk-v2.version>
+  </properties>
+</project>
+"""
+
+
+class InstallAwsSdkBundleTest(pkb_common_test_case.PkbCommonTestCase):
+
+  def setUp(self):
+    super().setUp()
+    hadoop.HadoopVersion.cache_clear()
+    hadoop._AwsSdkBundleVersion.cache_clear()
+    self.vm = mock.create_autospec(
+        virtual_machine.BaseVirtualMachine, instance=True, spec_set=True
+    )
+
+  @parameterized.named_parameters(
+      dict(testcase_name='3_4_2', hadoop_version='3.4.2'),
+      dict(testcase_name='3_3_6', hadoop_version='3.3.6'),
+  )
+  def testSkipsPreLeanHadoopVersions(self, hadoop_version):
+    with (
+        flagsaver.flagsaver(hadoop_version=hadoop_version),
+        requests_mock.Mocker() as mock_requests,
+    ):
+      hadoop.InstallAwsSdkBundle(self.vm)
+      self.assertFalse(mock_requests.called)
+      self.vm.RemoteCommand.assert_not_called()
+
+  @parameterized.named_parameters(
+      dict(testcase_name='3_4_3', hadoop_version='3.4.3'),
+      dict(testcase_name='3_5_0', hadoop_version='3.5.0'),
+  )
+  def testInstallsMatchingAwsSdkBundle(self, hadoop_version):
+    pom_url = (
+        'https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-project/'
+        f'{hadoop_version}/hadoop-project-{hadoop_version}.pom'
+    )
+    with (
+        flagsaver.flagsaver(hadoop_version=hadoop_version),
+        requests_mock.Mocker() as mock_requests,
+    ):
+      mock_requests.get(pom_url, text=HADOOP_PROJECT_POM)
+      hadoop.InstallAwsSdkBundle(self.vm)
+      hadoop.InstallAwsSdkBundle(self.vm)
+      self.assertEqual(mock_requests.call_count, 1)
+      expected_cmd = (
+          'cd /opt/pkb/hadoop/share/hadoop/common/lib && '
+          'curl -fsSL -O '
+          'https://repo1.maven.org/maven2/software/amazon/awssdk/bundle/'
+          '2.35.4/bundle-2.35.4.jar'
+      )
+      self.vm.RemoteCommand.assert_has_calls([
+          mock.call(expected_cmd),
+          mock.call(expected_cmd),
+      ])
+
+  @requests_mock.Mocker()
+  @flagsaver.flagsaver(hadoop_version='3.4.3')
+  def testAwsSdkBundlePomConnectionError(self, mock_requests):
+    pom_url = (
+        'https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-project/'
+        '3.4.3/hadoop-project-3.4.3.pom'
+    )
+    mock_requests.get(pom_url, status_code=404)
+    with self.assertRaisesRegex(
+        errors.Setup.MissingExecutableError,
+        'Could not load ' + pom_url,
+    ):
+      hadoop.InstallAwsSdkBundle(self.vm)
+    self.vm.RemoteCommand.assert_not_called()
+
+  @requests_mock.Mocker()
+  @flagsaver.flagsaver(hadoop_version='3.4.3')
+  def testAwsSdkBundlePomParseError(self, mock_requests):
+    pom_url = (
+        'https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-project/'
+        '3.4.3/hadoop-project-3.4.3.pom'
+    )
+    mock_requests.get(pom_url, text='<project><unclosed>')
+    with self.assertRaisesRegex(
+        errors.Setup.MissingExecutableError,
+        'Could not parse POM at ' + pom_url,
+    ):
+      hadoop.InstallAwsSdkBundle(self.vm)
+    self.vm.RemoteCommand.assert_not_called()
+
+  @requests_mock.Mocker()
+  @flagsaver.flagsaver(hadoop_version='3.4.3')
+  def testAwsSdkBundleMissingPropertyError(self, mock_requests):
+    pom_url = (
+        'https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-project/'
+        '3.4.3/hadoop-project-3.4.3.pom'
+    )
+    mock_requests.get(
+        pom_url,
+        text=(
+            '<project xmlns="http://maven.apache.org/POM/4.0.0">'
+            '<properties/></project>'
+        ),
+    )
+    with self.assertRaisesRegex(
+        errors.Setup.MissingExecutableError,
+        'Could not find aws-java-sdk-v2.version in ' + pom_url,
+    ):
+      hadoop.InstallAwsSdkBundle(self.vm)
+    self.vm.RemoteCommand.assert_not_called()
 
 
 if __name__ == '__main__':

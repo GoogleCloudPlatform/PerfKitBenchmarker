@@ -749,3 +749,5 @@
 -   Support smart zone retries and failed cluster cleanup for GKE benchmarks in
     PKB.
 -   Add support for AWS FSx for NetApp ONTAP volumes.
+-   Install the matching AWS SDK v2 bundle JAR for Hadoop 3.4.3+ lean binary
+    tarballs on unmanaged AWS Hadoop and Spark clusters.
