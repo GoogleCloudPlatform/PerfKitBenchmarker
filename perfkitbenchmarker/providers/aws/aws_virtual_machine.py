@@ -167,7 +167,10 @@ _EFA_V2_MACHINE_TYPES = (
     'trn1n.32xlarge',
 )
 
-_EFA_V3_MACHINE_TYPES = ('p5en.48xlarge',)
+_EFA_V3_MACHINE_TYPES = (
+    'p5en.48xlarge',
+    'trn2.48xlarge',
+)
 
 _UNSUPPORTED = 'Unsupported'
 

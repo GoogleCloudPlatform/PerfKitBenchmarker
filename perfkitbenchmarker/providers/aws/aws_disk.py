@@ -351,6 +351,7 @@ NUM_LOCAL_VOLUMES = {
     'g6.48xlarge': 8,
     'p5.48xlarge': 8,
     'p5en.48xlarge': 8,
+    'trn2.48xlarge': 4,
     'i7ie.large': 1,
     'i7ie.xlarge': 1,
     'i7ie.2xlarge': 2,
