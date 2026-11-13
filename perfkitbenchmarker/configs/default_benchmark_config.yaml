@@ -371,6 +371,9 @@ gke_kubernetes_redis_memtier:
 gke_kubernetes_postgres_sysbench:
   name: kubernetes_postgres_sysbench
 
+gke_kubernetes_alloydb_omni_sysbench:
+  name: kubernetes_alloydb_omni_sysbench
+
 redis_memtier_session_storage_cluster:
   name: redis_memtier
   flags:
