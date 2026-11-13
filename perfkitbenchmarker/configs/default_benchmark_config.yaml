@@ -23,6 +23,38 @@ dpdk_pktgen_small_pkt_loss:
     dpdk_pktgen_mbuf_cache_size: 128
     dpdk_pktgen_mbufs_per_port_multiplier: 8
 
+dpdk_pktgen_small_pkt_loss_external_IP:
+  name: dpdk_pktgen
+  flags:
+    dpdk_pktgen_tx_burst: 128
+    dpdk_pktgen_rx_burst: 128
+    dpdk_pktgen_packet_loss_threshold_rates: 0.0001
+    dpdk_pktgen_txd: 2048
+    dpdk_pktgen_rxd: 2048
+    dpdk_pktgen_mbuf_cache_size: 128
+    dpdk_pktgen_mbufs_per_port_multiplier: 8
+    dpdk_pktgen_num_flows: 25
+    assign_external_ip_all_nics: True
+    ip_addresses: EXTERNAL
+    dpdk_pktgen_initial_rate: 1_900_000
+    dpdk_pktgen_tx_rx_lcores_list: ['[2:1];[1:2]']
+
+dpdk_pktgen_small_pkt_loss_external_IP_high_pps:
+  name: dpdk_pktgen
+  flags:
+    dpdk_pktgen_tx_burst: 128
+    dpdk_pktgen_rx_burst: 128
+    dpdk_pktgen_packet_loss_threshold_rates: 0.0001
+    dpdk_pktgen_txd: 2048
+    dpdk_pktgen_rxd: 2048
+    dpdk_pktgen_mbuf_cache_size: 128
+    dpdk_pktgen_mbufs_per_port_multiplier: 8
+    dpdk_pktgen_num_flows: 50
+    assign_external_ip_all_nics: True
+    ip_addresses: EXTERNAL
+    dpdk_pktgen_initial_rate: 7_000_000
+    dpdk_pktgen_tx_rx_lcores_list: ['[2:1];[1:2]']
+
 dpdk_pktgen_multi_nic_small_pkt_loss:
   name: dpdk_pktgen
   flags:
