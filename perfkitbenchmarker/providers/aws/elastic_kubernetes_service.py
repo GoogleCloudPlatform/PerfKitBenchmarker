@@ -187,7 +187,9 @@ class BaseEksCluster(kubernetes_cluster.KubernetesCluster):
                 'tags': util.MakeDefaultTags(),
             },
             'iam': {
-                'withOidc': True,
+                # Required for IAM Roles for Service Accounts (IRSA),
+                # which KEDA and Karpenter rely on for AWS authentication.
+                'withOIDC': True,
             },
         },
         create_json,
@@ -449,18 +451,6 @@ class EksCluster(BaseEksCluster):
         },
     }
     self._EksCtlCreate(create_json)
-
-    # Above create command passes "withOidc=true", but it doesn't seem to work &
-    # therefore this command is needed.
-    cmd = [
-        FLAGS.eksctl,
-        'utils',
-        'associate-iam-oidc-provider',
-        f'--cluster={self.name}',
-        f'--region={self.region}',
-        '--approve',
-    ]
-    vm_util.IssueCommand(cmd)
 
     # EBS CSI driver is required for creating EBS volumes in version > 1.23
     # https://docs.aws.amazon.com/eks/latest/userguide/ebs-csi.html

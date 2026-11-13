@@ -15,6 +15,7 @@
 
 import time
 from typing import Any
+
 from absl import flags
 from perfkitbenchmarker import benchmark_spec as bm_spec
 from perfkitbenchmarker import configs
@@ -24,6 +25,11 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.azure import flags as azure_flags
 from perfkitbenchmarker.providers.gcp import util
 from perfkitbenchmarker.resources.container_service import kubernetes_commands
+
+
+class ReplicasNotReadyError(Exception):
+  """Exception raised when kubernetes replicas are not yet ready."""
+
 
 BENCHMARK_NAME = 'k8s_stz'
 BENCHMARK_CONFIG = """
@@ -135,7 +141,9 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
     sub_name = f'pkb-stz-sub-{FLAGS.run_uri}'
     _CreatePubSubInfra(topic_name, sub_name)
 
-  if not _DEPLOY_KEDA.value:
+  use_keda = _DEPLOY_KEDA.value or azure_flags.AZURE_AKS_ENABLE_KEDA.value
+
+  if not use_keda:
     # Deploy native HPA if KEDA is not being used
     kubernetes_commands.ApplyManifest(
         'kubernetes_stz/hpa_stz.yaml.j2',
@@ -143,7 +151,7 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
         target_scale=_TARGET_SCALE.value,
     )
 
-  if _DEPLOY_KEDA.value or azure_flags.AZURE_AKS_ENABLE_KEDA.value:
+  if use_keda:
     if not azure_flags.AZURE_AKS_ENABLE_KEDA.value:
       # Deploy OSS KEDA operator only if Managed KEDA is not in use
       kubernetes_commands.ApplyManifest('kubernetes_stz/keda_operator.yaml')
@@ -205,6 +213,11 @@ def _RunBenchmarkCommand(client_vm: Any) -> str:
   # Measurement logic: Poll kubernetes_commands until readyReplicas > 0
   start_time = time.time()
 
+  @vm_util.Retry(
+      poll_interval=2,
+      timeout=300,
+      retryable_exceptions=(ReplicasNotReadyError,),
+  )
   def _CheckReplicas():
     cmd = [
         'get',
@@ -219,18 +232,11 @@ def _RunBenchmarkCommand(client_vm: Any) -> str:
     if retcode == 0 and stdout.strip() and stdout.strip().isdigit():
       if int(stdout.strip()) > 0:
         return True
-    return False
+    raise ReplicasNotReadyError('No ready replicas yet.')
 
-  try:
-    # Poll every 2 seconds for up to 5 minutes
-    vm_util.Retry(
-        poll_interval=2, timeout=300, retryable_exceptions=(Exception,)
-    )(_CheckReplicas)()
-    end_time = time.time()
-    latency_ms = (end_time - start_time) * 1000.0
-  except vm_util.TimeoutExceededRetryError:
-    latency_ms = -1.0  # Timeout
-
+  _CheckReplicas()
+  end_time = time.time()
+  latency_ms = (end_time - start_time) * 1000.0
   return f'sfz_latency_ms={latency_ms}'
 
 

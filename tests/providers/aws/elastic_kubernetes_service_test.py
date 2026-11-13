@@ -106,7 +106,7 @@ class ElasticKubernetesServiceTest(BaseEksTest):
     called_json = self.patched_read_json.call_args_list[0][0][0]
     self.assertNotIn('availabilityZones', called_json)
     self.assertEqual({'nat': {'gateway': 'Disable'}}, called_json['vpc'])
-    self.assertEqual({'withOidc': True}, called_json['iam'])
+    self.assertEqual({'withOIDC': True}, called_json['iam'])
     self.assertEqual(
         [
             {

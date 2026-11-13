@@ -151,6 +151,8 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
     result = super().GetResourceMetadata()
     result['boot_disk_type'] = self.default_nodepool.disk_type
     result['boot_disk_size'] = self.default_nodepool.disk_size
+    if self.managed_keda:
+      result['azure_managed_keda'] = True
     if FLAGS.azure_aks_auto_node_provisioning:
       result['auto_node_provisioning_mode'] = True
     if not isinstance(self, AksAutomaticCluster) and (
