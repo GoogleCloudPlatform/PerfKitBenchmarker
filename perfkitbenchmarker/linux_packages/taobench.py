@@ -64,9 +64,9 @@ def Install(vm: virtual_machine.BaseVirtualMachine) -> None:
 
 def _ApplyUbuntu2604Workarounds(vm: virtual_machine.BaseVirtualMachine) -> None:
   """Patches DCPerf v1.0's TaoBench install scripts to build on Ubuntu 26.04."""
-  # Otherwise folly's getdeps builds ninja 1.10.2, which needs Python's
-  # removed pipes module.
-  vm.InstallPackages('ninja-build')
+  # install_tao_bench*.sh omits g++; folly's getdeps otherwise builds ninja
+  # 1.10.2, which needs Python's removed pipes module.
+  vm.InstallPackages('g++ ninja-build')
   edits = (
       # CMake 4 rejects old cmake_minimum_required versions.
       '1a export CMAKE_POLICY_VERSION_MINIMUM=3.5',
