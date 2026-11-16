@@ -79,6 +79,8 @@ async def run_local_agent[AgentConfigT](
   spans = span_exporter.get_finished_spans()
   generic_metrics = calculate_generic_metrics(spans)
   generic_metrics.update(execution_result.token_metrics)
+  generic_metrics.update(execution_result.tool_calls)
+  generic_metrics.update(execution_result.custom_metrics)
 
   handler.export_results(
       config.output_dir, execution_result.response_text, generic_metrics

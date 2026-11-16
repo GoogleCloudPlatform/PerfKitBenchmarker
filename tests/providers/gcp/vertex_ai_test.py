@@ -1,11 +1,11 @@
 """Tests for gcp providers vertex_ai.py."""
 
 import unittest
+from unittest import mock
 
 from absl import flags
 from absl.testing import flagsaver
 from absl.testing import parameterized
-import mock
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker.providers.gcp import util
 from perfkitbenchmarker.providers.gcp import vertex_ai

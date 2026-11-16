@@ -98,6 +98,7 @@ class BaseAgent(abc.ABC):
       'input_tokens',
       'output_tokens',
   )
+  TOOL_CALLS_METRIC_PREFIX: str = 'tool_calls_'
 
   @classmethod
   def GetOrCreateFromSpec(cls, spec: benchmark_spec.BenchmarkSpec) -> Self:
@@ -292,6 +293,16 @@ class BaseAgent(abc.ABC):
             sample.Sample(
                 token_metric,
                 prompt_results.metrics[token_metric],
+                'count',
+                metadata,
+            )
+        )
+    for metric_name, metric_value in prompt_results.metrics.items():
+      if metric_name.startswith(self.TOOL_CALLS_METRIC_PREFIX):
+        samples.append(
+            sample.Sample(
+                metric_name,
+                metric_value,
                 'count',
                 metadata,
             )

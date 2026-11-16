@@ -14,8 +14,9 @@
 """Tests for perfkitbenchmarker.virtual_machine."""
 
 import unittest
+from unittest import mock
+
 from absl import flags
-import mock
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import virtual_machine_spec
 from perfkitbenchmarker.configs import option_decoders

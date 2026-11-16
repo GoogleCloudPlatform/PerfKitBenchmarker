@@ -15,11 +15,11 @@
 import json
 import textwrap
 import unittest
+from unittest import mock
 
 from absl import flags
 from absl.testing import flagsaver
 from absl.testing import parameterized
-import mock
 from perfkitbenchmarker import benchmark_status
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_virtual_machine
@@ -567,7 +567,7 @@ class TestRunBenchmarks(pkb_common_test_case.PkbCommonTestCase):
       expected_quota_retry_calls,
       expected_capacity_retry_calls,
   ):
-    FLAGS.zones = ['test_zone']
+    FLAGS.zone = ['test_zone']
     FLAGS.cloud = 'GCP'
     FLAGS.retries = retry_count
     FLAGS.smart_quota_retry = quota_flag_value
@@ -780,10 +780,9 @@ class TestRunBenchmarks(pkb_common_test_case.PkbCommonTestCase):
     self.assertFalse(FLAGS.smart_capacity_retry)
     self.assertFalse(FLAGS.smart_quota_retry)
 
-  @parameterized.named_parameters(('ZonesFlag', 'zones'), ('ZoneFlag', 'zone'))
   @flagsaver.flagsaver(retries=2)
-  def testChooseAndSetNewZone(self, zone_flag):
-    FLAGS[zone_flag].parse(['us-west1-a'])
+  def testChooseAndSetNewZone(self):
+    FLAGS['zone'].parse(['us-west1-a'])
     FLAGS.smart_quota_retry = True
     self._MockGcpUtils('GetZonesFromMachineType', return_value=set())
     test_retry_manager = pkb.ZoneRetryManager(test_machine_type)
@@ -791,13 +790,202 @@ class TestRunBenchmarks(pkb_common_test_case.PkbCommonTestCase):
 
     # us-west1-b is chosen.
     test_retry_manager._ChooseAndSetNewZone(possible_zones)
-    self.assertEqual(FLAGS[zone_flag].value[0], 'us-west1-b')  # pyrefly: ignore[unsupported-operation]
+    self.assertEqual(FLAGS['zone'].value[0], 'us-west1-b')  # pyrefly: ignore[unsupported-operation]
     self.assertEqual(test_retry_manager._zones_tried, {'us-west1-a'})
 
     # All possible zones are exhausted so the original zone is used.
     test_retry_manager._ChooseAndSetNewZone(possible_zones)
-    self.assertEqual(FLAGS[zone_flag].value[0], 'us-west1-a')  # pyrefly: ignore[unsupported-operation]
+    self.assertEqual(FLAGS['zone'].value[0], 'us-west1-a')  # pyrefly: ignore[unsupported-operation]
     self.assertEmpty(test_retry_manager._zones_tried)
+
+  def testGetMachineTypesFromContainerCluster(self):
+    yaml_config = textwrap.dedent("""
+        cluster_boot:
+          container_cluster:
+            cloud: GCP
+            type: Kubernetes
+            vm_count: 1
+            vm_spec:
+              GCP:
+                machine_type: n4-standard-16
+                zone: us-east5-b
+            nodepools:
+              postgres:
+                vm_count: 1
+                vm_spec:
+                  GCP:
+                    machine_type: c4-standard-16
+                    zone: us-east5-b
+              custom_pool:
+                vm_count: 1
+                vm_spec:
+                  GCP:
+                    machine_type:
+                      cpus: 4
+                      memory: 8GiB
+                    zone: us-east5-b
+        """)
+    test_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
+        yaml_config, 'cluster_boot'
+    )
+    test_spec.vms_to_boot = {}
+    self.assertEqual(
+        pkb._GetMachineTypes(test_spec),
+        ['c4-standard-16', 'n4-standard-16'],
+    )
+
+  def testGetMachineTypesSkipsNonStringFromVmGroups(self):
+    yaml_config = textwrap.dedent("""
+        cluster_boot:
+          vm_groups:
+            custom:
+              vm_spec:
+                GCP:
+                  machine_type:
+                    cpus: 4
+                    memory: 8GiB
+                  zone: us-east5-b
+            client:
+              vm_spec:
+                GCP:
+                  machine_type: n4-standard-16
+                  zone: us-east5-b
+          container_cluster:
+            cloud: GCP
+            type: Kubernetes
+            vm_count: 1
+            vm_spec:
+              GCP:
+                machine_type: c4-standard-16
+                zone: us-east5-b
+        """)
+    test_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
+        yaml_config, 'cluster_boot'
+    )
+    self.assertEqual(
+        pkb._GetMachineTypes(test_spec),
+        ['c4-standard-16', 'n4-standard-16'],
+    )
+
+  def testGetMachineTypesAllCustomReturnsEmpty(self):
+    yaml_config = textwrap.dedent("""
+        cluster_boot:
+          vm_groups:
+            custom:
+              vm_spec:
+                GCP:
+                  machine_type:
+                    cpus: 4
+                    memory: 8GiB
+                  zone: us-east5-b
+        """)
+    test_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
+        yaml_config, 'cluster_boot'
+    )
+    self.assertEqual(pkb._GetMachineTypes(test_spec), [])
+
+  @flagsaver.flagsaver(zone=['zone_1'], smart_capacity_retry=True, retries=1)
+  def testSmartCapacityRetryWithoutMachineTypesUsesAllZones(self):
+    test_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml()
+    test_spec.failed_substatus = (
+        benchmark_status.FailedSubstatus.INSUFFICIENT_CAPACITY
+    )
+    self._MockLoadProviderUtils(gcp_utils)
+    self._MockGcpUtils('GetRegionFromZone', return_value='region_1')
+    self._MockGcpUtils('GetZonesInRegion', return_value={'zone_1', 'zone_2'})
+    mock_get_all_zones = self._MockGcpUtils(
+        'GetAllZones', return_value={'zone_1', 'zone_2'}
+    )
+
+    test_retry_manager = pkb.ZoneRetryManager([])
+    test_retry_manager.HandleSmartRetries(test_spec)
+
+    mock_get_all_zones.assert_called_once()
+    self.assertEqual(test_retry_manager._zones_tried, {'zone_1'})
+    self.assertEqual(FLAGS.zone, ['zone_2'])
+
+  def testRunBenchmarkTaskWithNoneAndStrMachineTypes(self):
+    yaml_config = textwrap.dedent("""
+        cluster_boot:
+          vm_groups:
+            custom:
+              vm_spec:
+                GCP:
+                  machine_type:
+                    cpus: 4
+                    memory: 8GiB
+                  zone: us-east5-b
+            standard:
+              vm_spec:
+                GCP:
+                  machine_type: n4-standard-16
+                  zone: us-east5-b
+        """)
+    test_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
+        yaml_config, 'cluster_boot'
+    )
+    self.enter_context(mock.patch.object(pkb, 'RunBenchmark'))
+
+    benchmark_specs, _ = pkb.RunBenchmarkTask(spec=test_spec)
+
+    self.assertLen(benchmark_specs, 1)
+
+  @parameterized.named_parameters(('ZonesFlag', 'zones'), ('ZoneFlag', 'zone'))
+  @flagsaver.flagsaver()
+  def testConstructContainerClusterUpdatesZoneFromFlags(self, zone_flag):
+    FLAGS[zone_flag].parse(['us-east5-c'])
+    yaml_config = textwrap.dedent("""
+        cluster_boot:
+          container_registry:
+            cloud: GCP
+          container_cluster:
+            cloud: GCP
+            type: Kubernetes
+            vm_count: 1
+            vm_spec:
+              GCP:
+                machine_type: n4-standard-16
+                zone: us-east5-b
+            nodepools:
+              postgres:
+                vm_count: 1
+                vm_spec:
+                  GCP:
+                    machine_type: n4-standard-16
+                    zone: us-east5-b
+        """)
+    test_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
+        yaml_config, 'cluster_boot'
+    )
+    self.enter_context(
+        mock.patch.object(providers, 'LoadProvider', autospec=True)
+    )
+    self.enter_context(
+        mock.patch.object(
+            pkb.bm_spec.container_cluster,
+            'GetContainerClusterClass',
+            autospec=True,
+        )
+    )
+    self.enter_context(
+        mock.patch.object(
+            pkb.bm_spec.container_registry,
+            'GetContainerRegistryClass',
+            autospec=True,
+        )
+    )
+    test_spec.ConstructContainerRegistry()
+    test_spec.ConstructContainerCluster()
+    assert test_spec.config.container_cluster is not None
+    assert test_spec.config.container_registry is not None
+    self.assertEqual(
+        test_spec.config.container_cluster.vm_spec.zone, 'us-east5-c'
+    )
+    self.assertEqual(
+        test_spec.config.container_cluster.nodepools['postgres'].vm_spec.zone,
+        'us-east5-c',
+    )
+    self.assertEqual(test_spec.config.container_registry.zone, 'us-east5-c')
 
 
 class FreezeRestoreTest(pkb_common_test_case.PkbCommonTestCase):

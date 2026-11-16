@@ -15,7 +15,8 @@
 
 
 import unittest
-import mock
+from unittest import mock
+
 from perfkitbenchmarker import resource
 from perfkitbenchmarker.providers.rackspace import util
 

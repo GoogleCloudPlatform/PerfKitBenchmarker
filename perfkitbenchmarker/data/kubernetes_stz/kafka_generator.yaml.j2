@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kafka-generator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kafka-generator
+  template:
+    metadata:
+      labels:
+        app: kafka-generator
+    spec:
+      containers:
+      - name: generator
+        image: confluentinc/cp-kafka:latest
+        command: ["/bin/sh", "-c"]
+        args: ["while true; do echo 'Generating kafka workload...'; sleep 10; done"]

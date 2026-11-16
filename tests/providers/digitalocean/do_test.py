@@ -14,7 +14,8 @@
 """Tests for perfkitbenchmarker.providers.digitalocean"""
 
 import unittest
-import mock
+from unittest import mock
+
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.digitalocean import util
 

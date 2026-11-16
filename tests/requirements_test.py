@@ -18,8 +18,8 @@ from collections import deque
 import contextlib
 import importlib.metadata
 import unittest
+from unittest import mock
 
-import mock
 from packaging import requirements as packaging_requirements
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import requirements

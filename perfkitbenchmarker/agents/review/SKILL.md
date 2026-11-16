@@ -50,6 +50,11 @@ rules. If there are no comments to add, grant approval.
     classes, prefer standalone utility/helper functions over creating new
     mixin classes or complex inheritance hierarchies unless inheritance is
     strictly necessary.
+-   **Lift Shared Subclass Logic Into Base Classes:** When multiple resource or
+    provider subclasses implement identical creation, configuration, or metadata
+    logic, define it once in the parent class rather than duplicating it across
+    children. If a specific subclass does not support the option, guard and
+    raise `errors.Config.InvalidValue` in that subclass.
 -   **Protect Default Provider Behavior:** New provider features, hooks, or
     optimizations must not alter default behavior, baseline resource
     allocations, or performance of existing workloads across the board
@@ -69,7 +74,11 @@ rules. If there are no comments to add, grant approval.
     implementations. For those values, flags can be used for convenience &
     should also feature in the `_ApplyFlags()` function of a spec. Flags are
     required when internal to `_benchmark.py` files / not resources, and can be
-    used for some implementation specific features.
+    used for some implementation specific features. Conversely, do not pollute
+    shared cross-cloud base specs with single-provider quirks (scope those to a
+    narrow provider flag or automatic threshold), and avoid introducing new
+    flags when a setting is an invariant requirement for valid measurements or
+    is already implied by an existing flag.
 -   **Expose in Metadata:** Flags & spec values which can affect the results of
     a file should be exposed in metadata. Some flags which don't affect results
     don't need to be exposed in metadata. Fetching real values from a cloud
@@ -94,11 +103,12 @@ rules. If there are no comments to add, grant approval.
     `gke_python_benchmark_threads` has the prefix `gke_python_benchmark`).
 -   **No 1:1 API Flag Mapping:** Group related features logically rather than
     exposing raw Cloud API arguments 1:1.
--   **Minimal Configuration Overrides:** When overriding shared service or
-    benchmark configurations for a specific workload variant, only include
-    parameters that differ from defaults and have a verified impact on the
-    workload. Omit redundant overrides that duplicate defaults or alter baseline
-    performance without measured justification.
+-   **Minimal Configuration Overrides:** When defining or overriding shared
+    service, benchmark, or suite configurations for a workload variant, inherit
+    from the existing base configuration and only override parameters that
+    differ from defaults and have a verified impact on the workload. Do not
+    duplicate full configuration blocks or include redundant overrides without
+    measured justification.
 
 ## 3. Reliability & Error Handling
 
@@ -167,6 +177,12 @@ rules. If there are no comments to add, grant approval.
 -   **No Optional Arguments Unless Omitted by a Call Site:** Only use optional
     arguments (e.g., `| None = None` or default parameter values) when they are
     actually omitted by at least one call site.
+-   **No Real Values in `third_party` Code or Tests:** Do not hardcode real or
+    production values (such as real hostnames, workspace IDs, project IDs, or
+    resource identifiers) in `third_party` code or unit tests; use dummy
+    placeholder values (e.g., `https://adb-1234.1.azuredatabricks.net` or
+    `mock-token`) instead. Real values are only acceptable in internal `artemis`
+    GCL configurations, never in `third_party`.
 
 ## 5. Performance Metrics
 

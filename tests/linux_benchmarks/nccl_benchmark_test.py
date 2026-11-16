@@ -15,9 +15,14 @@
 
 import os
 import unittest
-import mock
+from unittest import mock
+
+from perfkitbenchmarker import cluster
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import test_util
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_benchmarks import nccl_benchmark
+from perfkitbenchmarker.linux_benchmarks import nccl_cluster_benchmark
 from perfkitbenchmarker.sample import Sample
 
 
@@ -25,6 +30,7 @@ class NcclBenchmarkTest(unittest.TestCase, test_util.SamplesTestMixin):
 
   def setUp(self):
     super().setUp()
+    nccl_benchmark.FLAGS.mark_as_parsed()
     path = os.path.join(
         os.path.dirname(__file__), '..', 'data', 'nccl_output.txt'
     )
@@ -67,6 +73,180 @@ class NcclBenchmarkTest(unittest.TestCase, test_util.SamplesTestMixin):
     )
     self.assertIn(golden, samples)
     self.assertAlmostEqual(bandwidth, 0.63)
+
+  def testNcclClusterCheckPrerequisites(self):
+    class _GpuCluster(cluster.SlurmCluster):
+      gpus_per_node = 8
+
+    benchmark_config = mock.MagicMock()
+    benchmark_config.cluster.cloud = 'GCP'
+    with mock.patch.object(
+        cluster, 'GetClusterClass', return_value=_GpuCluster
+    ):
+      nccl_cluster_benchmark.CheckPrerequisites(benchmark_config)
+    with mock.patch.object(
+        cluster, 'GetClusterClass', return_value=cluster.SlurmCluster
+    ):
+      with self.assertRaises(errors.Config.InvalidValue):
+        nccl_cluster_benchmark.CheckPrerequisites(benchmark_config)
+
+  def testNcclClusterPrepare(self):
+    benchmark_spec = mock.MagicMock()
+    nccl_cluster_benchmark.Prepare(benchmark_spec)
+    self.assertTrue(benchmark_spec.always_call_cleanup)
+    benchmark_spec.cluster.DeployContainerImage.assert_called_once_with(
+        'nccl_cluster'
+    )
+
+  @mock.patch('time.time', mock.MagicMock(return_value=1550279509.59))
+  def testNcclClusterRun(self):
+    benchmark_spec = mock.MagicMock()
+    benchmark_spec.cluster.gpus_per_node = 8
+    benchmark_spec.cluster.RunJob.return_value = (self.contents, '')
+    with (
+        mock.patch.object(
+            nccl_benchmark, 'CreateMetadataDict', return_value={}
+        ),
+        mock.patch.object(nccl_cluster_benchmark, 'FLAGS') as mock_flags,
+    ):
+      mock_flags.nccl_extra_params = ['NCCL_DEBUG=INFO']
+      mock_flags.nccl_extra_params_spaceseplist = []
+      mock_flags.nccl_operations = ['all_reduce']
+      mock_flags.nccl_minbytes = '8'
+      mock_flags.nccl_maxbytes = '256M'
+      mock_flags.nccl_stepfactor = 2
+      mock_flags.nccl_ngpus = 1
+      mock_flags.nccl_check = False
+      mock_flags.nccl_nthreads = 1
+      mock_flags.nccl_iters = 20
+
+      samples = nccl_cluster_benchmark.Run(benchmark_spec)
+
+      benchmark_spec.cluster.RunJob.assert_called_once_with(
+          'nccl_cluster',
+          command=(
+              './all_reduce_perf --minbytes 8 --maxbytes 256M --stepfactor 2 '
+              '--ngpus 1 --check False --nthreads 1 --iters 20'
+          ),
+          env={'NCCL_DEBUG': 'INFO'},
+          gpus_per_node=8,
+      )
+      self.assertTrue(samples)
+
+  def testSlurmJobTemplateRender(self):
+    rendered = vm_util.ReadAndRenderJinja2Template(
+        'cluster/slurm_job.sbatch.j2',
+        job_name='nccl_cluster',
+        num_workers=2,
+        output_path='/opt/apps/slurm-%j.out',
+        env={'FI_PROVIDER': 'efa', 'NCCL_DEBUG': 'INFO'},
+        image='/opt/apps/a4.sqsh',
+        command=(
+            './all_reduce_perf --minbytes 8 --maxbytes 256M --stepfactor 2 '
+            '--ngpus 1 --check False --nthreads 1 --iters 20'
+        ),
+        gpus_per_node=8,
+    )
+    self.assertEqual(
+        rendered,
+        '#!/bin/bash\n'
+        '#SBATCH --job-name=nccl_cluster\n'
+        '#SBATCH --nodes=2\n'
+        '#SBATCH --gpus-per-node=8\n'
+        '#SBATCH --ntasks-per-node=8\n'
+        '#SBATCH --output=/opt/apps/slurm-%j.out\n\n'
+        'set -e\n'
+        'export FI_PROVIDER="efa"\n'
+        'export NCCL_DEBUG="INFO"\n\n'
+        'srun \\\n'
+        '  --mpi=pmix \\\n'
+        '  --cpu-bind=none \\\n'
+        '  --gpus-per-node=8 \\\n'
+        '  --ntasks-per-node=8 \\\n'
+        '  --container-image=/opt/apps/a4.sqsh \\\n'
+        '  --container-writable \\\n'
+        '  --wait=60 \\\n'
+        '  --kill-on-bad-exit=1 \\\n'
+        '  ./all_reduce_perf --minbytes 8 --maxbytes 256M --stepfactor 2 '
+        '--ngpus 1 --check False --nthreads 1 --iters 20',
+    )
+
+  def testSlurmJobTemplateRenderOptionalVars(self):
+    rendered = vm_util.ReadAndRenderJinja2Template(
+        'cluster/slurm_job.sbatch.j2',
+        job_name='custom_job',
+        num_workers=4,
+        output_path='/opt/apps/slurm-%j.out',
+        env={},
+        command='./run.sh',
+        ntasks_per_node=2,
+        cpus_per_task=12,
+    )
+    self.assertEqual(
+        rendered,
+        '#!/bin/bash\n'
+        '#SBATCH --job-name=custom_job\n'
+        '#SBATCH --nodes=4\n'
+        '#SBATCH --ntasks-per-node=2\n'
+        '#SBATCH --cpus-per-task=12\n'
+        '#SBATCH --output=/opt/apps/slurm-%j.out\n\n'
+        'set -e\n\n'
+        'srun \\\n'
+        '  --mpi=pmix \\\n'
+        '  --cpu-bind=none \\\n'
+        '  --ntasks-per-node=2 \\\n'
+        '  --cpus-per-task=12 \\\n'
+        '  --wait=60 \\\n'
+        '  --kill-on-bad-exit=1 \\\n'
+        '  ./run.sh',
+    )
+
+  def testK8sJobTemplateRender(self):
+    rendered = vm_util.ReadAndRenderJinja2Template(
+        'cluster/k8s_job.yaml.j2',
+        job_name='nccl-job',
+        num_workers=2,
+        worker_machine_type='a4-highgpu-8g',
+        env={'NCCL_DEBUG': 'INFO', 'CUSTOM_VAR': '123'},
+        image='us-docker.pkg.dev/my-proj/nccl_cluster_a4:latest',
+        command='./all_reduce_perf',
+        gpus_per_node=8,
+        resource_claim_template='default-rdma',
+    )
+    self.assertIn(
+        'nodeSelector:\n'
+        '        node.kubernetes.io/instance-type: a4-highgpu-8g',
+        rendered,
+    )
+    self.assertIn('topologyKey: kubernetes.io/hostname', rendered)
+    self.assertIn('key: nvidia.com/gpu', rendered)
+    self.assertIn('nvidia.com/gpu: 8', rendered)
+    self.assertIn('resourceClaimTemplateName: default-rdma', rendered)
+    self.assertIn('ENV_ARGS="-x NCCL_DEBUG -x CUSTOM_VAR "', rendered)
+    self.assertIn('mpirun \\', rendered)
+
+  def testK8sJobTemplateRenderCpuOnly(self):
+    rendered = vm_util.ReadAndRenderJinja2Template(
+        'cluster/k8s_job.yaml.j2',
+        job_name='cpu-job',
+        num_workers=4,
+        worker_machine_type='c3-standard-88',
+        env={},
+        image='us-docker.pkg.dev/my-proj/cpu_bench:latest',
+        command='./cpu_mpi_bench',
+        ntasks_per_node=2,
+        cpus_per_task=44,
+    )
+    self.assertIn(
+        'nodeSelector:\n'
+        '        node.kubernetes.io/instance-type: c3-standard-88',
+        rendered,
+    )
+    self.assertIn('topologyKey: kubernetes.io/hostname', rendered)
+    self.assertIn('cpu: 44', rendered)
+    self.assertIn('slots=2', rendered)
+    self.assertNotIn('nvidia.com/gpu', rendered)
+    self.assertNotIn('tolerations:', rendered)
 
 
 if __name__ == '__main__':

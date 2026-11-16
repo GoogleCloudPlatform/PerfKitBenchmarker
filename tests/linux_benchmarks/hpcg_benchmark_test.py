@@ -15,8 +15,8 @@
 """Tests for HPCG benchmark."""
 import os
 import unittest
+from unittest import mock
 
-import mock
 from perfkitbenchmarker.linux_benchmarks import hpcg_benchmark
 
 

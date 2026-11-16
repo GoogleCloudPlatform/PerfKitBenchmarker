@@ -16,8 +16,9 @@
 
 import os
 import unittest
+from unittest import mock
+
 from absl import flags
-import mock
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import provider_info

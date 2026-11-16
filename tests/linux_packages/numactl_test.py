@@ -1,8 +1,9 @@
 """Tests for perfkitbenchmarker.linux_packages.numactl."""
 
 import unittest
+from unittest import mock
+
 from absl.testing import parameterized
-import mock
 from perfkitbenchmarker.linux_packages import numactl
 
 SINGLE_NUMA_NODE = """

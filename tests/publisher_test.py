@@ -19,10 +19,11 @@ import json
 import re
 import tempfile
 import unittest
+from unittest import mock
 import uuid
+
 from absl import flags
 from absl.testing import flagsaver
-import mock
 
 from perfkitbenchmarker import pkb  # pylint: disable=unused-import
 from perfkitbenchmarker import publisher

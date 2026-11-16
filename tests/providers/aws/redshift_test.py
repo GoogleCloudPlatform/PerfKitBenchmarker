@@ -15,8 +15,9 @@
 
 import copy
 import unittest
+from unittest import mock
+
 from absl import flags
-import mock
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec

@@ -14,7 +14,8 @@
 """Tests for t2t_benchmark."""
 import os
 import unittest
-import mock
+from unittest import mock
+
 from perfkitbenchmarker import test_util
 from perfkitbenchmarker.linux_benchmarks import t2t_benchmark
 from perfkitbenchmarker.sample import Sample

@@ -15,11 +15,11 @@
 
 import logging
 import unittest
+from unittest import mock
 
 from absl import flags
 from absl.testing import flagsaver
 from absl.testing import parameterized
-import mock
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_packages import ycsb

@@ -3,10 +3,10 @@
 import datetime
 import typing
 import unittest
+from unittest import mock
 
 from absl.testing import parameterized
 import freezegun
-import mock
 from perfkitbenchmarker.scripts.messaging_service_scripts.common import runners
 
 FAKE_DATETIME = datetime.datetime(2021, 6, 14)

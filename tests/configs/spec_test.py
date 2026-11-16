@@ -16,8 +16,8 @@
 
 from typing import Any
 import unittest
+from unittest import mock
 
-import mock
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
 

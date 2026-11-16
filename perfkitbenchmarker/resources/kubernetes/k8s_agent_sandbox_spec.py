@@ -392,6 +392,7 @@ class K8sAgentSandboxConfigSpec(agent_sandbox_spec.BaseAgentSandboxConfigSpec):
     self.sandbox_nodepool: str
     self.sandbox_node_taint: str | None
     self.tune_apf_workload_low: bool
+    self.workload_transport: str
     self.manifest_repo: str
     self.controller: ControllerSpec | None
     self.sandbox_template: SandboxTemplateSpec | None
@@ -444,6 +445,10 @@ class K8sAgentSandboxConfigSpec(agent_sandbox_spec.BaseAgentSandboxConfigSpec):
         'tune_apf_workload_low': (
             option_decoders.BooleanDecoder,
             {'default': False},
+        ),
+        'workload_transport': (
+            option_decoders.EnumDecoder,
+            {'default': 'exec', 'valid_values': ['exec', 'http']},
         ),
         'manifest_repo': (
             option_decoders.StringDecoder,

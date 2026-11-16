@@ -15,9 +15,10 @@
 
 import pathlib
 import unittest
+from unittest import mock
+
 from absl import flags
 from absl.testing import flagsaver
-import mock
 from perfkitbenchmarker import managed_memory_store
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec

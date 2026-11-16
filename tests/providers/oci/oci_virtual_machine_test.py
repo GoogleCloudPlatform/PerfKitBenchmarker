@@ -19,11 +19,11 @@ import base64
 import json
 import time
 import unittest
+from unittest import mock
 
 from absl import flags
 from absl.testing import flagsaver
 from absl.testing import parameterized
-import mock
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import disk_strategies
 from perfkitbenchmarker import errors

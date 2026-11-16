@@ -16,8 +16,8 @@
 
 
 import unittest
+from unittest import mock
 
-import mock
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import context
 from tests import pkb_common_test_case

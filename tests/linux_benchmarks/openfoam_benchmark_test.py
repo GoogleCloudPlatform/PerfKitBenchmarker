@@ -16,10 +16,10 @@
 
 
 import unittest
+from unittest import mock
 
 from absl import flags
 from absl.testing import flagsaver
-import mock
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import static_virtual_machine
 from perfkitbenchmarker import test_util

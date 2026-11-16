@@ -329,7 +329,12 @@ def AptInstall(vm):
     )
     if vm.cpu_arch == 'aarch64':
       _InstallArmToolchain(vm, local_working_directory)
-    vm.RemoteCommand(f'cd {src_path} && rm -rf .git')
+
+  # Hooks (e.g. lastchange) read git metadata, so only drop it afterwards.
+  vm.RemoteCommand(
+      f'find {src_path} \\( -name ".git" -o -name ".gitmodules" '
+      '-o -name ".gitattributes" \\) -prune -exec rm -rf -- {} +'
+  )
 
   vm.RemoteCommand(
       'cd {} && PATH="$PATH:{}" gn gen out/Default'.format(
@@ -362,7 +367,9 @@ def _InstallViaPreprovisionedData(vm, scratch_dir='.'):
   vm.InstallPreprovisionedPackageData(
       'chromium_compile', [tarball], scratch_dir, timeout=1800
   )
-  vm.RemoteCommand(f'cd {scratch_dir} && tar xfz {tarball} && rm {tarball}')
+  vm.RemoteCommand(
+      f'cd {scratch_dir} && tar --no-same-owner -xzf {tarball} && rm {tarball}'
+  )
 
   return True
 

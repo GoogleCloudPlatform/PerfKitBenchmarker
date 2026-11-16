@@ -118,38 +118,53 @@ def _BuildValuesContext(cluster: Any) -> dict[str, Any]:
   decode_env_vars = _ExtractEnvVars(decode_worker)
   prefill_env_vars = _ExtractEnvVars(prefill_worker) or decode_env_vars
 
-  decode_replicas = decode_worker.get('nodeCount', 1)
+  decode_replicas = (
+      decode_worker['nodeCount']
+      if 'nodeCount' in decode_worker
+      else decode_worker.get('replicas', 1)
+  )
   prefill_replicas = prefill_worker.get('replicas', decode_replicas)
+  model_id = dynamo_sglang_benchmark_helper.ResolveModelId(
+      _DYNAMO_SGLANG_FABRIC_MODEL_ID, values_yaml
+  )
   release_version = dynamo_sglang_benchmark_helper.DYNAMO_RELEASE_VERSION.value
 
-  return {
-      'deployment_name': dynamo_config.get(
-          'deploymentName', 'dynamo-disagg1p1d'
-      ),
-      'namespace': dynamo_config.get('namespace', 'dynamo-cloud'),
-      'compute_domain_name': compute_domain.get('name', 'a4x-domain'),
-      'compute_domain_num_nodes': compute_domain.get('numNodes', 2),
-      'compute_domain_channel': compute_domain.get(
-          'resourceClaimTemplateName', 'a4x-channel'
-      ),
-      'frontend_replicas': dynamo_config.get('frontend', {}).get('replicas', 1),
-      'worker_replicas': decode_replicas,
-      'decode_replicas': decode_replicas,
-      'prefill_replicas': prefill_replicas,
-      'gpu_count': cluster.gpu_count or 4,
-      'dynamo_model_id': _DYNAMO_SGLANG_FABRIC_MODEL_ID.value,
-      'frontend_image': (
-          dynamo_sglang_benchmark_helper.DYNAMO_FRONTEND_IMAGE.value
-          or f'nvcr.io/nvidia/ai-dynamo/sglang-runtime:{release_version}'
-      ),
-      'workload_image': (
-          dynamo_sglang_benchmark_helper.DYNAMO_WORKLOAD_IMAGE.value
-          or f'nvcr.io/nvidia/ai-dynamo/sglang-runtime:{release_version}'
-      ),
-      'env_vars': decode_env_vars,
-      'decode_env_vars': decode_env_vars,
-      'prefill_env_vars': prefill_env_vars,
-  }
+  context = dynamo_sglang_benchmark_helper.ApplyValuesOverrides(
+      {
+          'deployment_name': dynamo_config.get(
+              'deploymentName', 'dynamo-disagg1p1d'
+          ),
+          'namespace': dynamo_config.get('namespace', 'dynamo-cloud'),
+          'compute_domain_name': compute_domain.get('name', 'a4x-domain'),
+          'compute_domain_num_nodes': compute_domain.get('numNodes', 2),
+          'compute_domain_channel': compute_domain.get(
+              'resourceClaimTemplateName', 'a4x-channel'
+          ),
+          'frontend_replicas': (
+              dynamo_config.get('frontend', {}).get('replicas', 1)
+          ),
+          'worker_replicas': decode_replicas,
+          'decode_replicas': decode_replicas,
+          'prefill_replicas': prefill_replicas,
+          'gpu_count': cluster.gpu_count or 4,
+          'dynamo_model_id': model_id,
+          'frontend_image': (
+              dynamo_sglang_benchmark_helper.DYNAMO_FRONTEND_IMAGE.value
+              or f'nvcr.io/nvidia/ai-dynamo/sglang-runtime:{release_version}'
+          ),
+          'workload_image': (
+              dynamo_sglang_benchmark_helper.DYNAMO_WORKLOAD_IMAGE.value
+              or f'nvcr.io/nvidia/ai-dynamo/sglang-runtime:{release_version}'
+          ),
+          'env_vars': decode_env_vars,
+          'decode_env_vars': decode_env_vars,
+          'prefill_env_vars': prefill_env_vars,
+      },
+      values_yaml,
+      default_pod_placement='unconstrained',
+  )
+  dynamo_sglang_benchmark_helper.ValidatePlacement(context, cluster.gpu_count)
+  return context
 
 
 def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
@@ -166,13 +181,9 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   logging.info('Triggering the Dynamo SGLang fabric benchmark workload...')
   return dynamo_sglang_benchmark_helper.Run(
       context,
-      metadata_fn=lambda: {
-          'profile': _DYNAMO_SGLANG_FABRIC_WORKLOAD_PROFILE.value,
-          'model_id': _DYNAMO_SGLANG_FABRIC_MODEL_ID.value,
-          'dynamo_release_version': (
-              dynamo_sglang_benchmark_helper.DYNAMO_RELEASE_VERSION.value
-          ),
-      },
+      metadata_fn=lambda: dynamo_sglang_benchmark_helper.BuildRunMetadata(
+          context, _DYNAMO_SGLANG_FABRIC_WORKLOAD_PROFILE.value
+      ),
   )
 
 

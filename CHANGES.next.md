@@ -306,6 +306,8 @@
 -   Add kubernetes_glm_sglang benchmark, which serves GLM-5.3 with SGLang on GKE
     a4-highgpu-8g (8x NVIDIA B200) nodes and measures it with
     sglang.bench_serving.
+-   Add a `spanner_omni_cluster` resource for running Spanner Omni on Kubernetes
+    (GKE provider).
 -   Add Oracle Cloud Infrastructure (OCI) as a new provider, supporting VMs
     (Ubuntu 22.04/24.04, Oracle Linux 8/9), VCN networking with firewall rules,
     and block volume scratch disks. (GH-7174 from @gadgilrajeev)
@@ -506,6 +508,10 @@
     client.
 -   Log still running resources at end of benchmark if teardown phase is
     skipped.
+-   Allow fixed-size Azure Databricks Lakebase computes larger than the 64 CU
+    autoscaling limit, up to 112 CU (`--lakebase_min_cu` ==
+    `--lakebase_max_cu`), and support `--db_flags` via role-level PostgreSQL
+    GUCs (`ALTER ROLE ... SET ...`).
 
 ### Bug fixes and maintenance updates:
 
@@ -745,3 +751,8 @@
 -   Suppress `not found: 404` errors from `gcloud storage buckets delete` in
     `GoogleCloudStorageService.DeleteBucket` when tearing down a bucket that was
     never created.
+-   Support smart zone retries and failed cluster cleanup for GKE benchmarks in
+    PKB.
+-   Add support for AWS FSx for NetApp ONTAP volumes.
+-   Install the matching AWS SDK v2 bundle JAR for Hadoop 3.4.3+ lean binary
+    tarballs on unmanaged AWS Hadoop and Spark clusters.

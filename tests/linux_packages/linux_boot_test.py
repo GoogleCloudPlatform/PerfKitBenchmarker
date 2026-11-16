@@ -8,9 +8,9 @@ Test data files stored in perfkitbenchmarker/tests/data/linux_boot.
 import datetime
 import os
 import unittest
+from unittest import mock
 
 from absl.testing import parameterized
-import mock
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import test_util
 from perfkitbenchmarker import vm_util

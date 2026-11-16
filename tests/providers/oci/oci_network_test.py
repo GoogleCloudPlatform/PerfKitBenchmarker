@@ -17,10 +17,10 @@
 
 import json
 import unittest
+from unittest import mock
 
 from absl import flags
 from absl.testing import flagsaver
-import mock
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import network
 from perfkitbenchmarker.providers.oci import oci_network

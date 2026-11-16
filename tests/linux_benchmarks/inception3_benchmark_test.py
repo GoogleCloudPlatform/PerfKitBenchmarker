@@ -14,7 +14,8 @@
 """Tests for inception3_benchmark."""
 import os
 import unittest
-import mock
+from unittest import mock
+
 from perfkitbenchmarker import test_util
 from perfkitbenchmarker.linux_benchmarks import mnist_benchmark
 from perfkitbenchmarker.sample import Sample

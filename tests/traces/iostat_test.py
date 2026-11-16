@@ -15,9 +15,9 @@
 
 import os
 import unittest
+from unittest import mock
 
 from absl.testing import parameterized
-import mock
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import sample
 from tests import pkb_common_test_case

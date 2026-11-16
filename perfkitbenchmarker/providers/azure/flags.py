@@ -121,6 +121,11 @@ AZURE_NIC_COUNT = flags.DEFINE_integer(
     'Number of NICs to attach to the VM. Defaults to 1. Flag azure_subnet_id'
     ' must be None if greater than 1.',
 )
+AZURE_NIC_MTU = flags.DEFINE_integer(
+    'azure_nic_mtu',
+    None,
+    'MTU to configure on VM network interfaces (in bytes).',
+)
 AZURE_SUBNET_ID = flags.DEFINE_string(
     'azure_subnet_id',
     None,
@@ -189,6 +194,13 @@ flags.DEFINE_boolean(
     'Enable automatic node provisioning for Azure AKS clusters. '
     'This is automatically set to True for the provision_node_pools benchmark.',
 )
+flags.DEFINE_boolean(
+    'azure_aks_standard_tier',
+    False,
+    'Use the AKS Standard tier (--tier standard), which enables dynamic'
+    ' kube-apiserver control-plane scaling (Free tier pins an unscaled'
+    ' control plane). Automatically enabled when max_total_nodes > 256.',
+)
 BLOBFUSE_BLOCK_SIZE_MB = flags.DEFINE_float(
     'azure_blobfuse_block_size_mb',
     2,
@@ -233,4 +245,34 @@ FLAG_K8S_INFERENCE_BLOBSTORAGE_KEY = flags.DEFINE_string(
     'k8s_inference_server_blobstorage_key',
     None,
     'The Azure Storage account key.',
+)
+# Azure Databricks Lakebase flags.
+LAKEBASE_PROJECT_ID = flags.DEFINE_string(
+    'lakebase_project_id',
+    None,
+    'Custom or existing Azure Databricks Lakebase project ID. Defaults to '
+    'pkb-<run_uri>.',
+)
+LAKEBASE_ENDPOINT_ID = flags.DEFINE_string(
+    'lakebase_endpoint_id',
+    None,
+    'Optional Lakebase compute endpoint ID.',
+)
+LAKEBASE_MIN_CU = flags.DEFINE_float(
+    'lakebase_min_cu',
+    None,
+    'Minimum compute capacity in Lakebase Compute Units (CU). One CU has ~2 '
+    'GiB of RAM. If only one of lakebase_min_cu or lakebase_max_cu is '
+    'specified, both are set to the same value.',
+)
+LAKEBASE_MAX_CU = flags.DEFINE_float(
+    'lakebase_max_cu',
+    None,
+    'Maximum compute capacity in Lakebase Compute Units (CU). One CU has ~2 '
+    'GiB of RAM. Must satisfy max_cu - min_cu <= 16.',
+)
+AZURE_AKS_ENABLE_KEDA = flags.DEFINE_boolean(
+    'azure_aks_enable_keda',
+    False,
+    'Whether to enable Managed KEDA on Azure AKS.',
 )

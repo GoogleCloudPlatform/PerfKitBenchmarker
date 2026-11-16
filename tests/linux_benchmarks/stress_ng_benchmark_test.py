@@ -14,8 +14,8 @@
 """Tests for stress-ng benchmark."""
 import os
 import unittest
+from unittest import mock
 
-import mock
 from perfkitbenchmarker.linux_benchmarks import stress_ng_benchmark
 
 

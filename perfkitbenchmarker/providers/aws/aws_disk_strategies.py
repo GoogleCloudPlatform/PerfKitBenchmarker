@@ -200,6 +200,8 @@ class CreateNonResourceDiskStrategy(  # pyrefly: ignore[inconsistent-inheritance
       return disk_strategies.SetUpSMBDiskStrategy(self.vm, self.disk_spec)
     elif self.disk_spec.disk_type == disk.NFS:
       return AWSSetUpNFSDiskStrategy(self.vm, self.disk_spec)
+    elif self.disk_spec.disk_type == disk.NETAPP_VOLUMES:
+      return AWSSetUpNetAppVolumesDiskStrategy(self.vm, self.disk_spec)
     elif self.disk_spec.disk_type == disk.OBJECT_STORAGE:
       return SetUpObjectStorageStrategy(self.vm, self.disk_spec)
     elif self.disk_spec.disk_type == disk.LUSTRE:
@@ -260,6 +262,12 @@ class AWSSetUpNFSDiskStrategy(disk_strategies.SetUpNFSDiskStrategy):
         'echo 15360 | sudo tee /sys/class/bdi/0:$(stat -c "%d"'
         f' {self.disk_spec.mount_point})/read_ahead_kb'
     )
+
+
+class AWSSetUpNetAppVolumesDiskStrategy(
+    disk_strategies.SetUpNetAppDiskStrategy
+):
+  """Strategies to set up FSx for NetApp ONTAP volumes on AWS."""
 
 
 class AWSSetupDiskStrategy(disk_strategies.SetUpDiskStrategy):

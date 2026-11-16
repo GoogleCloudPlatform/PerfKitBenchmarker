@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: PodTemplate
+metadata:
+  name: buffer-unit-template
+template:
+  metadata:
+    labels:
+      app: buffer-unit
+  spec:
+    containers:
+    - name: pause
+      image: registry.k8s.io/pause:3.9
+      resources:
+        requests:
+          cpu: "500m"
+          memory: "512Mi"
+---
+apiVersion: autoscaling.x-k8s.io/v1beta1
+kind: CapacityBuffer
+metadata:
+  name: active-buffer
+spec:
+  podTemplateRef:
+    name: buffer-unit-template
+  replicas: 1
+  provisioningStrategy: "buffer.x-k8s.io/active-capacity"

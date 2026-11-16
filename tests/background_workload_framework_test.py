@@ -16,8 +16,9 @@
 
 import functools
 import unittest
+from unittest import mock
+
 from absl import flags
-import mock
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import context
 from perfkitbenchmarker import pkb

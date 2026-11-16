@@ -17,10 +17,10 @@
 
 import json
 import unittest
+from unittest import mock
 
 from absl.testing import flagsaver
 from absl.testing import parameterized
-import mock
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
 from perfkitbenchmarker.providers.oci import util

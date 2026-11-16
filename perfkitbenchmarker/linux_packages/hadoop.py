@@ -24,6 +24,7 @@ import posixpath
 import re
 import time
 from typing import Any
+from xml.etree import ElementTree
 
 from absl import flags
 import bs4
@@ -33,6 +34,7 @@ from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import regex_util
+from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 import requests
 
@@ -40,9 +42,8 @@ FLAGS = flags.FLAGS
 
 _VERSION = flags.DEFINE_string(
     'hadoop_version',
-    '3.4.1',
-    'Version of Hadoop. Default is 3.4.1 to get around'
-    ' https://issues.apache.org/jira/projects/INFRA/issues/INFRA-27182.',
+    None,
+    'Version of Hadoop. Defaults to latest. Can be a version prefix like 3.4.',
 )
 _URL_OVERRIDE = flags.DEFINE_string(
     'hadoop_bin_url', None, 'Specify to override url from HADOOP_URL_BASE.'
@@ -108,8 +109,11 @@ DATA_FILES = [
 START_HADOOP_SCRIPT = 'hadoop/start-hadoop.sh.j2'
 
 HADOOP_URL_BASE = 'https://dlcdn.apache.org/hadoop/common'
-HADOOP_STABLE_URL = HADOOP_URL_BASE + '/stable'
-HADOOP_TAR_PATTERN = re.compile(r'hadoop-([0-9.]+)\.t(ar\.)?gz')
+HADOOP_VERSION_DIR_PATTERN = re.compile(r'hadoop-([0-9.]+)/')
+MAVEN_CENTRAL_BASE = 'https://repo1.maven.org/maven2'
+# Starting in Hadoop 3.4.3, Apache distributes binary tarballs as lean archives
+# that exclude the AWS SDK v2 bundle JAR required by hadoop-aws (S3A).
+HADOOP_LEAN_TARBALL_MIN_VERSION = version.Version('3.4.3')
 
 HADOOP_DIR = posixpath.join(linux_packages.INSTALL_DIR, 'hadoop')
 HADOOP_BIN = posixpath.join(HADOOP_DIR, 'bin')
@@ -127,8 +131,11 @@ YARN_CMD = posixpath.join(HADOOP_BIN, 'yarn')
 @functools.lru_cache()
 def HadoopVersion() -> version.Version:
   """Get provided or latest stable HadoopVersion."""
+  requested_version = None
   if _VERSION.value:
-    return version.Version(_VERSION.value)
+    requested_version = version.Version(str(_VERSION.value))
+    if len(requested_version.release) >= 3:
+      return requested_version
   if _URL_OVERRIDE.value:
     extracted_version = re.search(
         r'[0-9]+\.[0-9]+\.[0-9]+', _URL_OVERRIDE.value
@@ -140,20 +147,28 @@ def HadoopVersion() -> version.Version:
           'Cannot parse version out of --hadoop_bin_url please pass '
           '--hadoop_version as well.'
       )
-  response = requests.get(HADOOP_STABLE_URL)
+  response = requests.get(HADOOP_URL_BASE)
   if not response.ok:
     raise errors.Setup.MissingExecutableError(
-        'Could not load ' + HADOOP_STABLE_URL
+        'Could not load ' + HADOOP_URL_BASE
     )
   soup = bs4.BeautifulSoup(response.content, 'html.parser')
-  link = soup.find('a', href=HADOOP_TAR_PATTERN)
-  if link:
-    match = re.match(HADOOP_TAR_PATTERN, link['href'])  # pyrefly: ignore[bad-index, no-matching-overload]
+  found_versions = []
+  for link in soup.find_all('a', href=HADOOP_VERSION_DIR_PATTERN):
+    match = re.match(HADOOP_VERSION_DIR_PATTERN, link.get('href'))  # pyrefly: ignore[missing-attribute]
     if match:
-      return version.Version(match.group(1))
-  raise errors.Setup.MissingExecutableError(
-      'Could not find valid hadoop version at ' + HADOOP_STABLE_URL
-  )
+      found_version = version.Version(match.group(1))
+      if (
+          requested_version is None
+          or found_version.release[: len(requested_version.release)]
+          == requested_version.release
+      ):
+        found_versions.append(found_version)
+  if not found_versions:
+    raise errors.Setup.MissingExecutableError(
+        'Could not find valid hadoop versions at ' + HADOOP_URL_BASE
+    )
+  return max(found_versions)
 
 
 def _GetHadoopURL():
@@ -224,6 +239,55 @@ def InstallGcsConnector(vm, install_dir=HADOOP_LIB_DIR):
       'gcs-connector-hadoop{}-latest.jar'.format(HadoopVersion().major)
   )
   vm.RemoteCommand('cd {} && curl -O {}'.format(install_dir, connector_url))
+
+
+@functools.lru_cache()
+def _AwsSdkBundleVersion(hadoop_version: version.Version) -> str:
+  """Gets the AWS SDK v2 bundle version for the given Hadoop release."""
+  pom_url = (
+      f'{MAVEN_CENTRAL_BASE}/org/apache/hadoop/hadoop-project/'
+      f'{hadoop_version}/hadoop-project-{hadoop_version}.pom'
+  )
+  response = requests.get(pom_url, timeout=30)
+  if not response.ok:
+    raise errors.Setup.MissingExecutableError('Could not load ' + pom_url)
+  try:
+    root = ElementTree.fromstring(response.content)
+  except ElementTree.ParseError as e:
+    raise errors.Setup.MissingExecutableError(
+        f'Could not parse POM at {pom_url}'
+    ) from e
+  sdk_version = root.findtext('.//{*}properties/{*}aws-java-sdk-v2.version')
+  if not sdk_version or not sdk_version.strip():
+    raise errors.Setup.MissingExecutableError(
+        f'Could not find aws-java-sdk-v2.version in {pom_url}'
+    )
+  return sdk_version.strip()
+
+
+@vm_util.Retry(
+    poll_interval=10,
+    retryable_exceptions=(
+        errors.VirtualMachine.RemoteCommandError,
+        requests.RequestException,
+    ),
+)
+def InstallAwsSdkBundle(vm: virtual_machine.BaseVirtualMachine) -> None:
+  """Installs the AWS SDK v2 bundle JAR for Hadoop 3.4.3+ lean tarballs."""
+  hadoop_version = HadoopVersion()
+  if hadoop_version < HADOOP_LEAN_TARBALL_MIN_VERSION:
+    logging.info(
+        'Hadoop %s already bundles the AWS SDK, skipping AWS SDK bundle'
+        ' installation.',
+        hadoop_version,
+    )
+    return
+  sdk_version = _AwsSdkBundleVersion(hadoop_version)
+  bundle_url = (
+      f'{MAVEN_CENTRAL_BASE}/software/amazon/awssdk/bundle/'
+      f'{sdk_version}/bundle-{sdk_version}.jar'
+  )
+  vm.RemoteCommand(f'cd {HADOOP_LIB_DIR} && curl -fsSL -O {bundle_url}')
 
 
 # Scheduling constants.

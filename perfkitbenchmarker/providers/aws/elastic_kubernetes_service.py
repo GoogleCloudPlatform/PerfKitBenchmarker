@@ -143,6 +143,21 @@ class BaseEksCluster(kubernetes_cluster.KubernetesCluster):
           self.region + ('b' if self.zone.endswith('a') else 'a')  # pyrefly: ignore[unsupported-operation]
       )
 
+  def _VpcCniAddon(self) -> dict[str, Any]:
+    """Returns the eksctl addon entry that enables VPC CNI network policy."""
+    return {
+        'name': 'vpc-cni',
+        'configurationValues': json.dumps({'enableNetworkPolicy': 'true'}),
+        'resolveConflicts': 'overwrite',
+    }
+
+  def GetResourceMetadata(self):
+    """Returns a dict containing metadata about the cluster."""
+    result = super().GetResourceMetadata()
+    if self.enable_network_policy:
+      result['eks_vpc_cni_network_policy'] = True
+    return result
+
   def _CreateDependencies(self):
     """Set up the ssh key."""
     aws_virtual_machine.AwsKeyFileManager.ImportKeyfile(self.region)
@@ -157,6 +172,8 @@ class BaseEksCluster(kubernetes_cluster.KubernetesCluster):
     # Otherwise EKS will auto-select control plane zones in the region.
     if self.control_plane_zones:
       create_json['availabilityZones'] = self.control_plane_zones
+    if self.enable_network_policy:
+      create_json.setdefault('addons', []).append(self._VpcCniAddon())
     # Schema for the cluster create command is here:
     # https://schema.eksctl.io/
     create_json = RecursivelyUpdateDictionary(
@@ -170,7 +187,9 @@ class BaseEksCluster(kubernetes_cluster.KubernetesCluster):
                 'tags': util.MakeDefaultTags(),
             },
             'iam': {
-                'withOidc': True,
+                # Required for IAM Roles for Service Accounts (IRSA),
+                # which KEDA and Karpenter rely on for AWS authentication.
+                'withOIDC': True,
             },
         },
         create_json,
@@ -384,6 +403,7 @@ class EksCluster(BaseEksCluster):
   CLOUD = provider_info.AWS
 
   def __init__(self, spec):
+    self._explicit_volume_types: dict[str, str] = {}
     super().__init__(spec)
     # control_plane_zones must be a superset of the node zones
     for nodepool in self.nodepools.values():
@@ -397,8 +417,15 @@ class EksCluster(BaseEksCluster):
       nodepool_config: container.BaseNodePoolConfig,
   ):
     super().InitializeNodePoolForCloud(vm_config, nodepool_config)
+    # Only explicitly configured types are sent to eksctl, so the eksctl
+    # default volume type is unchanged when boot_disk_type is not set.
+    if vm_config.boot_disk_type:
+      self._explicit_volume_types[nodepool_config.name] = (
+          vm_config.boot_disk_type
+      )
     nodepool_config.disk_type = (
-        aws_virtual_machine.AwsVirtualMachine.DEFAULT_ROOT_DISK_TYPE
+        vm_config.boot_disk_type
+        or aws_virtual_machine.AwsVirtualMachine.DEFAULT_ROOT_DISK_TYPE
     )
 
   def GetResourceMetadata(self):
@@ -424,18 +451,6 @@ class EksCluster(BaseEksCluster):
         },
     }
     self._EksCtlCreate(create_json)
-
-    # Above create command passes "withOidc=true", but it doesn't seem to work &
-    # therefore this command is needed.
-    cmd = [
-        FLAGS.eksctl,
-        'utils',
-        'associate-iam-oidc-provider',
-        f'--cluster={self.name}',
-        f'--region={self.region}',
-        '--approve',
-    ]
-    vm_util.IssueCommand(cmd)
 
     # EBS CSI driver is required for creating EBS volumes in version > 1.23
     # https://docs.aws.amazon.com/eks/latest/userguide/ebs-csi.html
@@ -500,6 +515,8 @@ class EksCluster(BaseEksCluster):
     base_json = super()._RenderNodeGroupJson(nodepool)
     if nodepool.disk_size:
       base_json['volumeSize'] = nodepool.disk_size
+    if nodepool.name in self._explicit_volume_types:
+      base_json['volumeType'] = self._explicit_volume_types[nodepool.name]
     base_json.update({
         'ssh': {
             'allow': True,
@@ -569,6 +586,10 @@ class EksAutoCluster(BaseEksCluster):
 
   def _Create(self):
     """Creates the control plane and worker nodes."""
+    if self.enable_network_policy:
+      raise errors.Config.InvalidValue(
+          'enable_network_policy is not supported on EKS Auto Mode clusters.'
+      )
     self._EksCtlCreate({
         'autoModeConfig': {
             'enabled': True,

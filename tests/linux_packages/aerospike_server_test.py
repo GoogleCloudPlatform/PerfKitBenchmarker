@@ -14,10 +14,10 @@
 """Tests for perfkitbenchmarker.packages.aerospike_client."""
 
 import unittest
+from unittest import mock
 
 from absl import flags
 from absl.testing import flagsaver
-import mock
 
 # pylint:disable=unused-import
 from perfkitbenchmarker.linux_benchmarks import aerospike_benchmark

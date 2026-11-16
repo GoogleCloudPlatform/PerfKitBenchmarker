@@ -14,10 +14,10 @@
 
 import inspect
 import unittest
+from unittest import mock
 
 from absl import flags
 from absl.testing import flagsaver
-import mock
 from perfkitbenchmarker import managed_memory_store
 from perfkitbenchmarker.providers.gcp import gcp_cloud_valkey
 from tests import pkb_common_test_case

@@ -17,8 +17,9 @@
 import collections
 import json
 import unittest
+from unittest import mock
+
 from absl import flags
-import mock
 from perfkitbenchmarker import context
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors

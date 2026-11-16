@@ -4,13 +4,13 @@ import json
 import time
 from typing import Type, cast
 import unittest
+from unittest import mock
 
 from absl import flags
 from absl.testing import flagsaver
 from absl.testing import parameterized
 from google.cloud import monitoring_v3
 from google.cloud.monitoring_v3 import types
-import mock
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import vm_util

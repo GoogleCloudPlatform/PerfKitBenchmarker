@@ -167,7 +167,10 @@ _EFA_V2_MACHINE_TYPES = (
     'trn1n.32xlarge',
 )
 
-_EFA_V3_MACHINE_TYPES = ('p5en.48xlarge',)
+_EFA_V3_MACHINE_TYPES = (
+    'p5en.48xlarge',
+    'trn2.48xlarge',
+)
 
 _UNSUPPORTED = 'Unsupported'
 
@@ -408,6 +411,11 @@ class AwsVmSpec(virtual_machine_spec.BaseVmSpec):
     """
     result = super()._GetOptionDecoderConstructions()
     result.update({
+        # Currently only read by EKS node groups (as the volumeType).
+        'boot_disk_type': (
+            option_decoders.StringDecoder,
+            {'default': None, 'none_ok': True},
+        ),
         'use_spot_instance': (
             option_decoders.BooleanDecoder,
             {'default': False},

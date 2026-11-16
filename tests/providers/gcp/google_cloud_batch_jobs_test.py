@@ -16,8 +16,9 @@ import json
 import os
 import time
 import unittest
+from unittest import mock
+
 from absl import flags
-import mock
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import google_cloud_batch_jobs as gcb_jobs
 from tests import pkb_common_test_case

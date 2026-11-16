@@ -959,6 +959,8 @@ class UnmanagedDpbServiceYarnCluster(UnmanagedDpbService):
       vm.Install('hadoop')
       if self.cloud == 'GCP':
         hadoop.InstallGcsConnector(vm)
+      elif self.cloud == 'AWS':
+        hadoop.InstallAwsSdkBundle(vm)
 
     if 'worker_group' not in self.vms:
       raise errors.Resource.CreationError(
@@ -1063,6 +1065,8 @@ class UnmanagedDpbSparkCluster(UnmanagedDpbService):
       vm.Install('spark')
       if self.cloud == 'GCP':
         hadoop.InstallGcsConnector(vm)
+      elif self.cloud == 'AWS':
+        hadoop.InstallAwsSdkBundle(vm)
 
     if 'worker_group' not in self.vms:
       raise errors.Resource.CreationError(

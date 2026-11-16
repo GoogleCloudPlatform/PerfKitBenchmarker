@@ -1,7 +1,8 @@
 """Tests for perfkitbenchmarker.providers.azure.util."""
 
 import unittest
-import mock
+from unittest import mock
+
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.azure import util
 from tests import pkb_common_test_case

@@ -15,10 +15,10 @@
 
 import typing
 import unittest
+from unittest import mock
 
 from absl import flags
 from absl.testing import parameterized
-import mock
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import virtual_machine

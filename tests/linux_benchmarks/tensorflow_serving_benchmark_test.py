@@ -14,7 +14,8 @@
 """Tests for the Tensorflow Serving benchmark."""
 import os
 import unittest
-import mock
+from unittest import mock
+
 from perfkitbenchmarker.linux_benchmarks import tensorflow_serving_benchmark
 
 SAMPLE_CLIENT_OUTPUT = '../data/tensorflow_serving_client_workload_stdout.txt'

@@ -15,9 +15,10 @@
 
 import os
 import unittest
+from unittest import mock
+
 from absl import flags
 from absl.testing import parameterized
-import mock
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_benchmarks import dpdk_testpmd_benchmark

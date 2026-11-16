@@ -105,12 +105,13 @@ class KubernetesGlmSglangBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
       spec = pkb_common_test_case.CreateBenchmarkSpecFromConfigDict(
           config, glm_bench.BENCHMARK_NAME
       )
-    cluster_spec = spec.config.container_cluster  # pyrefly: ignore[missing-attribute]
+    cluster_spec = spec.config.container_cluster
+    assert cluster_spec is not None
     gpu_vm_spec = cluster_spec.nodepools[glm_bench.GPU_NODEPOOL].vm_spec
     self.assertEqual('a4-highgpu-8g', gpu_vm_spec.machine_type)
     self.assertEqual('b200', gpu_vm_spec.gpu_type)
     self.assertEqual(8, gpu_vm_spec.gpu_count)
-    self.assertEqual(32, gpu_vm_spec.num_local_ssds)
+    self.assertEqual(32, gpu_vm_spec.num_local_ssds)  # pyrefly: ignore[missing-attribute]
     self.assertEqual('europe-north1-b', gpu_vm_spec.zone)
     self.assertEqual('e2-standard-8', cluster_spec.vm_spec.machine_type)
 
@@ -164,9 +165,8 @@ class KubernetesGlmSglangBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
         )
     )
     issue_command = self.MockIssueCommand({'': [('', '', 0)]})
-    cluster = google_kubernetes_engine.GkeCluster(
-        spec.config.container_cluster  # pyrefly: ignore[missing-attribute]
-    )
+    assert spec.config.container_cluster is not None
+    cluster = google_kubernetes_engine.GkeCluster(spec.config.container_cluster)
     cluster._CreateNodePools()
     command = issue_command.GetCommandWithSubstring(
         'node-pools create gpupool'

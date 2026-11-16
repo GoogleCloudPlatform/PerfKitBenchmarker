@@ -72,6 +72,22 @@ class K8sAgentSandboxSpecTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(spec.controller.warmpool_workers, 40)
     self.assertEqual(spec.controller.api_connections, 8)
 
+  def testNetworkPolicyManagementAndWorkloadTransportDecodeFromSpec(self):
+    spec = self._Decode()
+    assert spec.sandbox_template is not None
+    self.assertIsNone(spec.sandbox_template.network_policy_management)
+    self.assertEqual(spec.workload_transport, 'exec')
+
+    spec_custom = self._Decode(
+        workload_transport='http',
+        sandbox_template={'network_policy_management': 'Unmanaged'},
+    )
+    assert spec_custom.sandbox_template is not None
+    self.assertEqual(
+        spec_custom.sandbox_template.network_policy_management, 'Unmanaged'
+    )
+    self.assertEqual(spec_custom.workload_transport, 'http')
+
   def testExplicitNoneSubSpecsFallBackToDefaults(self):
     spec = self._Decode(
         controller=None,
@@ -168,6 +184,65 @@ class K8sAgentSandboxTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(resources['requests']['ephemeral-storage'], '256Mi')
     self.assertEqual(resources['limits']['ephemeral-storage'], '256Mi')
 
+  @mock.patch.object(k8s_agent_sandbox.kubernetes_commands, 'ApplyYaml')
+  def testApplySandboxTemplateAddsStablePodLabel(self, mock_apply_yaml):
+    sandbox = _CreateSandbox()
+    pod_labels = {}
+    labels = {'team': 'perf'}
+    for candidate_labels in (None, labels):
+      template_spec = k8s_agent_sandbox_spec.SandboxTemplateSpec(
+          'test.sandbox_template', labels=candidate_labels
+      )
+      sandbox._ApplySandboxTemplateImpl(template_spec, {}, [])
+      manifest = mock_apply_yaml.call_args.args[0][0]
+      pod_labels = manifest['spec']['podTemplate']['metadata']['labels']
+      self.assertEqual(pod_labels['pkb-agent-sandbox'], 'true')
+    self.assertEqual(pod_labels['team'], 'perf')
+    # The caller's labels dict is not mutated.
+    self.assertEqual(labels, {'team': 'perf'})
+
+  @mock.patch.object(k8s_agent_sandbox.kubernetes_commands, 'ApplyYaml')
+  def testApplySandboxTemplateNetworkPolicyManagement(self, mock_apply_yaml):
+    sandbox = _CreateSandbox()
+    template_spec = k8s_agent_sandbox_spec.SandboxTemplateSpec(
+        'test.sandbox_template', network_policy_management='Managed'
+    )
+    sandbox._ApplySandboxTemplateImpl(template_spec, {}, [])
+    manifest = mock_apply_yaml.call_args.args[0][0]
+    self.assertEqual(manifest['spec']['networkPolicyManagement'], 'Managed')
+
+  @mock.patch.object(k8s_agent_sandbox.kubernetes_commands, 'ApplyYaml')
+  def testApplyLoadRunnerNetworkPolicy(self, mock_apply_yaml):
+    sandbox = _CreateSandbox()
+    sandbox.spec.namespace = 'custom-ns'
+
+    sandbox.ApplyLoadRunnerNetworkPolicy({'app': 'agent-sandbox-load-runner'})
+
+    manifests = mock_apply_yaml.call_args.args[0]
+    self.assertLen(manifests, 1)
+    policy = manifests[0]
+    self.assertEqual(policy['kind'], 'NetworkPolicy')
+    self.assertEqual(
+        policy['metadata']['name'], 'agent-sandbox-allow-load-runner'
+    )
+    self.assertEqual(policy['metadata']['namespace'], 'custom-ns')
+    self.assertEqual(
+        policy['spec']['podSelector'],
+        {'matchLabels': {'pkb-agent-sandbox': 'true'}},
+    )
+    self.assertEqual(policy['spec']['policyTypes'], ['Ingress'])
+    self.assertEqual(
+        policy['spec']['ingress'],
+        [{
+            'from': [{
+                'podSelector': {
+                    'matchLabels': {'app': 'agent-sandbox-load-runner'}
+                }
+            }],
+            'ports': [{'protocol': 'TCP', 'port': 8888}],
+        }],
+    )
+
   @mock.patch.object(k8s_agent_sandbox.kubernetes_commands, 'WaitForResource')
   @mock.patch.object(k8s_agent_sandbox.kubernetes_commands, 'ApplyYaml')
   def testInstallWarmpoolUsesSpecNamespace(self, mock_apply_yaml, mock_wait):
@@ -243,6 +318,24 @@ class K8sAgentSandboxTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(metadata['agent_sandbox_runtime_class'], 'runsc')
     self.assertEqual(metadata['agent_sandbox_warmpool_replicas'], 150)
     self.assertEqual(metadata['agent_sandbox_warmpool_shards'], 1)
+
+  def testGetResourceMetadataIncludesTemplateResourceLabels(self):
+    sandbox = _CreateSandbox()
+    sandbox.spec.sandbox_template.cpu_request = '50m'
+    sandbox.spec.sandbox_template.cpu_limit = '500m'
+    sandbox.spec.sandbox_template.memory_request = '128Mi'
+    sandbox.spec.sandbox_template.memory_limit = '512Mi'
+    sandbox.spec.sandbox_template.network_policy_management = 'Unmanaged'
+
+    metadata = sandbox.GetResourceMetadata()
+
+    self.assertEqual(metadata['agent_sandbox_cpu_request'], '50m')
+    self.assertEqual(metadata['agent_sandbox_cpu_limit'], '500m')
+    self.assertEqual(metadata['agent_sandbox_memory_request'], '128Mi')
+    self.assertEqual(metadata['agent_sandbox_memory_limit'], '512Mi')
+    self.assertEqual(
+        metadata['agent_sandbox_network_policy_management'], 'Unmanaged'
+    )
 
   def testSandboxSchedulingUsesSpecTaint(self):
     sandbox = _CreateSandbox()

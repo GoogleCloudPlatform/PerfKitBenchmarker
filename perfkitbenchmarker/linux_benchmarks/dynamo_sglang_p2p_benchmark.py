@@ -25,6 +25,7 @@ from absl import flags
 from perfkitbenchmarker import benchmark_spec as bm_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_benchmarks import dynamo_sglang_benchmark_helper
 import yaml
@@ -103,33 +104,59 @@ def _BuildValuesContext(cluster: Any) -> dict[str, Any]:
   decode_env_vars = _ExtractEnvVars(decode_worker)
   prefill_env_vars = _ExtractEnvVars(prefill_worker) or decode_env_vars
 
-  decode_replicas = decode_worker.get('nodeCount', 1)
+  decode_replicas = (
+      decode_worker['nodeCount']
+      if 'nodeCount' in decode_worker
+      else decode_worker.get('replicas', 1)
+  )
   prefill_replicas = prefill_worker.get('replicas', decode_replicas)
+  deployment_name = dynamo_config.get('deploymentName', 'dynamo-disagg1p1d')
+  workload_profile = dynamo_config.get('workloadProfile', 'latency')
+  if workload_profile not in ('latency', 'throughput'):
+    raise errors.Config.InvalidValue(
+        f'Invalid dynamo.workloadProfile {workload_profile!r}; expected'
+        " 'latency' or 'throughput'."
+    )
+  if workload_profile == 'throughput' and (
+      deployment_name == 'dynamo-disagg1p1d'
+  ):
+    deployment_name = 'dynamo-disagg2p1d'
+  model_id = dynamo_sglang_benchmark_helper.ResolveModelId(
+      _DYNAMO_SGLANG_P2P_MODEL_ID, values_yaml
+  )
   release_version = dynamo_sglang_benchmark_helper.DYNAMO_RELEASE_VERSION.value
 
-  return {
-      'deployment_name': dynamo_config.get(
-          'deploymentName', 'dynamo-disagg1p1d'
-      ),
-      'namespace': dynamo_config.get('namespace', 'dynamo-cloud'),
-      'frontend_replicas': dynamo_config.get('frontend', {}).get('replicas', 1),
-      'worker_replicas': decode_replicas,
-      'decode_replicas': decode_replicas,
-      'prefill_replicas': prefill_replicas,
-      'gpu_count': cluster.gpu_count or 4,
-      'dynamo_model_id': _DYNAMO_SGLANG_P2P_MODEL_ID.value,
-      'frontend_image': (
-          dynamo_sglang_benchmark_helper.DYNAMO_FRONTEND_IMAGE.value
-          or f'nvcr.io/nvidia/ai-dynamo/sglang-runtime:{release_version}'
-      ),
-      'workload_image': (
-          dynamo_sglang_benchmark_helper.DYNAMO_WORKLOAD_IMAGE.value
-          or f'nvcr.io/nvidia/ai-dynamo/sglang-runtime:{release_version}'
-      ),
-      'env_vars': decode_env_vars,
-      'decode_env_vars': decode_env_vars,
-      'prefill_env_vars': prefill_env_vars,
-  }
+  context = dynamo_sglang_benchmark_helper.ApplyValuesOverrides(
+      {
+          'deployment_name': deployment_name,
+          'workload_profile': workload_profile,
+          'namespace': dynamo_config.get('namespace', 'dynamo-cloud'),
+          'frontend_replicas': (
+              dynamo_config.get('frontend', {}).get('replicas', 1)
+          ),
+          'worker_replicas': decode_replicas,
+          'decode_replicas': decode_replicas,
+          'prefill_replicas': prefill_replicas,
+          'gpu_count': cluster.gpu_count or 4,
+          'dynamo_model_id': model_id,
+          'frontend_image': (
+              dynamo_sglang_benchmark_helper.DYNAMO_FRONTEND_IMAGE.value
+              or f'nvcr.io/nvidia/ai-dynamo/sglang-runtime:{release_version}'
+          ),
+          'workload_image': (
+              dynamo_sglang_benchmark_helper.DYNAMO_WORKLOAD_IMAGE.value
+              or f'nvcr.io/nvidia/ai-dynamo/sglang-runtime:{release_version}'
+          ),
+          'env_vars': decode_env_vars,
+          'decode_env_vars': decode_env_vars,
+          'prefill_env_vars': prefill_env_vars,
+      },
+      values_yaml,
+  )
+  if workload_profile == 'throughput':
+    context['prefill_replicas'] = max(context['prefill_replicas'], 2)
+  dynamo_sglang_benchmark_helper.ValidatePlacement(context, cluster.gpu_count)
+  return context
 
 
 def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
@@ -146,12 +173,9 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   logging.info('Triggering the Dynamo SGLang p2p benchmark workload...')
   return dynamo_sglang_benchmark_helper.Run(
       context,
-      metadata_fn=lambda: {
-          'model_id': _DYNAMO_SGLANG_P2P_MODEL_ID.value,
-          'dynamo_release_version': (
-              dynamo_sglang_benchmark_helper.DYNAMO_RELEASE_VERSION.value
-          ),
-      },
+      metadata_fn=lambda: dynamo_sglang_benchmark_helper.BuildRunMetadata(
+          context, context['workload_profile']
+      ),
   )
 
 

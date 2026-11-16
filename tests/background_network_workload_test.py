@@ -18,8 +18,9 @@
 import contextlib
 import itertools
 import unittest
+from unittest import mock
+
 from absl import flags
-import mock
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import context

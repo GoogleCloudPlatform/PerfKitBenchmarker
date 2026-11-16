@@ -42,12 +42,16 @@ from __future__ import annotations
 import argparse
 from concurrent import futures
 import dataclasses
+import functools
 import json
 import logging
+import shlex
 import sys
 import threading
 import time
 from typing import Any, Callable, Iterator, Optional, cast
+import urllib.error
+import urllib.request
 
 # The `kubernetes` Python client is installed inside the in-cluster load
 # generator pod (see load_runner_job.yaml.j2) rather than in PKB's host
@@ -80,6 +84,19 @@ except ImportError:
 _CREATE_MAX_RETRIES = 5
 _CREATE_RETRY_AFTER_DEFAULT = 1.0  # seconds
 _CREATE_RETRY_AFTER_CAP = 5.0  # seconds
+
+# Sandbox runtime HTTP API used by HttpExecExecutor (verified against
+# python-runtime-sandbox:v1.0.8 /app/main.py: POST /execute accepting
+# {command, timeout_seconds} -> {stdout, stderr, exit_code, timed_out}).
+_HTTP_EXECUTE_PORT = 8888
+_HTTP_EXECUTE_PATH = '/execute'
+_HTTP_EXECUTE_METHOD = 'POST'
+_HTTP_COMMAND_TIMEOUT_MARGIN = 30
+_HTTP_SOCKET_TIMEOUT_MARGIN = 60
+_HTTP_PREPARE_RETRIES = 3
+_HTTP_PREPARE_BACKOFF = 0.2
+_HTTP_CONNECT_RETRIES = 3
+_HTTP_CONNECT_BACKOFF = 0.3
 
 
 @dataclasses.dataclass(frozen=True)
@@ -271,11 +288,8 @@ class NoopExecutor(WorkloadExecutor):
     return
 
 
-class StreamExecExecutor(WorkloadExecutor):
-  """Execs the workload into the sandbox pod via the Kubernetes API server.
-
-  Uses connect_get_namespaced_pod_exec. Works from any host with kubeconfig.
-  """
+class _SandboxPodExecutor(WorkloadExecutor):
+  """Base for executors that target the pod backing a Ready claim."""
 
   def __init__(
       self,
@@ -327,6 +341,13 @@ class StreamExecExecutor(WorkloadExecutor):
     annotations = (sb.get('metadata') or {}).get('annotations') or {}
     return annotations.get('agents.x-k8s.io/pod-name') or sandbox_name
 
+
+class StreamExecExecutor(_SandboxPodExecutor):
+  """Execs the workload into the sandbox pod via the Kubernetes API server.
+
+  Uses connect_get_namespaced_pod_exec. Works from any host with kubeconfig.
+  """
+
   def prepare(self, claim_name: str, status: dict[str, Any]) -> Optional[str]:
     """Resolves the pod name while the Sandbox CR is guaranteed to exist."""
     return self._resolve_pod_name(status)
@@ -368,6 +389,151 @@ class StreamExecExecutor(WorkloadExecutor):
     finally:
       if owns_client:
         core_api.api_client.close()
+
+
+def _retry(
+    max_attempts: int,
+    backoff: float,
+    retryable_exceptions: tuple[type[BaseException], ...] = (Exception,),
+    unretryable_exceptions: tuple[type[BaseException], ...] = (),
+) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+  """Retries a method with exponential backoff using self.sleeper.
+
+  This module runs standalone inside the in-cluster load-runner pod without
+  perfkitbenchmarker.vm_util, so this provides a stdlib @vm_util.Retry
+  equivalent.
+
+  Args:
+    max_attempts: Maximum number of attempts before propagating the exception.
+    backoff: Initial sleep duration in seconds (doubled after each failure).
+    retryable_exceptions: Exception types that should trigger a retry.
+    unretryable_exceptions: Subtypes of retryable_exceptions to raise at once.
+
+  Returns:
+    A method decorator applying exponential-backoff retries.
+  """
+
+  def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+    @functools.wraps(func)
+    def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
+      for attempt in range(max_attempts):
+        try:
+          return func(self, *args, **kwargs)
+        except retryable_exceptions as exc:
+          if (
+              isinstance(exc, unretryable_exceptions)
+              or attempt + 1 >= max_attempts
+          ):
+            raise
+          self.sleeper(backoff * (2**attempt))
+
+    return wrapper
+
+  return decorator
+
+
+class HttpExecExecutor(_SandboxPodExecutor):
+  """Sends the workload straight to the sandbox pod's HTTP /execute endpoint.
+
+  Bypasses the Kubernetes API server, so the workload is not pod/exec traffic.
+  Requires the load runner to be allowed by a NetworkPolicy on the sandbox pod.
+  """
+
+  def __init__(
+      self,
+      *args: Any,
+      sleeper: Callable[[float], None] = time.sleep,
+      **kwargs: Any,
+  ) -> None:
+    super().__init__(*args, **kwargs)
+    self.sleeper = sleeper
+
+  @_retry(max_attempts=_HTTP_PREPARE_RETRIES, backoff=_HTTP_PREPARE_BACKOFF)
+  def _read_pod_ip(self, core_api: Any, pod_name: str, claim_name: str) -> str:
+    """Reads the sandbox pod's IP, retrying until assigned."""
+    pod = core_api.read_namespaced_pod(pod_name, self._namespace)
+    pod_ip = pod.status.pod_ip if pod and pod.status else None
+    if not pod_ip:
+      raise RuntimeError(f'pod {pod_name} for claim {claim_name} has no IP')
+    return pod_ip
+
+  def prepare(self, claim_name: str, status: dict[str, Any]) -> Optional[str]:
+    """Resolves the pod name, then reads its IP, outside the exec window."""
+    pod_name = self._resolve_pod_name(status)
+    if not pod_name:
+      return None
+    owns_client = self._core_api is None
+    core_api = (
+        K8sClientFactory(1).make_core_v1_api()
+        if owns_client
+        else self._core_api
+    )
+    try:
+      return self._read_pod_ip(core_api, pod_name, claim_name)
+    finally:
+      if owns_client:
+        core_api.api_client.close()
+
+  @_retry(
+      max_attempts=_HTTP_CONNECT_RETRIES,
+      backoff=_HTTP_CONNECT_BACKOFF,
+      retryable_exceptions=(urllib.error.URLError,),
+      unretryable_exceptions=(urllib.error.HTTPError,),
+  )
+  def _send_execute_request(
+      self, request: urllib.request.Request
+  ) -> tuple[int, bytes]:
+    """Issues the HTTP /execute request and returns (status, body)."""
+    with urllib.request.urlopen(
+        request,
+        timeout=self._workload_duration + _HTTP_SOCKET_TIMEOUT_MARGIN,
+    ) as response:
+      return response.status, response.read()
+
+  def execute(
+      self,
+      claim_name: str,
+      status: Optional[dict[str, Any]],
+      prepared: Optional[str],
+  ) -> None:
+    del status  # Unused.
+
+    try:
+      if not prepared:
+        raise RuntimeError('no sandbox pod IP')
+      command = (
+          f'python3 -c {shlex.quote(_busy_loop_code(self._workload_duration))}'
+      )
+      body = json.dumps({
+          'command': command,
+          'timeout_seconds': (
+              self._workload_duration + _HTTP_COMMAND_TIMEOUT_MARGIN
+          ),
+      }).encode()
+      host = (
+          f'[{prepared}]'
+          if ':' in prepared and not prepared.startswith('[')
+          else prepared
+      )
+      request = urllib.request.Request(
+          f'http://{host}:{_HTTP_EXECUTE_PORT}{_HTTP_EXECUTE_PATH}',
+          data=body,
+          headers={'Content-Type': 'application/json'},
+          method=_HTTP_EXECUTE_METHOD,
+      )
+      http_status, payload = self._send_execute_request(request)
+      if not 200 <= http_status < 300:
+        raise RuntimeError(f'sandbox /execute returned HTTP {http_status}')
+      result = json.loads(payload)
+      if not isinstance(result, dict) or 'exit_code' not in result:
+        raise RuntimeError('sandbox /execute missing exit_code in response')
+      if result['exit_code']:
+        raise RuntimeError(
+            f"sandbox /execute exited with {result['exit_code']}"
+        )
+    except Exception as exc:
+      exc.add_note(f'claim={claim_name}')
+      raise
 
 
 class ClaimDriver:
@@ -693,15 +859,18 @@ class LoadGenerator:
       errors_map,
   ):
     """Worker thread: prepare and run workload, then delete the claim."""
+    prepare_error = None
     try:
       prepared = self._executor.prepare(name, status)
     except Exception as exc:  # pylint: disable=broad-exception-caught
       logging.warning('Failed to prepare workload for claim %s: %s', name, exc)
       prepared = None
-    exec_started = self._clock()
-    exec_error = None
+      prepare_error = type(exc).__name__
+    exec_started = self._clock() if prepare_error is None else None
+    exec_error = prepare_error
     try:
-      self._executor.execute(name, status, prepared)
+      if prepare_error is None:
+        self._executor.execute(name, status, prepared)
     except Exception as exc:  # pylint: disable=broad-exception-caught
       logging.warning('Workload exec failed for claim %s: %s', name, exc)
       # Leave exec timings unset so a bad exec does not skew exec_duration
@@ -950,6 +1119,12 @@ def main(argv: Optional[list[str]] = None) -> None:
       help='Seconds to hold each sandbox after Ready (20s = default).',
   )
   parser.add_argument(
+      '--workload-transport',
+      choices=['exec', 'http'],
+      default='exec',
+      help='How the workload reaches the sandbox: pod/exec or direct HTTP.',
+  )
+  parser.add_argument(
       '--ready-timeout',
       type=float,
       default=180,
@@ -992,7 +1167,12 @@ def main(argv: Optional[list[str]] = None) -> None:
   if workload_duration > 0:
     pool_size = args.max_concurrent + 50
     client_factory = K8sClientFactory(pool_size)
-    executor = StreamExecExecutor(
+    executor_cls = (
+        HttpExecExecutor
+        if args.workload_transport == 'http'
+        else StreamExecExecutor
+    )
+    executor = executor_cls(
         custom_objects_api=client_factory.make_custom_objects_api(),
         core_v1_api=client_factory.make_core_v1_api(),
         namespace=args.namespace,

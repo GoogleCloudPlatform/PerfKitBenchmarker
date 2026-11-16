@@ -16,8 +16,9 @@
 
 import builtins
 import unittest
+from unittest import mock
+
 from absl import flags
-import mock
 from perfkitbenchmarker import temp_dir
 from perfkitbenchmarker import units
 from perfkitbenchmarker import vm_util

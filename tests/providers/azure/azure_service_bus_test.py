@@ -1,9 +1,9 @@
 """Tests for azure_service_bus."""
 
 import unittest
+from unittest import mock
 
 from absl import flags
-import mock
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.azure import azure_network
 from perfkitbenchmarker.providers.azure import azure_service_bus as asb

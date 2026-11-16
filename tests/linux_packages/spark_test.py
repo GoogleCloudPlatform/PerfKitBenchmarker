@@ -22,6 +22,7 @@ SPARK_VERSION_LIST = """\
 <img src="/icons/folder.gif" alt="[DIR]"> <a href="spark-3.0.3/">spark-3.0.3/</a>            2022-06-17 11:12    -
 <img src="/icons/folder.gif" alt="[DIR]"> <a href="spark-3.1.3/">spark-3.1.3/</a>            2022-06-17 11:12    -
 <img src="/icons/folder.gif" alt="[DIR]"> <a href="spark-3.2.2/">spark-3.2.2/</a>            2022-07-15 14:43    -
+<img src="/icons/folder.gif" alt="[DIR]"> <a href="spark-3.2.4/">spark-3.2.4/</a>            2022-07-15 14:43    -
 <img src="/icons/folder.gif" alt="[DIR]"> <a href="spark-3.3.0/">spark-3.3.0/</a>            2022-06-17 11:11    -
 <img src="/icons/unknown.gif" alt="[   ]"> <a href="KEYS">KEYS</a>                    2022-06-15 08:08  102K
 <hr></pre>
@@ -74,6 +75,30 @@ class SparkVersionsTest(pkb_common_test_case.PkbCommonTestCase):
     observed = spark.SparkVersion()
     self.assertFalse(mock_requests.called)
     self.assertEqual(version.Version('4.2.0'), observed)
+
+  @requests_mock.Mocker()
+  @flagsaver.flagsaver(spark_version='3.2')
+  def testSparkVersionPrefix(self, mock_requests):
+    mock_requests.get(
+        'https://dlcdn.apache.org/spark', text=SPARK_VERSION_LIST
+    )
+    for _ in range(5):
+      observed = spark.SparkVersion()
+      self.assertEqual(version.Version('3.2.4'), observed)
+    self.assertEqual(1, mock_requests.call_count)
+
+  @requests_mock.Mocker()
+  @flagsaver.flagsaver(spark_version='3.9')
+  def testSparkVersionPrefixNotFound(self, mock_requests):
+    mock_requests.get(
+        'https://dlcdn.apache.org/spark', text=SPARK_VERSION_LIST
+    )
+    with self.assertRaisesRegex(
+        errors.Setup.MissingExecutableError,
+        'Could not find valid spark versions at '
+        'https://dlcdn.apache.org/spark',
+    ):
+      spark.SparkVersion()
 
 
 if __name__ == '__main__':

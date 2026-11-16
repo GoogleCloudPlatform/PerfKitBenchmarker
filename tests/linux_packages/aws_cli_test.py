@@ -14,7 +14,8 @@
 """Tests for perfkitbenchmarker.linux_packages.awscli."""
 
 import unittest
-import mock
+from unittest import mock
+
 from perfkitbenchmarker.linux_packages import awscli
 
 

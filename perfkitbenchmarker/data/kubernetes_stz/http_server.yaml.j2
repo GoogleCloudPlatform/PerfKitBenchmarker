@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ benchmark_name }}-deployment
+  labels:
+    app: {{ benchmark_name }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ benchmark_name }}
+  template:
+    metadata:
+      labels:
+        app: {{ benchmark_name }}
+    spec:
+      containers:
+      - name: http-server
+        image: nginx:latest
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ benchmark_name }}-service
+spec:
+  selector:
+    app: {{ benchmark_name }}
+  ports:
+  - port: 80
+    targetPort: 80
+  type: ClusterIP

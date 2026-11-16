@@ -2,8 +2,9 @@
 
 import datetime
 import unittest
+from unittest import mock
+
 from absl import flags
-import mock
 from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import relational_db_spec
 from tests import pkb_common_test_case

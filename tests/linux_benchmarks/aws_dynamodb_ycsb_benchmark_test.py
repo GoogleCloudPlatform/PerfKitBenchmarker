@@ -14,11 +14,11 @@
 """Tests for aws_dynamodb_ycsb_benchmark."""
 
 import unittest
+from unittest import mock
 
 from absl import flags
 from absl.testing import flagsaver
 from absl.testing import parameterized
-import mock
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker.linux_benchmarks import aws_dynamodb_ycsb_benchmark
 from perfkitbenchmarker.linux_packages import ycsb

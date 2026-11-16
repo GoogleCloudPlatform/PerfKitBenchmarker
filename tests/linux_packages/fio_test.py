@@ -17,9 +17,9 @@ import copy
 import json
 import os
 import unittest
+from unittest import mock
 
 from absl import flags
-import mock
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import test_util
 from perfkitbenchmarker import vm_util

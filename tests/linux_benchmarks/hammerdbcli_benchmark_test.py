@@ -14,9 +14,10 @@
 
 import textwrap
 import unittest
+from unittest import mock
+
 from absl import flags
 from absl.testing import flagsaver
-import mock
 from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_benchmarks import hammerdbcli_benchmark

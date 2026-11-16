@@ -580,7 +580,10 @@ class VertexAiAgentEngineAiAgentService(GcpAiAgentService):
     return config
 
   @override
-  @vm_util.Retry(retryable_exceptions=(errors.Benchmarks.QuotaFailure,))
+  @vm_util.Retry(
+      retryable_exceptions=(errors.Benchmarks.QuotaFailure,),
+      max_retries=5,
+  )
   def Execute(
       self,
       output_dir: str,

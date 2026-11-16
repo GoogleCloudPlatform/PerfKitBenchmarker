@@ -2,10 +2,10 @@ import datetime
 import inspect
 import json
 import unittest
+from unittest import mock
 
 from absl import flags
 from absl.testing import flagsaver
-import mock
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors

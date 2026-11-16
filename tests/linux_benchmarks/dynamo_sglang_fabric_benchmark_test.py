@@ -17,9 +17,11 @@ import unittest
 from unittest import mock
 
 from absl.testing import flagsaver
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_benchmarks import dynamo_sglang_fabric_benchmark
 from perfkitbenchmarker.resources.container_service import kubernetes_commands
 from tests import pkb_common_test_case
+import yaml
 
 _FAKE_VALUES_YAML = """
 dynamo:
@@ -104,7 +106,70 @@ class DynamoSglangFabricBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
             'profile': 'throughput',
             'model_id': 'deepseek-ai/DeepSeek-R1',
             'dynamo_release_version': '0.7.0',
+            'decode_replicas': 1,
+            'prefill_replicas': 1,
+            'decode_tp': 4,
+            'prefill_tp': 4,
+            'pod_placement': 'unconstrained',
+            'num_prompts': 10240,
+            'input_len': 8192,
+            'output_len': 1024,
+            'max_concurrency': 2048,
         },
+    )
+
+  @flagsaver.flagsaver(dynamo_sglang_fabric_workload_profile='throughput')
+  def testDeepEpValuesPreservesEightDecodeReplicas(self):
+    context = dynamo_sglang_fabric_benchmark._BuildValuesContext(
+        mock.Mock(gpu_count=4)
+    )
+    self.assertEqual(context['decode_replicas'], 8)
+    self.assertEqual(context['prefill_replicas'], 5)
+
+  def testRenderFabricTemplateSupportsOverridesAndOptionalComputeDomain(self):
+    base = yaml.safe_load(_FAKE_VALUES_YAML)
+    base['dynamo']['podPlacement'] = 'cross_node'
+    base['dynamo']['disaggregationTransferBackend'] = 'nixl'
+    base['dynamo']['frontend']['routerMode'] = 'kv'
+    base['dynamo']['decodeWorker']['tp'] = 2
+    base['dynamo']['prefillWorker'] = {'replicas': 2, 'tp': 2}
+    with mock.patch(
+        'builtins.open', mock.mock_open(read_data=yaml.safe_dump(base))
+    ):
+      context = dynamo_sglang_fabric_benchmark._BuildValuesContext(
+          mock.Mock(gpu_count=4)
+      )
+
+    docs = list(
+        yaml.safe_load_all(
+            vm_util.ReadAndRenderJinja2Template(
+                'dynamo/sglang_fabric/dynamo_graph.yaml.j2',
+                trim_spaces=False,
+                **context,
+            )
+        )
+    )
+    self.assertLen(docs, 2)
+    self.assertEqual(docs[0]['kind'], 'ComputeDomain')
+    decode_spec = docs[1]['spec']['services']['decode']
+    self.assertEqual(decode_spec['resources']['limits']['gpu'], '2')
+    self.assertIn('podAntiAffinity', decode_spec['extraPodSpec']['affinity'])
+
+    context['enable_compute_domain'] = False
+    docs_no_cd = list(
+        yaml.safe_load_all(
+            vm_util.ReadAndRenderJinja2Template(
+                'dynamo/sglang_fabric/dynamo_graph.yaml.j2',
+                trim_spaces=False,
+                **context,
+            )
+        )
+    )
+    self.assertLen(docs_no_cd, 1)
+    self.assertEqual(docs_no_cd[0]['kind'], 'DynamoGraphDeployment')
+    self.assertNotIn(
+        'resourceClaims',
+        docs_no_cd[0]['spec']['services']['decode']['extraPodSpec'],
     )
 
 

@@ -2,9 +2,9 @@
 
 import os
 import unittest
+from unittest import mock
 
 from absl import flags
-import mock
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import cloud_harmony_util
 from perfkitbenchmarker import sample

@@ -13,8 +13,9 @@
 # limitations under the License.
 
 import unittest
+from unittest import mock
+
 from absl import flags
-import mock
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_benchmarks.fio import fio_max_throughput_benchmark

@@ -14,8 +14,9 @@
 """Tests for perfkitbenchmarker.providers.aws.redshift."""
 
 import unittest
+from unittest import mock
+
 from absl import flags
-import mock
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import aws_cluster_parameter_group
 from perfkitbenchmarker.providers.aws import util

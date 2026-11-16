@@ -1,0 +1,15 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: {{ benchmark_name }}-scaledobject
+spec:
+  scaleTargetRef:
+    name: {{ benchmark_name }}-deployment
+  minReplicaCount: 0
+  maxReplicaCount: {{ target_scale }}
+  triggers:
+  - type: prometheus
+    metadata:
+      serverAddress: http://prometheus-server.monitoring.svc.cluster.local:9090
+      query: sum(rate(http_requests_total[2m]))
+      threshold: '10'

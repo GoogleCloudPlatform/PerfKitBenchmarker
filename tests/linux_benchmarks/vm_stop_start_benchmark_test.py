@@ -3,8 +3,9 @@
 import itertools
 import time
 import unittest
+from unittest import mock
+
 from absl.testing import parameterized
-import mock
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import test_util
 from perfkitbenchmarker.linux_benchmarks import vm_stop_start_benchmark

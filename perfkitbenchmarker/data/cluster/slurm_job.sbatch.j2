@@ -1,0 +1,40 @@
+#!/bin/bash
+#SBATCH --job-name={{ job_name }}
+#SBATCH --nodes={{ num_workers }}
+{%- if gpus_per_node is defined and gpus_per_node %}
+#SBATCH --gpus-per-node={{ gpus_per_node }}
+#SBATCH --ntasks-per-node={{ ntasks_per_node | default(gpus_per_node) }}
+{%- elif ntasks_per_node is defined and ntasks_per_node %}
+#SBATCH --ntasks-per-node={{ ntasks_per_node }}
+{%- endif %}
+{%- if cpus_per_task is defined and cpus_per_task %}
+#SBATCH --cpus-per-task={{ cpus_per_task }}
+{%- endif %}
+#SBATCH --output={{ output_path }}
+
+set -e
+{%- if env %}
+{%- for key, value in env.items() %}
+export {{ key }}="{{ value }}"
+{%- endfor %}
+{%- endif %}
+
+srun \
+  --mpi=pmix \
+  --cpu-bind=none \
+  {%- if gpus_per_node is defined and gpus_per_node %}
+  --gpus-per-node={{ gpus_per_node }} \
+  --ntasks-per-node={{ ntasks_per_node | default(gpus_per_node) }} \
+  {%- elif ntasks_per_node is defined and ntasks_per_node %}
+  --ntasks-per-node={{ ntasks_per_node }} \
+  {%- endif %}
+  {%- if cpus_per_task is defined and cpus_per_task %}
+  --cpus-per-task={{ cpus_per_task }} \
+  {%- endif %}
+  {%- if image is defined and image %}
+  --container-image={{ image }} \
+  --container-writable \
+  {%- endif %}
+  --wait=60 \
+  --kill-on-bad-exit=1 \
+  {{ command }}

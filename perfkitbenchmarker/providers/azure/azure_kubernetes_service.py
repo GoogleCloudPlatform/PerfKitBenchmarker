@@ -27,6 +27,7 @@ from perfkitbenchmarker import virtual_machine_spec
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import azure
 from perfkitbenchmarker.providers.azure import azure_network
+from perfkitbenchmarker.providers.azure import flags as azure_flags
 from perfkitbenchmarker.providers.azure import util
 from perfkitbenchmarker.resources.container_service import container
 from perfkitbenchmarker.resources.container_service import container_cluster
@@ -124,6 +125,7 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
     self.resource_group = azure_network.GetResourceGroup(self.region)
     self.node_resource_group = None
     self.name = 'pkbcluster%s' % FLAGS.run_uri
+    self.managed_keda = azure_flags.AZURE_AKS_ENABLE_KEDA.value
     # TODO(pclay): replace with built in service principal once I figure out how
     # to make it work with ACR
     self.cluster_version = FLAGS.container_cluster_version
@@ -149,8 +151,18 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
     result = super().GetResourceMetadata()
     result['boot_disk_type'] = self.default_nodepool.disk_type
     result['boot_disk_size'] = self.default_nodepool.disk_size
+    if self.managed_keda:
+      result['azure_managed_keda'] = True
     if FLAGS.azure_aks_auto_node_provisioning:
       result['auto_node_provisioning_mode'] = True
+    if not isinstance(self, AksAutomaticCluster) and (
+        self.max_total_nodes > 256 or FLAGS.azure_aks_standard_tier
+    ):
+      result['azure_aks_tier'] = 'standard'
+    if self.default_nodepool.disk_type in ('Managed', 'Ephemeral'):
+      result['azure_aks_node_osdisk_type'] = self.default_nodepool.disk_type
+    if self.enable_network_policy:
+      result['azure_aks_overlay_cilium'] = True
     return result
 
   def GetNodeSelectors(self, machine_type: str | None = None) -> dict[str, str]:
@@ -187,18 +199,25 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
         '--nodepool-labels',
         f'pkb_nodepool={container_cluster.DEFAULT_NODEPOOL}',
     ] + self._GetNodeFlags(self.default_nodepool)
-    if self.max_total_nodes > 256:
+    use_cilium = (
+        FLAGS.azure_aks_auto_node_provisioning or self.enable_network_policy
+    )
+    if self.managed_keda:
+      cmd += ['--enable-keda']
+    if self.max_total_nodes > 256 or use_cilium:
       cmd += [
           '--network-plugin',
           'azure',
           '--network-plugin-mode',
           'overlay',
+      ]
+    if use_cilium:
+      cmd += ['--network-dataplane', 'cilium']
+    if self.max_total_nodes > 256:
+      cmd += [
           # Default /16 supports ~250 nodes; /10 provides ~4M IPs for up to 16k.
           '--pod-cidr',
           '100.64.0.0/10',
-          # Free tier caps at 1k nodes; standard scales up to 5k nodes.
-          '--tier',
-          'standard',
           # Standard LB exhausts SNAT ports at ~1k nodes; NAT Gateway required.
           '--outbound-type',
           'managedNATGateway',
@@ -209,10 +228,16 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
           '--nat-gateway-idle-timeout',
           '10',
       ]
+    use_standard_tier = (
+        self.max_total_nodes > 256 or FLAGS.azure_aks_standard_tier
+    )
+    if use_standard_tier:
+      cmd += ['--tier', 'standard']
     if self.enable_vpa:
       cmd.append('--enable-vpa')
     if FLAGS.azure_aks_auto_node_provisioning:
-      # For provision_node_pools benchmark, add auto provisioning mode
+      # For provision_node_pools / node_autoprovisioning benchmarks, AKS NAP
+      # requires Azure CNI Overlay with Cilium dataplane.
       cmd.append('--node-provisioning-mode=auto')
 
     self._RunCreateClusterCmd(cmd)
@@ -291,13 +316,19 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
           f'--max-count={nodepool_config.max_nodes}',
       ]
     args += [f'--node-count={nodepool_config.num_nodes}']
-    if self.default_nodepool.zone and self.default_nodepool.zone != self.region:
-      zones = ' '.join(
-          zone[-1] for zone in self.default_nodepool.zone.split(',')
-      )
+    zone_str = nodepool_config.zone or self.default_nodepool.zone
+    if zone_str and zone_str != self.region:
+      zones = ' '.join(zone[-1] for zone in zone_str.split(','))
       args += ['--zones', zones]
-    if self.default_nodepool.disk_size:
-      args += ['--node-osdisk-size', str(self.default_nodepool.disk_size)]
+    disk_size = nodepool_config.disk_size or self.default_nodepool.disk_size
+    if disk_size:
+      args += ['--node-osdisk-size', str(disk_size)]
+    # Traditional Azure CNI defaults to 30 pods/node (250 is only the default on
+    # Azure CNI Overlay), so allow explicit per-nodepool overrides.
+    if nodepool_config.max_pods:
+      args += ['--max-pods', str(nodepool_config.max_pods)]
+    if nodepool_config.disk_type in ('Managed', 'Ephemeral'):
+      args += ['--node-osdisk-type', nodepool_config.disk_type]
     if self.cluster_version:
       args += ['--kubernetes-version', self.cluster_version]
     return args
