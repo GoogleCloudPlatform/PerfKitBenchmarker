@@ -19,6 +19,7 @@ from unittest import mock
 from absl import flags
 from absl.testing import flagsaver
 from perfkitbenchmarker import mysql_iaas_relational_db
+from perfkitbenchmarker import omni_postgres_iaas_relational_db
 from perfkitbenchmarker import postgres_iaas_relational_db
 from perfkitbenchmarker import relational_db_spec
 from perfkitbenchmarker import sqlserver_iaas_relational_db
@@ -452,6 +453,61 @@ class RelationalDbUnmanagedTestCase(pkb_common_test_case.PkbCommonTestCase):
           mock.call('Get-ClusterGroup | Start-ClusterGroup'),
       ]
       self.assertCountEqual(db.server_vm.RemoteCommand.call_args_list, command)
+
+  @flagsaver.flagsaver(use_managed_db=False)
+  def testSetupOmniPostgresServer(self):
+    omni_spec = relational_db_spec.RelationalDbSpec(
+        _COMPONENT,
+        flag_values=FLAGS,
+        cloud='GCP',
+        engine='omni',
+        engine_version='15',
+        db_spec={'GCP': {'machine_type': 'n1-standard-1'}},
+        db_disk_spec={'GCP': {'disk_size': 500}},
+    )
+    db = omni_postgres_iaas_relational_db.OmniPostgresIAASRelationalDb(
+        omni_spec
+    )
+    server_vm = mock.MagicMock()
+    server_vm.IS_REBOOTABLE = False
+    server_vm.total_memory_kb = 100000000
+    client_vm = CreateTestLinuxVm()
+    client_vm.IS_REBOOTABLE = False
+    db.SetVms({'default': [client_vm], 'servers': [server_vm]})
+    db.postgres_shared_buffer_size = 25
+    with (
+        mock.patch.object(db.server_vm_query_tools, 'InstallPackages'),
+        mock.patch.object(db, '_WaitUntilReady') as wait_until_ready,
+    ):
+      db._SetupLinuxUnmanagedDatabase()
+
+    self.assertEqual(
+        server_vm.Install.call_args_list,
+        [mock.call('rsync'), mock.call('docker')],
+    )
+    wait_until_ready.assert_called_once_with()
+    self.assertEqual(
+        server_vm.RemoteCommand.call_args_list,
+        [
+            mock.call('sudo mkdir /scratch/omni'),
+            mock.call(
+                'sudo docker run --rm --privileged google/alloydbomni'
+                ' setup-host'
+            ),
+            mock.call(
+                'sudo docker run --ulimit memlock=-1:-1 --shm-size=100.0g'
+                ' --name omni -e POSTGRES_PASSWORD=perfkitbenchmarker -v'
+                ' /scratch/omni:/var/lib/postgresql/data -p 5432:5432 -d'
+                ' google/alloydbomni -c shared_buffers=25GB'
+            ),
+            mock.call(
+                'PGPASSWORD=perfkitbenchmarker psql -h localhost -U postgres'
+                " -c \"CREATE ROLE root LOGIN SUPERUSER PASSWORD"
+                " 'perfkitbenchmarker';\""
+            ),
+        ],
+    )
+
 
 if __name__ == '__main__':
   unittest.main()
