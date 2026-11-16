@@ -16,6 +16,7 @@
 This module abstract out the disk algorithm for formatting and creating
 scratch disks.
 """
+import logging
 import threading
 import time
 from typing import Any
@@ -568,5 +569,59 @@ class GCPSetUpNFSDiskStrategy(disk_strategies.SetUpNFSDiskStrategy):
 class GCPSetUpNetAppVolumesDiskStrategy(
     disk_strategies.SetUpNetAppDiskStrategy
 ):
-  """Strategies to set up NetApp Volumes disks on GCP."""
-  pass
+  """Strategies to set up NetApp Volumes disks on GCP.
+
+  Applies the Google Cloud NetApp Volumes Linux NFS client recommendations:
+  https://docs.cloud.google.com/netapp/volumes/docs/connect-clients/optimize-linux-nfs-clients
+  """
+
+  # Read-ahead of 15 * rsize for sequential reads:
+  # https://docs.cloud.google.com/netapp/volumes/docs/connect-clients/linux-nfs-read-ahead
+  _READ_AHEAD_RSIZE_MULTIPLIER = 15
+  # NetApp Volumes supports 180 NFSv4.1 session slots; the Linux default of 64
+  # caps outstanding operations per client regardless of nconnect:
+  # https://docs.cloud.google.com/netapp/volumes/docs/connect-clients/linux-nfs-concurrency
+  _NFSV4_MAX_SESSION_SLOTS = 180
+  _MAX_SESSION_SLOTS_PARAM = '/sys/module/nfs/parameters/max_session_slots'
+
+  def _ConfigureClientBeforeMount(self, netapp_disk: disk.NetAppDisk):
+    if not (
+        netapp_disk.nfs_version and netapp_disk.nfs_version.startswith('4')
+    ):
+      return
+    # Session slots are negotiated when the mount creates the NFSv4.1 session,
+    # so this must happen before the mount. The modprobe option covers a
+    # not-yet-loaded nfs module; the sysfs write covers a loaded one.
+    self.vm.RemoteCommand(
+        'echo "options nfs'
+        f' max_session_slots={self._NFSV4_MAX_SESSION_SLOTS}" | sudo tee'
+        ' /etc/modprobe.d/nfsclient.conf > /dev/null; if [ -e'
+        f' {self._MAX_SESSION_SLOTS_PARAM} ]; then echo'
+        f' {self._NFSV4_MAX_SESSION_SLOTS} | sudo tee'
+        f' {self._MAX_SESSION_SLOTS_PARAM} > /dev/null; fi'
+    )
+
+  def _ConfigureClientAfterMount(self, netapp_disk: disk.NetAppDisk):
+    read_ahead_kb = (
+        self._READ_AHEAD_RSIZE_MULTIPLIER * netapp_disk.nfs_rsize // 1024
+    )
+    read_ahead_path = (
+        f'/sys/class/bdi/0:$(stat -c "%d" {self.disk_spec.mount_point})'
+        '/read_ahead_kb'
+    )
+    default_read_ahead_kb, _ = self.vm.RemoteCommand(f'cat {read_ahead_path}')
+    session_slots, _ = self.vm.RemoteCommand(
+        f'cat {self._MAX_SESSION_SLOTS_PARAM} 2>/dev/null || echo n/a'
+    )
+    logging.info(
+        'Default read_ahead_kb for %s on %s is %s; setting it to %s'
+        ' (%s * rsize %s). nfs max_session_slots=%s.',
+        self.disk_spec.mount_point,
+        self.vm.name,
+        default_read_ahead_kb.strip(),
+        read_ahead_kb,
+        self._READ_AHEAD_RSIZE_MULTIPLIER,
+        netapp_disk.nfs_rsize,
+        session_slots.strip(),
+    )
+    self.vm.RemoteCommand(f'echo {read_ahead_kb} | sudo tee {read_ahead_path}')

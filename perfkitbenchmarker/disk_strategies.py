@@ -321,10 +321,17 @@ class SetUpNetAppDiskStrategy(SetUpDiskStrategy):
       )
     self.netapp_service: netapp_service.BaseNetAppService = netapp_svc
 
+  def _ConfigureClientBeforeMount(self, netapp_disk: disk.NetAppDisk):
+    """Hook for provider-specific NFS client settings applied before mount."""
+
+  def _ConfigureClientAfterMount(self, netapp_disk: disk.NetAppDisk):
+    """Hook for provider-specific NFS client settings applied after mount."""
+
   def SetUpDiskOnLinux(self):
     """Performs Linux specific setup of NetApp volume disk."""
     self.vm.Install('nfs_utils')
     netapp_disk = self.netapp_service.CreateNetAppDisk()
+    self._ConfigureClientBeforeMount(netapp_disk)
     self.vm.MountDisk(
         netapp_disk.GetDevicePath(),
         self.disk_spec.mount_point,
@@ -334,6 +341,7 @@ class SetUpNetAppDiskStrategy(SetUpDiskStrategy):
     )
     netapp_disk.UpdateDevicePath(self.disk_spec.mount_point)
     self.vm.scratch_disks.append(netapp_disk)
+    self._ConfigureClientAfterMount(netapp_disk)
 
 
 class SetUpLustreDiskStrategy(SetUpDiskStrategy):
