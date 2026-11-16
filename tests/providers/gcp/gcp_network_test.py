@@ -690,6 +690,47 @@ class TestGceNetwork(BaseGceNetworkTest):
         ' '.join(create_network_cmd), 'compute networks create .*--mtu 1500'
     )
 
+  @flagsaver.flagsaver(
+      gce_network_type='custom', gce_enable_private_ipv6_access=True
+  )
+  @mock.patch.object(vm_util, 'IssueCommand', return_value=('', '', 0))
+  def testSubnetCreateWithPrivateIpv6Access(self, mock_issue):
+    subnet = gce_network.GceSubnetResource(
+        'test-subnet',
+        'test-network',
+        'us-central1',
+        '10.128.0.0/20',
+        'test-project',
+    )
+    subnet._Create()
+    cmd_str = ' '.join(mock_issue.call_args_list[0][0][0])
+    self.assertIn('--stack-type IPV4_IPV6', cmd_str)
+    self.assertIn('--ipv6-access-type INTERNAL', cmd_str)
+    self.assertIn('--enable-private-ip-google-access', cmd_str)
+    self.assertIn(
+        '--private-ipv6-google-access-type enable-bidirectional-access',
+        cmd_str,
+    )
+
+  @flagsaver.flagsaver(
+      gce_network_type='custom', gce_subnet_enable_private_ipv6=True
+  )
+  @mock.patch.object(vm_util, 'IssueCommand', return_value=('', '', 0))
+  def testSubnetCreateWithPrivateIpv6AliasFlag(self, mock_issue):
+    subnet = gce_network.GceSubnetResource(
+        'test-subnet',
+        'test-network',
+        'us-central1',
+        '10.128.0.0/20',
+        'test-project',
+    )
+    subnet._Create()
+    cmd_str = ' '.join(mock_issue.call_args_list[0][0][0])
+    self.assertIn(
+        '--private-ipv6-google-access-type enable-bidirectional-access',
+        cmd_str,
+    )
+
 
 class GceFirewallRuleTest(pkb_common_test_case.PkbCommonTestCase):
 
