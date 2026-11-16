@@ -1095,5 +1095,28 @@ class RemoteHostCommandWithReturnCodeTest(
       )
 
 
+class TestGenerateAndCaptureLogs(pkb_common_test_case.PkbCommonTestCase):
+
+  def setUp(self):
+    super().setUp()
+    self.vm = CreateTestLinuxVm()
+    self.vm.name = 'pkb-test'
+    self.enter_context(
+        mock.patch.object(
+            self.vm,
+            'GetConnectionIp',
+            side_effect=lambda: linux_virtual_machine.BaseLinuxVirtualMachine.GetConnectionIp(
+                self.vm
+            ),
+        )
+    )
+
+  def testUncreatedVmSkipsRemoteLogCapture(self):
+    self.vm.created = False
+    with mock.patch.object(vm_util, 'IssueCommand') as mock_issue:
+      self.assertEqual(self.vm.GenerateAndCaptureLogs(), [])
+    mock_issue.assert_not_called()
+
+
 if __name__ == '__main__':
   unittest.main()

@@ -1466,10 +1466,18 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       return
     if self.WasInterrupted():
       return
+    if not self.created:
+      if use_api:
+        # _UpdateInterruptibleVmStatusThroughApi uses compute operations list
+        # and thus will not crash even if no VM Insert operation exists.
+        self._UpdateInterruptibleVmStatusThroughApi()
+      return
     try:
       self._UpdateInterruptibleVmStatusThroughMetadataService()
     except errors.VirtualMachine.RemoteCommandError as error:
-      if use_api and 'connection timed out' in str(error).lower():
+      if not (use_api and 'connection timed out' in str(error).lower()):
+        return
+      if use_api:
         self._UpdateInterruptibleVmStatusThroughApi()
 
   def IsInterruptible(self):

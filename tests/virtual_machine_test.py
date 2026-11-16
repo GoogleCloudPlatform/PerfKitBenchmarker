@@ -279,5 +279,37 @@ class TestInstallData(pkb_common_test_case.PkbCommonTestCase):
     check.assert_not_called()
 
 
+class TestUpdateInterruptibleVmStatus(pkb_common_test_case.PkbCommonTestCase):
+
+  def setUp(self):
+    super().setUp()
+    self.vm = CreateTestVm()
+    self.enter_context(
+        mock.patch.object(self.vm, 'IsInterruptible', return_value=True)
+    )
+
+  def testUncreatedVmWithoutApiSkipsInterruptibleStatusUpdate(self):
+    self.vm.created = False
+    with mock.patch.object(
+        self.vm, '_UpdateInterruptibleVmStatusThroughMetadataService'
+    ) as metadata_check, mock.patch.object(
+        self.vm, '_UpdateInterruptibleVmStatusThroughApi'
+    ) as api_check:
+      self.vm.UpdateInterruptibleVmStatus(use_api=False)
+    metadata_check.assert_not_called()
+    api_check.assert_not_called()
+
+  def testUncreatedVmWithApiChecksApiOnly(self):
+    self.vm.created = False
+    with mock.patch.object(
+        self.vm, '_UpdateInterruptibleVmStatusThroughMetadataService'
+    ) as metadata_check, mock.patch.object(
+        self.vm, '_UpdateInterruptibleVmStatusThroughApi'
+    ) as api_check:
+      self.vm.UpdateInterruptibleVmStatus(use_api=True)
+    metadata_check.assert_not_called()
+    api_check.assert_called_once_with()
+
+
 if __name__ == '__main__':
   unittest.main()

@@ -408,6 +408,42 @@ class GceVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
       )
       self.assertTrue(vm.spot_early_termination)
 
+  def testUpdateInterruptibleVmStatusUncreatedVmWithoutApi(self):
+    spec = gce_virtual_machine.GceVmSpec(
+        _COMPONENT,
+        machine_type='test_machine_type',
+        preemptible=True,
+        project='p',
+    )
+    vm = gce_virtual_machine.Debian12BasedGceVirtualMachine(spec)
+    self.assertFalse(vm.created)
+    with PatchCriticalObjects() as issue_command:
+      vm.UpdateInterruptibleVmStatus(use_api=False)
+      issue_command.assert_not_called()
+      self.assertFalse(vm.WasInterrupted())
+
+  def testUpdateInterruptibleVmStatusUncreatedVmUsesApi(self):
+    spec = gce_virtual_machine.GceVmSpec(
+        _COMPONENT,
+        machine_type='test_machine_type',
+        preemptible=True,
+        project='p',
+    )
+    vm = gce_virtual_machine.Debian12BasedGceVirtualMachine(spec)
+    self.assertFalse(vm.created)
+    vm.name = 'pkb-1234-0'
+    vm.zone = 'asia-northeast2-a'
+    operations_stdout = json.dumps(
+        [{'operationType': 'compute.instances.preempted'}]
+    )
+    fake_rets = [
+        (operations_stdout, '', 0),  # gcloud compute operations list
+    ]
+    with PatchCriticalObjects(fake_rets) as issue_command:
+      vm.UpdateInterruptibleVmStatus(use_api=True)
+      issue_command.assert_called_once()
+      self.assertTrue(vm.WasInterrupted())
+
   @parameterized.named_parameters(
       (
           'is_deleted',

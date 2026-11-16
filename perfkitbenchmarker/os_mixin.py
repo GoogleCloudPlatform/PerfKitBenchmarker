@@ -79,6 +79,7 @@ class BaseOsMixin(command_interface.CommandInterface, metaclass=abc.ABCMeta):
   internal_ip: str  # mixed from BaseVirtualMachine
   can_connect_via_internal_ip: bool  # mixed from BaseVirtualMachine
   boot_completion_ip_subset: bool  # mixed from BaseVirtualMachine
+  created: bool  # mixed from BaseResource
 
   @abc.abstractmethod
   def GetConnectionIp(self):

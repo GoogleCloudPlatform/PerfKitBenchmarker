@@ -2297,6 +2297,8 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
     Returns:
       A list of paths where the logs are stored on the caller's machine.
     """
+    if not self.created:
+      return []
     log_files = []
     # syslog
     try:

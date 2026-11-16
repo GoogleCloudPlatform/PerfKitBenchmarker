@@ -31,6 +31,8 @@ from perfkitbenchmarker import stages
 from perfkitbenchmarker import test_util
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import linux_boot
+from perfkitbenchmarker.providers.gcp import gce_network
+from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 from perfkitbenchmarker.providers.gcp import util as gcp_utils
 from tests import pkb_common_test_case
 
@@ -201,7 +203,26 @@ class TestPublishStageStartedSamples(unittest.TestCase):
     self.collector.PublishSamples.assert_called()
 
 
-class TestPublishFailedRunSample(unittest.TestCase):
+class TestPublishFailedRunSample(pkb_common_test_case.PkbCommonTestCase):
+
+  def _CreateUncreatedGceSpotVm(self):
+    self.enter_context(
+        mock.patch.object(gce_network.GceNetwork, 'GetNetwork')
+    )
+    self.enter_context(
+        mock.patch.object(gce_network.GceFirewall, 'GetFirewall')
+    )
+    self.enter_context(
+        mock.patch.object(vm_util, 'GetTempDir', return_value='/tmp/pkb')
+    )
+    vm_spec = gce_virtual_machine.GceVmSpec(
+        'test_component',
+        machine_type='n1-standard-2',
+        preemptible=True,
+        project='fakeproject',
+        zone='us-central1-a',
+    )
+    return gce_virtual_machine.Debian12BasedGceVirtualMachine(vm_spec)
 
   @mock.patch('time.time', return_value=123.45)
   @mock.patch('perfkitbenchmarker.sample.Sample')
@@ -249,6 +270,128 @@ class TestPublishFailedRunSample(unittest.TestCase):
             'failed_substatus': 'QuotaExceeded',
         },
     )
+
+  @mock.patch('time.time', return_value=123.45)
+  @mock.patch('perfkitbenchmarker.sample.Sample')
+  def testPublishFailedRunSampleUncreatedSpotVm(self, sample_mock, _):
+    vm = self._CreateUncreatedGceSpotVm()
+    self.assertFalse(vm.created)
+    spec = mock.MagicMock()
+    spec.vms = [vm]
+    spec.failed_substatus = (
+        benchmark_status.FailedSubstatus.INSUFFICIENT_CAPACITY
+    )
+
+    with mock.patch.object(
+        vm_util, 'IssueCommand', return_value=('[]', '', 0)
+    ) as mock_issue:
+      pkb.PublishFailedRunSample(
+          spec, 'Zone stockout', stages.PROVISION, collector=mock.Mock()
+      )
+      mock_issue.assert_called_once()
+
+    sample_mock.assert_called_once_with(
+        'Run Failed',
+        123.45,
+        'seconds',
+        {
+            'error_message': 'Zone stockout',
+            'run_stage': stages.PROVISION,
+            'flags': '{}',
+            'failed_substatus': (
+                benchmark_status.FailedSubstatus.INSUFFICIENT_CAPACITY
+            ),
+            'interruptible_vms': 1,
+            'interrupted_vms': 0,
+            'vm_status_codes': [],
+        },
+    )
+
+  @mock.patch('time.time', return_value=123.45)
+  @mock.patch('perfkitbenchmarker.sample.Sample')
+  def testPublishFailedRunSamplePreemptedDuringCreateSpotVm(
+      self, sample_mock, _
+  ):
+    vm = self._CreateUncreatedGceSpotVm()
+    self.assertFalse(vm.created)
+    spec = mock.MagicMock()
+    spec.vms = [vm]
+    spec.failed_substatus = (
+        benchmark_status.FailedSubstatus.INSUFFICIENT_CAPACITY
+    )
+
+    with mock.patch.object(
+        vm_util,
+        'IssueCommand',
+        return_value=(
+            '[{"operationType": "compute.instances.preempted"}]',
+            '',
+            0,
+        ),
+    ) as mock_issue:
+      pkb.PublishFailedRunSample(
+          spec, 'Preempted on start', stages.PROVISION, collector=mock.Mock()
+      )
+      mock_issue.assert_called_once()
+
+    sample_mock.assert_called_once_with(
+        'Run Failed',
+        123.45,
+        'seconds',
+        {
+            'error_message': 'Preempted on start',
+            'run_stage': stages.PROVISION,
+            'flags': '{}',
+            'failed_substatus': benchmark_status.FailedSubstatus.INTERRUPTED,
+            'interruptible_vms': 1,
+            'interrupted_vms': 1,
+            'vm_status_codes': [],
+        },
+    )
+
+  @flagsaver.flagsaver(
+      create_failed_run_samples=True,
+      capture_vm_logs=True,
+      run_stage=[stages.PROVISION],
+  )
+  def testRunBenchmarkPublishesFailedSampleForUncreatedSpotVm(self):
+    vm = self._CreateUncreatedGceSpotVm()
+    test_bm_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
+        pkb_common_test_case.SIMPLE_CONFIG, 'cluster_boot'
+    )
+    test_bm_spec.unmanaged_vm_groups = {'default': [vm]}
+    self.enter_context(mock.patch.object(test_bm_spec, 'Pickle'))
+    self.enter_context(
+        mock.patch.object(
+            pkb,
+            'DoProvisionPhase',
+            side_effect=errors.Benchmarks.InsufficientCapacityCloudFailure(
+                'Spot stockout'
+            ),
+        )
+    )
+    collector = mock.create_autospec(publisher.SampleCollector, instance=True)
+
+    with mock.patch.object(
+        vm_util, 'IssueCommand', return_value=('[]', '', 0)
+    ) as mock_issue:
+      with self.assertRaises(
+          errors.Benchmarks.InsufficientCapacityCloudFailure
+      ):
+        pkb.RunBenchmark(test_bm_spec, collector, False)
+      mock_issue.assert_called_once()
+
+    added_samples = []
+    for call in collector.AddSamples.call_args_list:
+      added_samples += list(call.args[0])
+    run_failed_samples = [s for s in added_samples if s.metric == 'Run Failed']
+    self.assertLen(run_failed_samples, 1)
+    self.assertEqual(
+        run_failed_samples[0].metadata['failed_substatus'],
+        benchmark_status.FailedSubstatus.INSUFFICIENT_CAPACITY,
+    )
+    self.assertEqual(run_failed_samples[0].metadata['interruptible_vms'], 1)
+    self.assertEqual(run_failed_samples[0].metadata['interrupted_vms'], 0)
 
 
 class TestMiscFunctions(

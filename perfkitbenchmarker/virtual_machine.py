@@ -1022,6 +1022,10 @@ class BaseVirtualMachine(os_mixin.BaseOsMixin, resource.BaseResource):
       return
     if self.WasInterrupted():
       return
+    if not self.created:
+      if use_api:
+        self._UpdateInterruptibleVmStatusThroughApi()
+      return
     try:
       self._UpdateInterruptibleVmStatusThroughMetadataService()
     except (NotImplementedError, errors.VirtualMachine.RemoteCommandError):
