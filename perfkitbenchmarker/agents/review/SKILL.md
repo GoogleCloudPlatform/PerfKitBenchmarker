@@ -29,8 +29,9 @@ rules. If there are no comments to add, grant approval.
     *Worker VMs* instead.
 -   **Shared Benchmark Utilities:** Factor reusable workload preparation steps
     (e.g., disk preconditioning, multi-VM filesystem creation and mounting, disk
-    striping) into common utility modules (e.g., `lssd_workloads_util.py`)
-    instead of duplicating logic across individual benchmark files.
+    striping) and shared suite or configuration helper logic into common utility
+    modules (e.g., `lssd_workloads_util.py` or shared config helpers) instead of
+    duplicating logic across individual benchmark or suite files.
 -   **Separate Benchmarks for High-Variance Hardware/Storage:** Maintain
     distinct benchmark files (e.g., `cassandra_stress_lssd_benchmark.py` vs.
     `cassandra_stress_benchmark.py`) for specialized storage or hardware
@@ -74,11 +75,21 @@ rules. If there are no comments to add, grant approval.
     implementations. For those values, flags can be used for convenience &
     should also feature in the `_ApplyFlags()` function of a spec. Flags are
     required when internal to `_benchmark.py` files / not resources, and can be
-    used for some implementation specific features. Conversely, do not pollute
-    shared cross-cloud base specs with single-provider quirks (scope those to a
-    narrow provider flag or automatic threshold), and avoid introducing new
-    flags when a setting is an invariant requirement for valid measurements or
-    is already implied by an existing flag.
+    used for some implementation specific features. When a subclass needs a
+    configurable resource option (such as provisioned throughput or disk size),
+    reuse existing properties and flags from the parent base spec (narrowing the
+    option decoder if needed) rather than defining duplicate resource-specific
+    spec options and flags. Conversely, do not pollute shared cross-cloud base
+    specs with single-provider quirks (scope those to a narrow provider flag or
+    automatic threshold), and avoid introducing new flags when a setting is an
+    invariant requirement for valid measurements or is already implied by an
+    existing flag.
+-   **Prefer Flag Holders Over Global `FLAGS`:** Define and read `absl` flags
+    via flag holder objects (e.g., `_MY_FLAG = flags.DEFINE_boolean(...)` and
+    `_MY_FLAG.value`, or imported module flag holders) rather than accessing
+    attributes off the global `FLAGS` object (`FLAGS.my_flag`). Flag holders
+    enable static type checking and catch typos or undefined flags before
+    runtime.
 -   **Expose in Metadata:** Flags & spec values which can affect the results of
     a file should be exposed in metadata. Some flags which don't affect results
     don't need to be exposed in metadata. Fetching real values from a cloud
@@ -89,6 +100,12 @@ rules. If there are no comments to add, grant approval.
     sizes defaulting to a percentage of JVM heap), only include the values in
     `Sample.metadata` when explicitly configured or non-default, to avoid
     misleading `None` or inaccurate placeholder values.
+-   **Fail on Invalid User Config; Log Adjusted Unspecified Values:** When an
+    explicitly requested user configuration cannot be created (e.g., it violates
+    cloud minimums or constraints), fail loudly rather than silently clamping or
+    adjusting it. When the user configuration is unspecified and provider code
+    selects or adjusts a value to satisfy service constraints, log the actual
+    adjusted configuration.
 -   **No Redundant Function Parameters for Flags:** Avoid accepting function
     parameters that merely duplicate existing global flag values when the
     function can read the flag directly.
@@ -108,11 +125,18 @@ rules. If there are no comments to add, grant approval.
     from the existing base configuration and only override parameters that
     differ from defaults and have a verified impact on the workload. Do not
     duplicate full configuration blocks or include redundant overrides without
-    measured justification.
+    measured justification. Conversely, when an updated setting applies
+    generally across variants or clouds, prefer updating the shared default
+    configuration rather than adding per-variant overrides that increase
+    configuration complexity.
 
 ## 3. Reliability & Error Handling
 
--   **Fail Fast:** Fail loudly and fast over silently swallowing errors.
+-   **Fail Fast:** Fail loudly and fast over silently swallowing errors. Do not
+    use defensive fallbacks such as `or []` or `or ''` for required values or
+    inputs already validated in `CheckPrerequisites`; use explicit `assert`
+    checks (or direct access) so missing or invalid state fails immediately
+    instead of turning into a silent no-op or downstream failure.
 -   **Strict Execution Rules:** Use `raise_on_failure=False` with caution, as
     generally we should fail (see also "Fail Fast"). Some patterns that are a
     good use for `raise_on_failure=False`:
@@ -136,6 +160,12 @@ rules. If there are no comments to add, grant approval.
     `raise_on_failure=False`, do not wrap calls in redundant
     `try ... except Exception` blocks to catch command execution errors;
     instead, inspect the returned stderr, returncode, or stdout directly.
+-   **Use Specific Exception Types:** Raise and catch specific PKB error classes
+    (e.g., `errors.Resource.RetryableGetError`, `errors.Config.InvalidValue`) or
+    dedicated custom exception types rather than bare `Exception` or overly
+    broad `errors.Error`. This is especially important in
+    `@vm_util.Retry(retryable_exceptions=...)` so unrelated programming errors
+    fail fast instead of being retried.
 
 ## 4. Coding Standards
 
@@ -150,14 +180,23 @@ rules. If there are no comments to add, grant approval.
 -   **Docstring Code Formatting:** Format code symbols, class names, and
     function references inside docstrings with backticks (e.g.
     `` `base_benchmark.Prepare` ``) for clarity and readability.
--   **Document Tuning Parameter Rationale and Lifecycle Ordering:** When
-    introducing non-default workload, database, or OS tuning parameters (e.g.,
-    I/O capacities, cache limits, or `ulimit` overrides) or non-obvious service
-    restart sequences across benchmark phases, suggest adding inline comments
-    explaining why each value or step is required (mark review comments for
-    this suggestion as "Optional but good to have").
+-   **Concise, High-Signal Inline Comments:** Keep code and configuration
+    comments brief and focused on non-obvious rationale. Flag verbose multi-line
+    explanations, comments that restate obvious code or config names, inline
+    copies of external tool documentation, business-decision writeups (which
+    belong outside the code), and comments in `third_party` files referencing
+    downstream-only scenarios that cannot occur in PKB. When non-default tuning
+    parameters (e.g., I/O capacities, cache limits, or `ulimit` overrides) or
+    non-obvious service restart sequences genuinely warrant explanation, suggest
+    a brief one-line comment (mark requests to add comments as "Optional but
+    good to have").
 -   **Memoization:** Implement `@functools.lru_cache` for repetitive operations.
 -   **Type Hinting:** Pytype annotations are mandatory.
+-   **Prefer Direct Attribute Access Over `getattr`:** Avoid `getattr` when the
+    attribute is statically defined on a base class or spec interface. Instead,
+    guard optional containers or sub-specs with explicit `if` checks and access
+    the attribute directly so static type checkers can verify names and catch
+    refactor regressions.
 -   **No Dead or Speculative Code:** Do not introduce unused helper methods,
     uncalled functions, or speculative hooks that have no active callers. If
     code is intended for a child/stacked CL, introduce it in the specific CL
@@ -194,6 +233,11 @@ rules. If there are no comments to add, grant approval.
     limited; verify non-trivial or provider-level changes by running an actual
     benchmark end-to-end to confirm success, and document the verified
     benchmark run in the `TESTED=` field.
+-   **Avoid Low-Value Mock-Only Unit Tests:** Do not add unit tests that mock
+    out the unit's own internal helper methods solely to assert call order or
+    wiring without exercising real behavior, parsing, or state transitions. Such
+    change-detector tests add maintenance overhead while providing little
+    regression protection.
 
 ## Resource specific comments
 
