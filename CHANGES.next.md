@@ -295,6 +295,8 @@
 -   Add kubernetes_management benchmark for measuring GKE/EKS/AKS management
     plane API responsiveness.
 -   Add support for Clickhouse running on GKE.
+-   Add kubernetes_alloydb_omni_sysbench benchmark for running Sysbench against
+    containerized AlloyDB Omni on Kubernetes.
 -   dpb_sparksql_benchmark now requires passing --dpb_sparksql_queries_url flag.
 -   Add dpb_tpcx_hs_benchmark, which runs the TPCx-HS kit's HSGen, HSSort and
     HSValidate programs on a DPB cluster and reports HSph@SF.
