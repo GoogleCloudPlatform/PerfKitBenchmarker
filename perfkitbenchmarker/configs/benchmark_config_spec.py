@@ -43,19 +43,36 @@ from perfkitbenchmarker.resources import ai_agent_service_spec
 from perfkitbenchmarker.resources import example_resource_spec
 from perfkitbenchmarker.resources import jobs_setter
 from perfkitbenchmarker.resources import managed_ai_model_spec
+from perfkitbenchmarker.resources import spanner_omni_cluster_spec
 from perfkitbenchmarker.resources.pinecone import pinecone_resource_spec
 from perfkitbenchmarker.resources.vertex_vector_search import vvs_resource_spec
 
 _NONE_OK = {'default': None, 'none_ok': True}
 
 
-def _LoadProvider(config, flag_values):
-  """Loads the provider associated with the config."""
+def _LoadProvider(config, flag_values) -> str:
+  """Loads and returns the cloud provider associated with the config.
+
+  Args:
+    config: Config dictionary that may specify a `cloud` entry.
+    flag_values: Parsed flag values providing the fallback/override `--cloud`.
+
+  Returns:
+    The resolved cloud provider name.
+
+  Raises:
+    errors.Config.MissingOption: If neither the config nor --cloud names a
+      cloud.
+  """
   cloud = config.get('cloud')
   if not cloud or flag_values['cloud'].present:
     cloud = flag_values.cloud
-  if cloud:
-    providers.LoadProvider(cloud)
+  if not cloud:
+    raise errors.Config.MissingOption(
+        'No cloud specified: set `cloud` in the config or pass --cloud.'
+    )
+  providers.LoadProvider(cloud)
+  return cloud
 
 
 class _DpbApplicationListDecoder(option_decoders.ListDecoder):
@@ -345,6 +362,35 @@ class _ExampleResourceDecoder(option_decoders.TypeVerifier):
         self._GetOptionFullName(component_full_name),
         flag_values,
         **example_config,
+    )
+
+
+class _SpannerOmniClusterDecoder(option_decoders.TypeVerifier):
+  """Validates the spanner_omni_cluster dictionary of a benchmark config."""
+
+  def Decode(self, value, component_full_name, flag_values):
+    """Decodes the spanner_omni_cluster dict of a benchmark config object.
+
+    Args:
+      value: dict. Config dictionary
+      component_full_name: string.  Fully qualified name of the configurable
+        component containing the config option.
+      flag_values: flags.FlagValues.  Runtime flag values to be propagated to
+        BaseSpec constructors.
+
+    Returns:
+      SpannerOmniClusterSpec built from the config passed in value.
+
+    Raises:
+      errors.Config.InvalidValue upon invalid input value.
+    """
+    omni_config = super().Decode(value, component_full_name, flag_values)
+    cloud = _LoadProvider(omni_config, flag_values)
+    spec_class = spanner_omni_cluster_spec.GetSpannerOmniClusterSpecClass(cloud)
+    return spec_class(
+        self._GetOptionFullName(component_full_name),
+        flag_values,
+        **omni_config,
     )
 
 
@@ -1496,6 +1542,10 @@ class BenchmarkConfigSpec(spec.BaseSpec):
         'edw_compute_resource': (_EdwComputeResourceDecoder, {'default': None}),
         'edw_service': (_EdwServiceDecoder, {'default': None}),
         'example_resource': (_ExampleResourceDecoder, {'default': None}),
+        'spanner_omni_cluster': (
+            _SpannerOmniClusterDecoder,
+            {'default': None},
+        ),
         'base_job': (_BaseJobDecoder, {'default': None}),
         'memory_store': (_MemoryStoreDecoder, {'default': None}),
         'vpn_service': (_VPNServiceDecoder, {'default': None}),

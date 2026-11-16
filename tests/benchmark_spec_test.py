@@ -20,8 +20,10 @@ from unittest import mock
 
 from absl import flags
 from absl.testing import flagsaver
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import context
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_alias
 from perfkitbenchmarker import pkb  # pylint: disable=unused-import # noqa
 from perfkitbenchmarker import provider_info
@@ -31,6 +33,8 @@ from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.aws import aws_virtual_machine as aws_vm
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine as gce_vm
 from perfkitbenchmarker.providers.gcp import gcp_spanner
+from perfkitbenchmarker.providers.gcp import gcp_spanner_omni_cluster
+from perfkitbenchmarker.resources.container_service import container_cluster
 from tests import pkb_common_test_case
 
 flags.DEFINE_integer('benchmark_spec_test_flag', 0, 'benchmark_spec_test flag.')
@@ -65,6 +69,19 @@ cluster_boot:
           machine_type: n1-standard-4
           project: my-project
           zone: us-central1-c
+"""
+SPANNER_OMNI_CONFIG = """
+cluster_boot:
+  vm_groups:
+    clients:
+      vm_spec:
+        GCP:
+          machine_type: n2-standard-32
+          zone: us-central1-a
+          project: my-project
+  spanner_omni_cluster:
+    cloud: GCP
+    database_name: benchbase
 """
 STATIC_VM_CONFIG = """
 static_vms:
@@ -297,6 +314,101 @@ class ConstructSpannerTestCase(_BenchmarkSpecTestCase):
     self.test_bm_spec.ConstructRelationalDb()
 
     self.assertEqual(self.test_bm_spec.relational_db.nodes, 10)  # pyrefly: ignore[missing-attribute]
+
+
+class ConstructSpannerOmniClusterTestCase(_BenchmarkSpecTestCase):
+
+  def _CreateSpec(self):
+    spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(SPANNER_OMNI_CONFIG)
+    spec.ConstructVirtualMachines()
+    spec.container_cluster = mock.create_autospec(
+        container_cluster.BaseContainerCluster, instance=True, spec_set=True
+    )
+    spec.ConstructSpannerOmniCluster()
+    return spec
+
+  def testConstructSpannerOmniCluster(self):
+    spec = self._CreateSpec()
+
+    cluster = spec.spanner_omni_cluster
+    self.assertIsInstance(
+        cluster, gcp_spanner_omni_cluster.GcpSpannerOmniCluster
+    )
+    with self.assertRaises(errors.Resource.CreationError):
+      _ = cluster.client_vm
+    cluster.SetVms(spec.vm_groups)
+    self.assertIs(cluster.client_vm, spec.vm_groups['clients'][0])
+    self.assertEqual(cluster.database_name, 'benchbase')
+    self.assertIn(cluster, spec.resources)
+
+  def testConstructSpannerOmniClusterRequiresClientVmGroup(self):
+    spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
+        SPANNER_OMNI_CONFIG.replace('    clients:', '    loaders:')
+    )
+    spec.ConstructVirtualMachines()
+    spec.container_cluster = mock.create_autospec(
+        container_cluster.BaseContainerCluster, instance=True, spec_set=True
+    )
+
+    with self.assertRaisesRegex(
+        errors.Config.InvalidValue, "requires the 'clients' vm_group"
+    ):
+      spec.ConstructSpannerOmniCluster()
+
+  def testConstructSpannerOmniClusterRejectsUnknownCloud(self):
+    spec = self._CreateSpec()
+    spec.config.spanner_omni_cluster.cloud = 'UnknownOmniCloud'
+    with mock.patch.object(providers, 'LoadProvider', autospec=True):
+      with self.assertRaises(errors.Resource.SubclassNotFoundError):
+        spec.ConstructSpannerOmniCluster()
+
+  def testConstructSpannerOmniClusterRequiresContainerCluster(self):
+    spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(SPANNER_OMNI_CONFIG)
+    spec.ConstructVirtualMachines()
+    with self.assertRaisesRegex(
+        errors.Config.InvalidValue,
+        'spanner_omni_cluster requires a container_cluster',
+    ):
+      spec.ConstructSpannerOmniCluster()
+
+  def testProvisionAttachesClientVmToSpannerOmniCluster(self):
+    spec = self._CreateSpec()
+    with (
+        mock.patch.object(background_tasks, 'RunThreaded', autospec=True),
+        mock.patch.object(
+            benchmark_spec.vm_util, 'GenerateSSHConfig', autospec=True
+        ),
+    ):
+      spec.Provision()
+
+    self.assertIs(
+        spec.spanner_omni_cluster.client_vm, spec.vm_groups['clients'][0]
+    )
+
+  def testCheckPrerequisitesChecksSpannerOmniCluster(self):
+    spec = self._CreateSpec()
+    with mock.patch.object(
+        spec.spanner_omni_cluster, 'CheckPrerequisites', autospec=True
+    ) as mock_check:
+      spec.CheckPrerequisites()
+    mock_check.assert_called_once_with()
+
+  def testDeleteDeletesSpannerOmniClusterBeforeContainerCluster(self):
+    spec = self._CreateSpec()
+    call_order = mock.Mock()
+    with (
+        mock.patch.object(
+            spec.spanner_omni_cluster, 'Delete', autospec=True
+        ) as mock_omni_delete,
+        mock.patch.object(background_tasks, 'RunThreaded', autospec=True),
+    ):
+      call_order.attach_mock(mock_omni_delete, 'omni_delete')
+      call_order.attach_mock(spec.container_cluster.Delete, 'cluster_delete')
+      spec.Delete()
+    self.assertEqual(
+        [c[0] for c in call_order.mock_calls],
+        ['omni_delete', 'cluster_delete'],
+    )
 
 
 class ConstructVmsTestCase(_BenchmarkSpecTestCase):
