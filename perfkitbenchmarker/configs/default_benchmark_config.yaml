@@ -726,6 +726,12 @@ io500_lustre:
     scratch_dir: lustre_dir
     openmpi_version: 4.1.6
     mpi_ranks_list: [1, 16, 64, 192]
+    io500_tests:
+      - ior_easy_write
+      - ior_easy_read
+      - mdtest_easy_write
+      - mdtest_easy_stat
+      - mdtest_easy_delete
     ior_easy_direct_io: True
     lustre_stripe_args: '-E 1M -c 1 -E -1 -c -1'
     lustre_max_dirty_mb: 2000
