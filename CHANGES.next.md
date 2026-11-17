@@ -762,3 +762,5 @@
 -   Add support for AWS FSx for NetApp ONTAP volumes.
 -   Install the matching AWS SDK v2 bundle JAR for Hadoop 3.4.3+ lean binary
     tarballs on unmanaged AWS Hadoop and Spark clusters.
+-   Quote `cbt` CLI arguments in `cloud_bigtable_ycsb_benchmark` table creation
+    and cleanup remote commands.

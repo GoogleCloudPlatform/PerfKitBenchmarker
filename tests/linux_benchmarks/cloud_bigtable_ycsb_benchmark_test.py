@@ -19,6 +19,7 @@ from unittest import mock
 from absl import flags
 from absl.testing import flagsaver
 from perfkitbenchmarker.linux_benchmarks import cloud_bigtable_ycsb_benchmark
+from perfkitbenchmarker.linux_packages import google_cloud_cbt
 from perfkitbenchmarker.linux_packages import ycsb
 from perfkitbenchmarker.providers.gcp import gcp_bigtable
 from tests import pkb_common_test_case
@@ -89,6 +90,58 @@ class CloudBigtableYcsbBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
 
     self.mock_update_nodes.assert_not_called()
     self.mock_load.assert_not_called()
+
+  @flagsaver.flagsaver(
+      project='test-project',
+      google_bigtable_admin_endpoint='test-bigtableadmin.googleapis.com',
+      google_bigtable_static_table_name='ycsb table (test)',
+  )
+  def testCreateTableQuotesCommandArguments(self):
+    test_instance: gcp_bigtable.GcpBigtableInstance = self._CreateMockBigtable(
+        node_count=3, load_node_count=6
+    )
+    test_instance.name = 'instance with spaces'
+    mock_vm = mock.Mock()
+    self.mock_bm_spec.unmanaged_vm_groups = {'default': [mock_vm]}
+
+    cloud_bigtable_ycsb_benchmark._CreateTable(self.mock_bm_spec)
+
+    mock_vm.RemoteCommand.assert_called_once()
+    cmd = mock_vm.RemoteCommand.call_args[0][0]
+    expected_prefix = (
+        f'{google_cloud_cbt.CBT_BIN} -project=test-project '
+        "'-instance=instance with spaces' "
+        '-admin-endpoint=test-bigtableadmin.googleapis.com:443 '
+        "createtable 'ycsb table (test)' "
+        f'families={cloud_bigtable_ycsb_benchmark.COLUMN_FAMILY}:maxversions=1 '
+        'splits=user1000,'
+    )
+    self.assertStartsWith(cmd, expected_prefix)
+
+  @flagsaver.flagsaver(
+      project='test-project',
+      google_bigtable_admin_endpoint='test-bigtableadmin.googleapis.com',
+      google_bigtable_static_table_name='ycsb table (test)',
+      google_bigtable_delete_static_table=True,
+  )
+  def testCleanupTableQuotesCommandArguments(self):
+    test_instance: gcp_bigtable.GcpBigtableInstance = self._CreateMockBigtable(
+        node_count=3, load_node_count=6
+    )
+    test_instance.name = 'instance with spaces'
+    test_instance.user_managed = True
+    mock_vm = mock.Mock()
+    self.mock_bm_spec.unmanaged_vm_groups = {'default': [mock_vm]}
+
+    cloud_bigtable_ycsb_benchmark.Cleanup(self.mock_bm_spec)
+
+    expected_cmd = (
+        f'{google_cloud_cbt.CBT_BIN} -project=test-project '
+        "'-instance=instance with spaces' "
+        '-admin-endpoint=test-bigtableadmin.googleapis.com:443 '
+        "deletetable 'ycsb table (test)'"
+    )
+    mock_vm.RemoteCommand.assert_called_once_with(expected_cmd)
 
 
 if __name__ == '__main__':

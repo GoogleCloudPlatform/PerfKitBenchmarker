@@ -607,7 +607,7 @@ def _CreateTable(benchmark_spec: bm_spec.BenchmarkSpec):
   ]
 
   try:
-    vm.RemoteCommand(' '.join(command))
+    vm.RemoteCommand(shlex.join(command))
   except errors.VirtualMachine.RemoteCommandError as e:
     # Expected if --google_bigtable_static_table_name is set. We don't want to
     # skip table creation in this case because it is convenient to have PKB
@@ -634,7 +634,7 @@ def _CleanupTable(benchmark_spec: bm_spec.BenchmarkSpec):
       'deletetable',
       _GetTableName(),
   ]
-  vm.RemoteCommand(' '.join(command))
+  vm.RemoteCommand(shlex.join(command))
 
 
 def Cleanup(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
