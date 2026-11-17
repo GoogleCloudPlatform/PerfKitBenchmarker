@@ -90,6 +90,15 @@ class EdwConversationalAnalyticsBenchmarkTest(
     ):
       edw_conversational_analytics_benchmark.CheckPrerequisites(mock_config)
 
+  @flagsaver.flagsaver(
+      (bigquery.BQ_CA_DATA_AGENT, ''),
+      (bigquery.BQ_CA_CHAT_MODE, 'free_form'),
+  )
+  def testCheckPrerequisitesDoesNotRaiseWhenFreeFormAndAgentMissing(self):
+    mock_config = mock.Mock()
+    mock_config.edw_service.type = 'bigquery'
+    edw_conversational_analytics_benchmark.CheckPrerequisites(mock_config)
+
   @flagsaver.flagsaver(bq_ca_data_agent='', bq_ca_client='claude')
   def testCheckPrerequisitesDoesNotRaiseValueErrorWhenBqCaClientNotDataAgentAndFlagMissing(
       self,

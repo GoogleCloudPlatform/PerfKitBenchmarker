@@ -43,11 +43,23 @@ INITIALIZE_SEARCH_TABLE_PARTITIONED = flags.DEFINE_bool(
     ' benchmarking.',
 )
 
+BQ_CA_CHAT_MODE_DATA_AGENT = 'data_agent'
+BQ_CA_CHAT_MODE_FREE_FORM = 'free_form'
+
 BQ_CA_DATA_AGENT = flags.DEFINE_string(
     'bq_ca_data_agent',
     None,
     'The full resource name of the agent to use, e.g. '
     'projects/{project}/locations/{location}/dataAgents/{agent_id}',
+)
+
+BQ_CA_CHAT_MODE = flags.DEFINE_enum(
+    'bq_ca_chat_mode',
+    BQ_CA_CHAT_MODE_DATA_AGENT,
+    [BQ_CA_CHAT_MODE_DATA_AGENT, BQ_CA_CHAT_MODE_FREE_FORM],
+    'The chat mode for BigQuery Conversational Analytics: data_agent queries '
+    'a pre-authored agent; free_form sends stateless chat scoped to the '
+    'project.',
 )
 
 BQ_CA_CLIENT = flags.DEFINE_enum(
@@ -647,6 +659,13 @@ class ConversationalAnalyticsClientInterface(
     return 'bq_data_agent'
 
   @override
+  def GetMetadata(self) -> dict[str, str]:
+    """Get the metadata attributes for the Client Interface."""
+    metadata = super().GetMetadata()
+    metadata['ca_chat_mode'] = BQ_CA_CHAT_MODE.value
+    return metadata
+
+  @override
   def Prepare(self, package_name: str) -> None:
     """Prepares the client vm by installing geminidataanalytics package and driver."""
     assert self.client_vm is not None
@@ -667,13 +686,18 @@ class ConversationalAnalyticsClientInterface(
   @override
   def _GetConversationalAnalyticsCommand(self, remote_query_file: str) -> str:
     key_file = os.path.basename(FLAGS.gcp_service_account_key_file)
-    return (
+    cmd = (
         'source .venv/bin/activate && python3 bq_ca_driver.py single '
         f'--project={self.project_id} '
-        f'--agent={BQ_CA_DATA_AGENT.value} '
+        f'--chat_mode={BQ_CA_CHAT_MODE.value} '
+    )
+    if BQ_CA_CHAT_MODE.value == BQ_CA_CHAT_MODE_DATA_AGENT:
+      cmd += f'--agent={BQ_CA_DATA_AGENT.value} '
+    cmd += (
         f'--credentials_file={key_file} '
         f'--print_results --query_file={remote_query_file}'
     )
+    return cmd
 
 
 class ClaudeConversationalAnalyticsClientInterface(

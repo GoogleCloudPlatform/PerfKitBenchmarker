@@ -317,6 +317,8 @@ def CheckPrerequisites(benchmark_config):
   if edw_service_type == 'bigquery':
     if (
         bigquery.BQ_CA_CLIENT.value == 'bq_data_agent'
+        and bigquery.BQ_CA_CHAT_MODE.value
+        == bigquery.BQ_CA_CHAT_MODE_DATA_AGENT
         and not bigquery.BQ_CA_DATA_AGENT.value
     ):
       missing_flags.append('--bq_ca_data_agent')

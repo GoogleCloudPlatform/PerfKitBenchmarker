@@ -687,7 +687,7 @@ class BigqueryTestCase(pkb_common_test_case.PkbCommonTestCase):
         mock.call('[ -d . ] || mkdir -p .'),
         mock.call(
             'source .venv/bin/activate && python3 bq_ca_driver.py single '
-            f'--project={PROJECT_ID} --agent=AGENT_ID '
+            f'--project={PROJECT_ID} --chat_mode=data_agent --agent=AGENT_ID '
             '--credentials_file=SERVICE_ACCOUNT_KEY_FILE --print_results '
             f'--query_file={expected_query_file}'
         ),
@@ -789,12 +789,73 @@ class BigqueryTestCase(pkb_common_test_case.PkbCommonTestCase):
         mock.call('[ -d . ] || mkdir -p .'),
         mock.call(
             'source .venv/bin/activate && python3 bq_ca_driver.py single '
-            f'--project={PROJECT_ID} --agent=AGENT_ID '
+            f'--project={PROJECT_ID} --chat_mode=data_agent --agent=AGENT_ID '
             '--credentials_file=SERVICE_ACCOUNT_KEY_FILE --print_results '
             f'--query_file={expected_query_file}'
         ),
     ])
     mock_vm.PushFile.assert_called_once_with(mock.ANY, expected_query_file)
+
+  @flagsaver.flagsaver(
+      (
+          gcp_flags.GCP_SERVICE_ACCOUNT_KEY_FILE,
+          '/path/to/SERVICE_ACCOUNT_KEY_FILE',
+      ),
+      (bigquery.BQ_CA_CHAT_MODE, 'free_form'),
+  )
+  def testConversationalAnalyticsClientInterfaceExecuteQueryFreeForm(self):
+    # Arrange
+    interface = bigquery.ConversationalAnalyticsClientInterface(
+        PROJECT_ID, DATASET_ID
+    )
+    mock_vm = mock.MagicMock()
+    bm_spec = FakeBenchmarkSpec(mock_vm)
+    interface.SetProvisionedAttributes(bm_spec)
+
+    response_dict = {
+        'query_wall_time_in_secs': 5.0,
+        'details': {
+            'job_id': None,
+            'query_results': {
+                'text_response': 'The total sales is $1000.',
+                'generated_sql': 'SELECT sum(sales) FROM t',
+                'retrieved_data': [['1000']],
+            },
+        },
+    }
+    mock_vm.RemoteCommand.side_effect = [
+        (None, None),
+        (json.dumps(response_dict), None),
+    ]
+
+    # Act
+    interface.ExecuteQuery(QUERY_NAME)
+
+    # Assert
+    self.assertIn(
+        '--chat_mode=free_form', mock_vm.RemoteCommand.call_args[0][0]
+    )
+
+  @flagsaver.flagsaver(
+      (
+          gcp_flags.GCP_SERVICE_ACCOUNT_KEY_FILE,
+          '/path/to/SERVICE_ACCOUNT_KEY_FILE',
+      ),
+      (bigquery.BQ_CA_CHAT_MODE, 'free_form'),
+  )
+  def testConversationalAnalyticsClientInterfaceGetMetadata(self):
+    interface = bigquery.ConversationalAnalyticsClientInterface(
+        PROJECT_ID, DATASET_ID
+    )
+
+    self.assertDictEqual(
+        interface.GetMetadata(),
+        {
+            'fetches_results_immediately': 'True',
+            'ca_client': 'bq_data_agent',
+            'ca_chat_mode': 'free_form',
+        },
+    )
 
   @flagsaver.flagsaver(
       (
