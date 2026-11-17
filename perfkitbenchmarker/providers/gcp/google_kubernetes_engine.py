@@ -480,11 +480,16 @@ class GkeCluster(BaseGkeCluster):
     vm_config = typing.cast(gce_virtual_machine.GceVmSpec, vm_config)
     nodepool_config.disk_type = vm_config.boot_disk_type
     nodepool_config.disk_size = vm_config.boot_disk_size
+    nodepool_config.disk_iops = vm_config.boot_disk_iops
+    nodepool_config.disk_throughput = vm_config.boot_disk_throughput
     nodepool_config.max_local_disks = vm_config.max_local_disks
     nodepool_config.ssd_interface = vm_config.ssd_interface
     nodepool_config.threads_per_core = vm_config.threads_per_core
     nodepool_config.gce_tags = vm_config.gce_tags
     nodepool_config.min_cpu_platform = vm_config.min_cpu_platform
+    nodepool_config.enable_nested_virtualization = (
+        vm_config.enable_nested_virtualization
+    )
     nodepool_config.cpus: int = vm_config.cpus  # pyrefly: ignore[bad-assignment]
     nodepool_config.memory_mib: int = vm_config.memory  # pyrefly: ignore[bad-assignment]
 
@@ -511,12 +516,24 @@ class GkeCluster(BaseGkeCluster):
     result = super().GetResourceMetadata()
     result['boot_disk_type'] = self.default_nodepool.disk_type
     result['boot_disk_size'] = self.default_nodepool.disk_size
+    if self.default_nodepool.disk_iops:
+      result['boot_disk_provisioned_iops'] = self.default_nodepool.disk_iops
+    if self.default_nodepool.disk_throughput:
+      result['boot_disk_provisioned_throughput'] = (
+          self.default_nodepool.disk_throughput
+      )
+    if self.default_nodepool.enable_nested_virtualization:
+      result['enable_nested_virtualization'] = True
     if self.default_nodepool.max_local_disks:
       result['gce_local_ssd_count'] = self.default_nodepool.max_local_disks
       result['gce_local_ssd_interface'] = self.default_nodepool.ssd_interface
     result['gke_nccl_fast_socket'] = self.enable_nccl_fast_socket
-    if self.enable_network_policy:
+    if self.enable_network_policy or gcp_flags.GKE_ENABLE_DATAPLANE_V2.value:
       result['gke_enable_dataplane_v2'] = True
+    if gcp_flags.GKE_KUBERNETES_UNSTABLE_APIS.value:
+      result['gke_kubernetes_unstable_apis'] = ','.join(
+          gcp_flags.GKE_KUBERNETES_UNSTABLE_APIS.value
+      )
     if self.image_type:
       result['image_type'] = self.image_type
     if gcp_flags.MAX_CPU.value:
@@ -577,17 +594,20 @@ class GkeCluster(BaseGkeCluster):
       cmd.args.append('--no-enable-shielded-nodes')
     if gcp_flags.GKE_ADDONS.value:
       cmd.args.append(f'--addons={gcp_flags.GKE_ADDONS.value}')
+    if gcp_flags.GKE_KUBERNETES_UNSTABLE_APIS.value:
+      cmd.flags['enable-kubernetes-unstable-apis'] = ','.join(
+          gcp_flags.GKE_KUBERNETES_UNSTABLE_APIS.value
+      )
     if gcp_flags.GKE_ENABLE_WORKLOAD_IDENTITY.value:
       cmd.flags['workload-pool'] = f'{self.project}.svc.id.goog'
-    if self.enable_network_policy:
+    if gcp_flags.GKE_ENABLE_DATAPLANE_V2.value or self.enable_network_policy:
       addons = (gcp_flags.GKE_ADDONS.value or '').split(',')
       if 'NetworkPolicy' in addons:
         raise errors.Config.InvalidValue(
-            'enable_network_policy uses Dataplane V2 (--enable-dataplane-v2)'
-            ' and cannot be combined with --gke_addons=NetworkPolicy.'
+            'Dataplane V2 (--enable-dataplane-v2) cannot be combined with'
+            ' --gke_addons=NetworkPolicy.'
         )
-      if '--enable-dataplane-v2' not in cmd.args:
-        cmd.args.append('--enable-dataplane-v2')
+      cmd.args.append('--enable-dataplane-v2')
     if not self.release_channel:
       cmd.args.append('--no-enable-autoupgrade')
     self._AddNodeParamsToCmd(
@@ -744,6 +764,12 @@ class GkeCluster(BaseGkeCluster):
       cmd.flags['disk-size'] = nodepool_config.disk_size
     if nodepool_config.disk_type:
       cmd.flags['disk-type'] = nodepool_config.disk_type
+    if nodepool_config.disk_iops:
+      cmd.flags['boot-disk-provisioned-iops'] = nodepool_config.disk_iops
+    if nodepool_config.disk_throughput:
+      cmd.flags['boot-disk-provisioned-throughput'] = (
+          nodepool_config.disk_throughput
+      )
     if nodepool_config.max_local_disks:
       # https://cloud.google.com/kubernetes-engine/docs/concepts/local-ssd
       if nodepool_config.ssd_interface == gce_virtual_machine.NVME:
@@ -814,6 +840,9 @@ class GkeCluster(BaseGkeCluster):
 
     if nodepool_config.sandbox_config is not None:
       cmd.flags['sandbox'] = nodepool_config.sandbox_config.ToSandboxFlag()
+
+    if nodepool_config.enable_nested_virtualization:
+      cmd.args.append('--enable-nested-virtualization')
 
     if self.image_type and 'image-type' not in cmd.flags:
       cmd.flags['image-type'] = self.image_type

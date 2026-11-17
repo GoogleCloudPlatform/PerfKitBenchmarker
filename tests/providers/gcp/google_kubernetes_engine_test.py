@@ -382,6 +382,9 @@ class GoogleKubernetesEngineTestCase(PatchedObjectsTestCase):
           'version': 'v1.2.3',
       }
       self.assertEqual(metadata, {**metadata, **expected})
+      self.assertNotIn('boot_disk_provisioned_iops', metadata)
+      self.assertNotIn('boot_disk_provisioned_throughput', metadata)
+      self.assertNotIn('enable_nested_virtualization', metadata)
 
   def testCidrCalculations(self):
     self.assertEqual(google_kubernetes_engine._CalculateCidrSize(1), 19)
@@ -546,6 +549,9 @@ class GoogleKubernetesEngineAutoscalingTestCase(PatchedObjectsTestCase):
           'max_size': 30,
       }
       self.assertEqual(metadata, {**metadata, **expected})
+      self.assertNotIn('boot_disk_provisioned_iops', metadata)
+      self.assertNotIn('boot_disk_provisioned_throughput', metadata)
+      self.assertNotIn('enable_nested_virtualization', metadata)
 
   def testLabelDisks(self):
     with self.patch_critical_objects(stdout=_PVC_LIST) as issue_command:
@@ -981,6 +987,9 @@ class GoogleKubernetesEngineWithTpusTestCase(PatchedObjectsTestCase):
           'machine_type': 'ct6e-standard-4t',
       }
       self.assertEqual(metadata, {**metadata, **expected})
+      self.assertNotIn('boot_disk_provisioned_iops', metadata)
+      self.assertNotIn('boot_disk_provisioned_throughput', metadata)
+      self.assertNotIn('enable_nested_virtualization', metadata)
 
 
 class GoogleKubernetesEngineGetNodesTestCase(GoogleKubernetesEngineTestCase):
@@ -1692,6 +1701,163 @@ class GoogleKubernetesEngineGclusterTestCase(PatchedObjectsTestCase):
         get_creds_cmd = issue_command.GetCommandWithSubstring('get-credentials')
         self.assertIn('--region us-central1', get_creds_cmd)
         self.assertNotIn('--zone', get_creds_cmd)
+
+
+class GoogleKubernetesEngineNodepoolIsolationAndFlagsTestCase(
+    PatchedObjectsTestCase
+):
+
+  @staticmethod
+  def create_kubernetes_engine_spec(
+      enable_nested_virt: bool = True,
+      worker_machine_type: str = 'c3-standard-88',
+  ):
+    return container_spec.ContainerClusterSpec(
+        'NAME',
+        **{
+            'cloud': 'GCP',
+            'vm_spec': {
+                'GCP': {
+                    'machine_type': 'c3-standard-8',
+                    'zone': 'us-west1-c',
+                    'project': 'fakeproject',
+                },
+            },
+            'vm_count': 2,
+            'poll_for_events': False,
+            'nodepools': {
+                'workers': {
+                    'vm_spec': {
+                        'GCP': {
+                            'machine_type': worker_machine_type,
+                            'zone': 'us-west1-c',
+                            'enable_nested_virtualization': enable_nested_virt,
+                        },
+                    },
+                    'vm_count': 1,
+                },
+            },
+        },
+    )
+
+  def testDefaultsPreserveClusterCreateCommand(self):
+    spec = GoogleKubernetesEngineTestCase.create_kubernetes_engine_spec()
+    with self.patch_critical_objects() as issue_command:
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      cluster._Create()
+      cluster_cmd = issue_command.GetCommandWithSubstring(
+          'gcloud container clusters create'
+      )
+      self.assertNotIn('--enable-dataplane-v2', cluster_cmd)
+      self.assertNotIn('--enable-kubernetes-unstable-apis', cluster_cmd)
+      self.assertNotIn('--enable-nested-virtualization', cluster_cmd)
+
+  @flagsaver.flagsaver(
+      gke_enable_dataplane_v2=True,
+      gke_kubernetes_unstable_apis=[
+          'certificates.k8s.io/v1beta1/clustertrustbundles',
+          'certificates.k8s.io/v1beta1/podcertificaterequests',
+      ],
+  )
+  def testClusterFlagsAndWorkerNodepoolIsolation(self):
+    spec = self.create_kubernetes_engine_spec(enable_nested_virt=True)
+    with self.patch_critical_objects() as issue_command:
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      cluster._Create()
+
+      cluster_cmd = issue_command.GetCommandWithSubstring(
+          'gcloud container clusters create'
+      )
+      self.assertIn('--enable-dataplane-v2', cluster_cmd)
+      self.assertIn(
+          '--enable-kubernetes-unstable-apis '
+          'certificates.k8s.io/v1beta1/clustertrustbundles,'
+          'certificates.k8s.io/v1beta1/podcertificaterequests',
+          cluster_cmd,
+      )
+      self.assertNotIn('--enable-nested-virtualization', cluster_cmd)
+      self.assertNotIn('--image-type', cluster_cmd)
+
+      worker_cmd = issue_command.GetCommandWithSubstring(
+          'node-pools create workers'
+      )
+      self.assertIn('--machine-type c3-standard-88', worker_cmd)
+      self.assertIn('--enable-nested-virtualization', worker_cmd)
+      self.assertIn('--node-labels pkb_nodepool=workers', worker_cmd)
+      self.assertNotIn('--enable-dataplane-v2', worker_cmd)
+      self.assertNotIn('--enable-kubernetes-unstable-apis', worker_cmd)
+
+      metadata = cluster.GetResourceMetadata()
+      self.assertTrue(metadata['gke_enable_dataplane_v2'])
+      self.assertEqual(
+          metadata['gke_kubernetes_unstable_apis'],
+          'certificates.k8s.io/v1beta1/clustertrustbundles,'
+          'certificates.k8s.io/v1beta1/podcertificaterequests',
+      )
+
+  @flagsaver.flagsaver(
+      gke_enable_dataplane_v2=True,
+      gke_addons='HttpLoadBalancing,NetworkPolicy',
+  )
+  def testDataplaneV2FlagConflictsWithLegacyNetworkPolicyAddon(self):
+    spec = self.create_kubernetes_engine_spec(enable_nested_virt=False)
+    with self.patch_critical_objects():
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      with self.assertRaises(errors.Config.InvalidValue):
+        cluster._Create()
+
+  def testHyperdiskProvisionedIopsAndThroughputFlags(self):
+    spec = self.create_kubernetes_engine_spec(
+        enable_nested_virt=False,
+        worker_machine_type='c3-highcpu-192-metal',
+    )
+    spec.nodepools['workers'].vm_spec.boot_disk_type = 'hyperdisk-balanced'
+    spec.nodepools['workers'].vm_spec.boot_disk_size = 500
+    spec.nodepools['workers'].vm_spec.boot_disk_iops = 6000
+    spec.nodepools['workers'].vm_spec.boot_disk_throughput = 890
+    with self.patch_critical_objects() as issue_command:
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      cluster._Create()
+      worker_cmd = issue_command.GetCommandWithSubstring(
+          'node-pools create workers'
+      )
+      self.assertIn('--machine-type c3-highcpu-192-metal', worker_cmd)
+      self.assertIn('--disk-type hyperdisk-balanced', worker_cmd)
+      self.assertIn('--disk-size 500', worker_cmd)
+      self.assertIn('--boot-disk-provisioned-iops 6000', worker_cmd)
+      self.assertIn('--boot-disk-provisioned-throughput 890', worker_cmd)
+      self.assertNotIn('--enable-nested-virtualization', worker_cmd)
+
+  def testDefaultNodepoolHyperdiskAndNestedVirtMetadata(self):
+    spec = container_spec.ContainerClusterSpec(
+        'NAME',
+        **{
+            'cloud': 'GCP',
+            'vm_spec': {
+                'GCP': {
+                    'machine_type': 'c3-standard-88',
+                    'zone': 'us-west1-c',
+                    'project': 'fakeproject',
+                    'boot_disk_type': 'hyperdisk-balanced',
+                    'boot_disk_size': 500,
+                    'boot_disk_iops': 6000,
+                    'boot_disk_throughput': 890,
+                    'enable_nested_virtualization': True,
+                },
+            },
+            'vm_count': 2,
+            'poll_for_events': False,
+        },
+    )
+    with self.patch_critical_objects(stdout=_KUBECTL_VERSION):
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      cluster.created = True
+      metadata = cluster.GetResourceMetadata()
+      self.assertEqual(metadata['boot_disk_type'], 'hyperdisk-balanced')
+      self.assertEqual(metadata['boot_disk_size'], 500)
+      self.assertEqual(metadata['boot_disk_provisioned_iops'], 6000)
+      self.assertEqual(metadata['boot_disk_provisioned_throughput'], 890)
+      self.assertTrue(metadata['enable_nested_virtualization'])
 
 
 if __name__ == '__main__':

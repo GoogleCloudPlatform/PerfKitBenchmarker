@@ -515,6 +515,9 @@
     autoscaling limit, up to 112 CU (`--lakebase_min_cu` ==
     `--lakebase_max_cu`), and support `--db_flags` via role-level PostgreSQL
     GUCs (`ALTER ROLE ... SET ...`).
+-   Add `--gke_enable_dataplane_v2` and `--gke_kubernetes_unstable_apis` GKE
+    cluster flags, plus `enable_nested_virtualization` and boot disk
+    `provisioned_iops`/`provisioned_throughput` support on GKE node pools.
 
 ### Bug fixes and maintenance updates:
 

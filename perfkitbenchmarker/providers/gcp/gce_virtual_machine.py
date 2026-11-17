@@ -198,6 +198,8 @@ class GceVmSpec(virtual_machine_spec.BaseVmSpec):
     boot_disk_type: string or None. The type of the boot disk.
     boot_disk_iops: None or int. I/O operations per second
     boot_disk_throughtput: None or int. Number of throughput mb per second
+    enable_nested_virtualization: bool. Whether to enable nested virtualization
+      on the VM.
   """
 
   CLOUD = provider_info.GCP
@@ -220,6 +222,7 @@ class GceVmSpec(virtual_machine_spec.BaseVmSpec):
     self.gce_tags: List[str] = None  # pyrefly: ignore[bad-assignment]
     self.min_node_cpus: int = None  # pyrefly: ignore[bad-assignment]
     self.subnet_names: List[str] = None  # pyrefly: ignore[bad-assignment]
+    self.enable_nested_virtualization: bool = False
     self.ssd_interface: str
     self.mtu: int | None
     super().__init__(*args, **kwargs)
@@ -387,6 +390,10 @@ class GceVmSpec(virtual_machine_spec.BaseVmSpec):
                 'item_decoder': option_decoders.StringDecoder(),
                 'default': None,
             },
+        ),
+        'enable_nested_virtualization': (
+            option_decoders.BooleanDecoder,
+            {'default': False},
         ),
     })
     return result
@@ -633,6 +640,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.min_cpu_platform = vm_spec.min_cpu_platform
     self.threads_per_core = vm_spec.threads_per_core
     self.visible_core_count = vm_spec.visible_core_count
+    self.enable_nested_virtualization = vm_spec.enable_nested_virtualization
     self.gce_accelerator_type_override = FLAGS.gce_accelerator_type_override
     self.gce_tags = vm_spec.gce_tags
     self.gce_network_tier = FLAGS.gce_network_tier
@@ -810,6 +818,10 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     if self.visible_core_count:
       cmd.flags['visible-core-count'] = self.visible_core_count
       self.metadata['visible_core_count'] = self.visible_core_count
+
+    if self.enable_nested_virtualization:
+      cmd.flags['enable-nested-virtualization'] = True
+      self.metadata['enable_nested_virtualization'] = True
 
     if self.gpu_count and (
         self.cpus

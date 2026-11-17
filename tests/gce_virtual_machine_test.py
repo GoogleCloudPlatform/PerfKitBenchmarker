@@ -1071,6 +1071,25 @@ class GCEVMFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(call_count, 1)
     self.assertIn('--shielded-secure-boot', cmd)
 
+  def testEnableNestedVirtualizationSpec(self):
+    """Tests that enable_nested_virtualization on GceVmSpec sets the flag."""
+    with PatchCriticalObjects() as issue_command:
+      vm_spec = gce_virtual_machine.GceVmSpec(
+          'test_vm_spec.GCP',
+          FLAGS,
+          image='image',
+          machine_type='test_machine_type',
+          zone='us-central1-a',
+          enable_nested_virtualization=True,
+      )
+      vm = pkb_common_test_case.TestGceVirtualMachine(vm_spec)
+      vm._CreateDependencies()
+      vm._Create()
+      vm.created = True
+      cmd = ' '.join(issue_command.call_args[0][0])
+      self.assertIn('--enable-nested-virtualization', cmd)
+      self.assertTrue(vm.GetResourceMetadata()['enable_nested_virtualization'])
+
 
 class GCEVMCreateTestCase(pkb_common_test_case.PkbCommonTestCase):
 

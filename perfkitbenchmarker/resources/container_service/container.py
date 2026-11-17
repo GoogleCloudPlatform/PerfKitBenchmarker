@@ -196,11 +196,14 @@ class BaseNodePoolConfig:
     self.swap_config: swap_config_spec.SwapConfigSpec | None = None
     # Defined by GceVmSpec. Used by google_kubernetes_engine.
     self.network: Any | None = None
+    self.disk_iops: int | None = None
+    self.disk_throughput: int | None = None
     self.max_local_disks: int | None
     self.ssd_interface: str | None
     self.threads_per_core: int
     self.gce_tags: list[str]
     self.min_cpu_platform: str
+    self.enable_nested_virtualization: bool = False
     self.cpus: int
     self.memory_mib: int
     # Defined by NodepoolSpec. Used by google_kubernetes_engine.

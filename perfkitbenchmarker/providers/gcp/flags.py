@@ -604,6 +604,18 @@ GKE_ADDONS = flags.DEFINE_string(
     '',
     'The addons to enable or disable.',
 )
+GKE_ENABLE_DATAPLANE_V2 = flags.DEFINE_boolean(
+    'gke_enable_dataplane_v2',
+    False,
+    'Whether to enable GKE Dataplane V2 (--enable-dataplane-v2) when creating'
+    ' the cluster.',
+)
+GKE_KUBERNETES_UNSTABLE_APIS = flags.DEFINE_list(
+    'gke_kubernetes_unstable_apis',
+    [],
+    'Beta/unstable Kubernetes APIs to enable on the GKE cluster via'
+    ' --enable-kubernetes-unstable-apis.',
+)
 GKE_AUTOSCALING_PROFILE = flags.DEFINE_enum(
     'gke_autoscaling_profile',
     None,
