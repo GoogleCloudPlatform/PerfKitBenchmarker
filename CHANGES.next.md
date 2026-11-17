@@ -765,3 +765,4 @@
 -   Quote `cbt` CLI arguments in `cloud_bigtable_ycsb_benchmark` table creation
     and cleanup remote commands.
 -   Quote Maven arguments in `google_cloud_bigtable_client.Install`.
+-   Quote `--google_cloud_cbt_cli_version` in `google_cloud_cbt.Install`.

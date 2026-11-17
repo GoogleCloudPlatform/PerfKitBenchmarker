@@ -19,6 +19,7 @@ from unittest import mock
 from absl import flags
 from absl.testing import flagsaver
 from perfkitbenchmarker.linux_benchmarks import cloud_bigtable_ycsb_benchmark
+from perfkitbenchmarker.linux_packages import go_lang
 from perfkitbenchmarker.linux_packages import google_cloud_bigtable_client
 from perfkitbenchmarker.linux_packages import google_cloud_cbt
 from perfkitbenchmarker.linux_packages import ycsb
@@ -160,6 +161,19 @@ class CloudBigtableYcsbBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
         f"'-DoutputDirectory={ycsb.YCSB_DIR}/custom hbase (v1)-binding/lib'"
     )
     self.assertIn(expected_output_arg, cmd)
+
+  @flagsaver.flagsaver(google_cloud_cbt_cli_version='v0.12.0 (rc1)')
+  def testGoogleCloudCbtInstallQuotesCliVersion(self):
+    mock_vm = mock.Mock()
+
+    google_cloud_cbt.Install(mock_vm)
+
+    expected_install_cmd = (
+        f"{go_lang.GO_BIN} install 'cloud.google.com/go/cbt@v0.12.0 (rc1)'"
+    )
+    self.assertIn(
+        mock.call(expected_install_cmd), mock_vm.RemoteCommand.call_args_list
+    )
 
 
 if __name__ == '__main__':

@@ -17,6 +17,7 @@ See https://github.com/googleapis/cloud-bigtable-cbt-cli for info about the CLI.
 """
 
 import os
+import shlex
 from absl import flags
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import vm_util
@@ -38,7 +39,10 @@ def Install(vm):
   vm.Install('go_lang')
   vm.RemoteCommand(f'cd {linux_packages.INSTALL_DIR} && mkdir -p cbt')
   vm.RemoteCommand(
-      f'{go_lang.GO_BIN} install '
-      f'cloud.google.com/go/cbt@{CBT_CLI_VERSION.value}'
+      shlex.join([
+          go_lang.GO_BIN,
+          'install',
+          f'cloud.google.com/go/cbt@{CBT_CLI_VERSION.value}',
+      ])
   )
   vm.RemoteCommand(f'cp go/bin/cbt {CBT_BIN}')
