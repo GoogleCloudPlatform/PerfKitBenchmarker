@@ -19,6 +19,7 @@ from unittest import mock
 from absl import flags
 from absl.testing import flagsaver
 from perfkitbenchmarker.linux_benchmarks import cloud_bigtable_ycsb_benchmark
+from perfkitbenchmarker.linux_packages import google_cloud_bigtable_client
 from perfkitbenchmarker.linux_packages import google_cloud_cbt
 from perfkitbenchmarker.linux_packages import ycsb
 from perfkitbenchmarker.providers.gcp import gcp_bigtable
@@ -142,6 +143,23 @@ class CloudBigtableYcsbBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
         "deletetable 'ycsb table (test)'"
     )
     mock_vm.RemoteCommand.assert_called_once_with(expected_cmd)
+
+  @flagsaver.flagsaver(
+      hbase_version='1.3.2',
+      hbase_binding='custom hbase (v1)',
+      google_bigtable_client_version='2.5.0',
+  )
+  def testGoogleCloudBigtableClientInstallQuotesMavenArgs(self):
+    mock_vm = mock.Mock()
+
+    google_cloud_bigtable_client.Install(mock_vm)
+
+    mock_vm.RemoteCommand.assert_called_once()
+    cmd = mock_vm.RemoteCommand.call_args[0][0]
+    expected_output_arg = (
+        f"'-DoutputDirectory={ycsb.YCSB_DIR}/custom hbase (v1)-binding/lib'"
+    )
+    self.assertIn(expected_output_arg, cmd)
 
 
 if __name__ == '__main__':

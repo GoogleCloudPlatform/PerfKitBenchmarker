@@ -15,6 +15,7 @@
 
 import os
 import posixpath
+import shlex
 from absl import flags
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
@@ -79,4 +80,4 @@ def Install(vm):
       _MVN_DEPENDENCY_COPY_GOAL,
       f'-DoutputDirectory={dependency_install_dir}',
   ]
-  vm.RemoteCommand(maven.GetRunCommand(' '.join(maven_args)))
+  vm.RemoteCommand(maven.GetRunCommand(shlex.join(maven_args)))
