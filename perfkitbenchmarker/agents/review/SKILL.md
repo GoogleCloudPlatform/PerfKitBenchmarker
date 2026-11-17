@@ -130,7 +130,31 @@ rules. If there are no comments to add, grant approval.
     configuration rather than adding per-variant overrides that increase
     configuration complexity.
 
-## 3. Reliability & Error Handling
+## 3. Check for Duplicate Work
+
+Before commenting on implementation details, search the PKB codebase for
+existing implementations that are identical or similar to what the CL
+introduces. New code should prefer standardizing on existing functionality
+rather than diverging unless there is a strong reason to differ:
+
+-   **Functions & Utilities:** Search helper modules (e.g., `vm_util.py`,
+    `flag_util.py`, `regex_util.py`, `linux_virtual_machine.py`, and nearby
+    `*_util.py` / `*_helper.py` files) and parent/provider classes for functions
+    or methods that already perform the same or a similar operation.
+-   **Benchmarks & Packages:** Search `linux_benchmarks/`,
+    `windows_benchmarks/`, `linux_packages/`, and `windows_packages/` to check
+    whether an existing benchmark or package already covers the workload or
+    installation and should be reused or extended.
+-   **Resources & Providers:** Search `resources/`, `providers/`, and base
+    resource modules (`resource.py`, `virtual_machine.py`, `disk.py`, etc.) for
+    existing abstractions or provider implementations before approving new
+    resource classes or cloud CLI wrappers.
+-   **Feedback:** When an existing feature is identical or similar, cite the
+    existing file and symbol and ask the author to standardize on, reuse, or
+    extend it unless there is a strong reason to differ (e.g., separating
+    high-variance hardware/storage variants).
+
+## 4. Reliability & Error Handling
 
 -   **Fail Fast:** Fail loudly and fast over silently swallowing errors. Do not
     use defensive fallbacks such as `or []` or `or ''` for required values or
@@ -167,7 +191,7 @@ rules. If there are no comments to add, grant approval.
     `@vm_util.Retry(retryable_exceptions=...)` so unrelated programming errors
     fail fast instead of being retried.
 
-## 4. Coding Standards
+## 5. Coding Standards
 
 -   **No Inline Dependencies:** Do not add inline module imports inside
     functions.
@@ -223,11 +247,11 @@ rules. If there are no comments to add, grant approval.
     `mock-token`) instead. Real values are only acceptable in internal `artemis`
     GCL configurations, never in `third_party`.
 
-## 5. Performance Metrics
+## 6. Performance Metrics
 
 -   **Metadata Reporting:** Variations MUST be reported in `Sample.metadata`.
 
-## 6. Testing & Validation
+## 7. Testing & Validation
 
 -   **End-to-End Benchmark Verification:** Unit test coverage in PKB is often
     limited; verify non-trivial or provider-level changes by running an actual
