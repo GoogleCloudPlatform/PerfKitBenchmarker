@@ -39,10 +39,11 @@ from perfkitbenchmarker import nfs_service
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import vm_util
 
-_LUSTRE_SET_STRIPE = flags.DEFINE_boolean(
-    'lustre_set_stripe',
-    False,
-    'Whether to set stripe count to -1 on the Lustre mount point.',
+_LUSTRE_STRIPE_ARGS = flags.DEFINE_string(
+    'lustre_stripe_args',
+    None,
+    'Arguments passed to lfs setstripe on the Lustre mount point. Set to empty '
+    'or None to skip setting striping.',
 )
 _LUSTRE_MAX_DIRTY_MB = flags.DEFINE_integer(
     'lustre_max_dirty_mb',
@@ -373,13 +374,15 @@ class SetUpLustreDiskStrategy(SetUpDiskStrategy):
     )
     lustre_disk.UpdateDevicePath(self.disk_spec.mount_point)
     self.vm.scratch_disks.append(lustre_disk)
-    if FLAGS.lustre_set_stripe:
+    stripe_args = (_LUSTRE_STRIPE_ARGS.value or '').strip()
+    if stripe_args:
       self.vm.RemoteCommand(
-          f'sudo lfs setstripe -c -1 {self.disk_spec.mount_point}'
+          f'sudo lfs setstripe {stripe_args} {self.disk_spec.mount_point}'
       )
-    if FLAGS.lustre_max_dirty_mb:
+    if _LUSTRE_MAX_DIRTY_MB.value:
       self.vm.RemoteCommand(
-          f'sudo lctl set_param osc.*.max_dirty_mb={FLAGS.lustre_max_dirty_mb}',
+          'sudo lctl set_param'
+          f' osc.*.max_dirty_mb={_LUSTRE_MAX_DIRTY_MB.value}',
           ignore_failure=True,
       )
 

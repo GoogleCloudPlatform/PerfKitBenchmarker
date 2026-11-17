@@ -727,8 +727,9 @@ io500_lustre:
     openmpi_version: 4.1.6
     mpi_ranks_list: [1, 16, 64, 192]
     ior_easy_direct_io: True
-    lustre_set_stripe: True
+    lustre_stripe_args: '-E 1M -c 1 -E -1 -c -1'
     lustre_max_dirty_mb: 2000
+    io500_wait_for_cleanup: True
 
 gpu_jobs_provisioning:
   name: jobs_benchmark

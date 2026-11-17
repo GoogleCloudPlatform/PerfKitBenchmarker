@@ -31,6 +31,7 @@ from perfkitbenchmarker import hpc_util
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
@@ -76,6 +77,15 @@ _MPI_RANKS_LIST = flags.DEFINE_list(
     'mpi_ranks_list',
     [],
     'Total mpi ranks to use. By default, same as total cores available.',
+)
+
+# TODO(andytzhu): Verify df -k -P drain behavior on NFS/NetApp Volumes before
+# enabling io500_wait_for_cleanup there.
+_IO500_WAIT_FOR_CLEANUP = flags.DEFINE_boolean(
+    'io500_wait_for_cleanup',
+    False,
+    'If True, poll df between iterations until used filesystem space drains '
+    'back near pre-run baseline instead of sleeping a fixed 60s.',
 )
 
 # Section names in io500.ini.j2 that can be run
@@ -125,6 +135,10 @@ IO500_RESULT_FILES = [
 # default ior-easy transfersize is 2MiB by default in io500.
 # https://github.com/IO500/io500/blob/main/config-sample-all.ini
 DEFAULT_IOR_EASY_TRANSFER_SIZE = 2 * 1024 * 1024  # 2 MiB
+_CLEANUP_WAIT_TIMEOUT_SEC = 1800
+_CLEANUP_POLL_INTERVAL_SEC = 30
+_CLEANUP_TOLERANCE_RATIO = 0.005  # 0.5% of filesystem capacity
+_MIN_CLEANUP_TOLERANCE_KB = 64 * 1024  # 64 MiB
 
 
 def GetConfig(user_config):
@@ -326,6 +340,7 @@ def _Run(headnode, ranks, ppn, num_clients):
                   'invalid': '[INVALID]' in line,
                   'ior_hard_write_direct_io': _IOR_HARD_WRITE_DIRECT_IO.value,
                   'ior_easy_direct_io': _IOR_EASY_DIRECT_IO.value,
+                  'io500_wait_for_cleanup': _IO500_WAIT_FOR_CLEANUP.value,
               },
           )
       )
@@ -340,6 +355,7 @@ def _Run(headnode, ranks, ppn, num_clients):
           'invalid': '[INVALID]' in line,
           'ior_hard_write_direct_io': _IOR_HARD_WRITE_DIRECT_IO.value,
           'ior_easy_direct_io': _IOR_EASY_DIRECT_IO.value,
+          'io500_wait_for_cleanup': _IO500_WAIT_FOR_CLEANUP.value,
       }
       results.extend([
           sample.Sample('BANDWIDTH', raw_result[0], raw_result[1], metadata),
@@ -347,6 +363,66 @@ def _Run(headnode, ranks, ppn, num_clients):
           sample.Sample('TOTAL', raw_result[4], '', metadata),
       ])
   return results
+
+
+class _FilesystemNotDrainedError(Exception):
+  """Raised while waiting for filesystem space to drain after an io500 run."""
+
+
+def _GetFilesystemUsageKb(
+    vm: virtual_machine.BaseVirtualMachine, mount_point: str
+) -> tuple[int, int]:
+  """Returns `(used_kb, total_kb)` for `mount_point` from POSIX `df` output."""
+  stdout, _ = vm.RemoteCommand(f'df -k -P {mount_point} | tail -n 1')
+  parts = stdout.strip().split()
+  if len(parts) < 5:
+    raise errors.Benchmarks.RunError(
+        f'Unexpected df output for {mount_point}: {stdout!r}'
+    )
+  try:
+    total_kb, used_kb = int(parts[1]), int(parts[2])
+  except ValueError as e:
+    raise errors.Benchmarks.RunError(
+        f'Failed to parse df output for {mount_point}: {stdout!r}'
+    ) from e
+  if total_kb < 0 or used_kb < 0:
+    raise errors.Benchmarks.RunError(
+        f'Negative df sizes for {mount_point}: {stdout!r}'
+    )
+  return (used_kb, total_kb)
+
+
+@vm_util.Retry(
+    poll_interval=_CLEANUP_POLL_INTERVAL_SEC,
+    max_retries=-1,
+    timeout=_CLEANUP_WAIT_TIMEOUT_SEC,
+    fuzz=0,
+    retryable_exceptions=(
+        _FilesystemNotDrainedError,
+        errors.VirtualMachine.RemoteCommandError,
+    ),
+)
+def _WaitForFilesystemDrain(
+    vm: virtual_machine.BaseVirtualMachine,
+    mount_point: str,
+    baseline_used_kb: int,
+) -> None:
+  """Polls `df` until used space returns near baseline or timeout expires."""
+  used_kb, total_kb = _GetFilesystemUsageKb(vm, mount_point)
+  threshold_kb = baseline_used_kb + max(
+      _MIN_CLEANUP_TOLERANCE_KB, int(total_kb * _CLEANUP_TOLERANCE_RATIO)
+  )
+  if used_kb > threshold_kb:
+    raise _FilesystemNotDrainedError(
+        f'Filesystem {mount_point} has not drained yet '
+        f'({used_kb} > {threshold_kb} KiB).'
+    )
+  logging.info(
+      'Filesystem %s drained (%d <= %d KiB).',
+      mount_point,
+      used_kb,
+      threshold_kb,
+  )
 
 
 def Run(benchmark_spec):
@@ -403,12 +479,19 @@ def Run(benchmark_spec):
       else [len(vms)]
   )
 
-  for num_clients in client_counts:
+  baseline_used_kb = (
+      _GetFilesystemUsageKb(headnode, headnode.scratch_disks[0].mount_point)[0]
+      if _IO500_WAIT_FOR_CLEANUP.value
+      else 0
+  )
+
+  for client_idx, num_clients in enumerate(client_counts):
     active_vms = vms[:num_clients]
     num_nodes = len(active_vms)
-    for total_ranks in [int(r) for r in _MPI_RANKS_LIST.value] or [
+    ranks_list = [int(r) for r in _MPI_RANKS_LIST.value] or [
         num_nodes * num_cpus
-    ]:
+    ]
+    for rank_idx, total_ranks in enumerate(ranks_list):
       ppn = math.ceil(total_ranks / num_nodes)
       # Only list the VMs these ranks need, so 1 rank runs on the headnode only.
       run_vms = active_vms[: math.ceil(total_ranks / ppn)]
@@ -444,7 +527,16 @@ def Run(benchmark_spec):
       results.extend(_Run(headnode, total_ranks, ppn, len(run_vms)))
       if FLAGS.object_storage_fuse_log_trace:
         headnode.RemoteCommand('sudo bash -c "cat /tmp/logs/*"')
-      time.sleep(60)
+      if _IO500_WAIT_FOR_CLEANUP.value:
+        if (
+            client_idx < len(client_counts) - 1
+            or rank_idx < len(ranks_list) - 1
+        ):
+          _WaitForFilesystemDrain(
+              headnode, headnode.scratch_disks[0].mount_point, baseline_used_kb
+          )
+      else:
+        time.sleep(60)
   return results
 
 
