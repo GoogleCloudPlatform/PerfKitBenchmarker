@@ -18,7 +18,6 @@ import time
 import py4j
 from pyspark import sql
 
-
 _results_logger = logging.getLogger('spark_sql_runner_results')
 _results_logger.propagate = False
 _results_logger.setLevel(logging.INFO)
@@ -139,6 +138,13 @@ def parse_args(args=None):
       '--catalog',
       help='Spark catalog to look for data in.',
   )
+  parser.add_argument(
+      '--iteration',
+      help=(
+          'Iteration label (e.g. warmup1, iter1) to annotate Spark UI and'
+          ' Persistent History Server.'
+      ),
+  )
   if args is None:
     return parser.parse_args()
   return parser.parse_args(args)
@@ -204,10 +210,10 @@ def set_tag(spark, tag):
 
 
 def main(args, results_logger_getter=get_results_logger):
-  app_name = (
-      f'spark_sql_runner_{args.run_uri}'
-      if args.run_uri
-      else 'spark_sql_runner'
+  app_name = '_'.join(
+      part
+      for part in ('spark_sql_runner', args.run_uri, args.iteration)
+      if part
   )
   builder = sql.SparkSession.builder.appName(app_name)
   if args.enable_hive:
@@ -250,7 +256,12 @@ def main(args, results_logger_getter=get_results_logger):
   executor = futures.ThreadPoolExecutor(max_workers=threads)
   result_futures = [
       executor.submit(
-          run_sql_query, spark, stream, i, args.fail_on_query_execution_errors
+          run_sql_query,
+          spark,
+          stream,
+          i,
+          args.fail_on_query_execution_errors,
+          args.iteration,
       )
       for i, stream in enumerate(query_streams)
   ]
@@ -300,7 +311,11 @@ def get_table_metadata(args):
 
 
 def run_sql_query(
-    spark_session, query_stream, stream_id, raise_query_execution_errors
+    spark_session,
+    query_stream,
+    stream_id,
+    raise_query_execution_errors,
+    iteration=None,
 ):
   """Runs a SQL query stream, returns list[dict] with durations."""
 
@@ -308,10 +323,14 @@ def run_sql_query(
   results = []
   for query_id in query_stream:
     query = QUERIES[query_id]
+    query_label = f'{iteration}_q{query_id}' if iteration else f'q{query_id}'
 
     try:
-      logging.info('Running query %s', query_id)
-      annotate_query(spark_session, f'q{query_id}')
+      logging.info(
+          'Running %s',
+          f'{iteration} query {query_id}' if iteration else f'query {query_id}',
+      )
+      annotate_query(spark_session, query_label)
       start = time.time()
       df = spark_session.sql(query)
       df.collect()

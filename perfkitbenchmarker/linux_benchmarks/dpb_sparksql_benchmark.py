@@ -44,12 +44,13 @@ One data soruce of note is Google BigQuery using
 https://github.com/GoogleCloudPlatform/spark-bigquery-connector.
 """
 
-from collections.abc import MutableMapping
+from collections.abc import Mapping, MutableMapping
 import functools
 import json
 import logging
 import os
 import re
+import statistics
 import time
 from typing import Any, List
 
@@ -133,6 +134,18 @@ _CATALOG = flags.DEFINE_string(
 
 _READAHEAD_KB = flags.DEFINE_integer(
     'sparksql_readahead_kb', None, 'Configure block device readahead settings.'
+)
+_ITERATIONS = flags.DEFINE_integer(
+    'dpb_sparksql_iterations',
+    1,
+    'Number of measured iterations to run.',
+    lower_bound=1,
+)
+_WARMUP_ITERATIONS = flags.DEFINE_integer(
+    'dpb_sparksql_warmup_iterations',
+    0,
+    'Number of warmup iterations to run before measured iterations.',
+    lower_bound=0,
 )
 
 FLAGS = flags.FLAGS
@@ -333,16 +346,131 @@ def Run(benchmark_spec):
     Benchmarks.RunError if no query succeeds.
   """
   cluster = benchmark_spec.dpb_service
-  storage_service = cluster.storage_service
   metadata = _GetSampleMetadata(benchmark_spec)
+  all_samples = _RunIterations(
+      benchmark_spec, _WARMUP_ITERATIONS.value, 'warmup_iteration', metadata
+  )
+  measured_samples = _RunIterations(
+      benchmark_spec, _ITERATIONS.value, 'iteration', metadata
+  )
+  all_samples.extend(measured_samples)
 
-  # Run PySpark Spark SQL Runner
-  report_dir, job_result = _RunQueries(benchmark_spec)
+  all_samples += _GetAggregatedSamples(
+      measured_samples, metadata, _ITERATIONS.value
+  )
+  all_samples += _GetPrepareSamples(benchmark_spec, metadata)
 
-  results = _GetQuerySamples(storage_service, report_dir, job_result, metadata)
-  results += _GetGlobalSamples(results, cluster, job_result, metadata)
-  results += _GetPrepareSamples(benchmark_spec, metadata)
-  return results
+  total_cumulative_run_time = sum(
+      s.value for s in all_samples if s.metric == 'sparksql_cumulative_run_time'
+  )
+  cluster.cluster_duration = total_cumulative_run_time + (
+      cluster.GetClusterCreateTime() or 0
+  )
+  cluster.metadata.update({
+      **metadata,
+      **_GetFailingQueriesMetadata(all_samples),
+  })
+  return all_samples
+
+
+def _GetIterationLabel(metadata: Mapping[str, Any]) -> str:
+  """Returns iteration label like 'warmup1' or 'iter1' from sample metadata."""
+  if 'warmup_iteration' in metadata:
+    return f"warmup{metadata['warmup_iteration']}"
+  return f"iter{metadata.get('iteration', '1')}"
+
+
+def _GetFailingQueriesMetadata(
+    all_samples: list[sample.Sample],
+) -> dict[str, str]:
+  """Builds failing-query summary across all iterations for cluster metadata."""
+  failures = []
+  for s in all_samples:
+    if s.metric != 'sparksql_cumulative_run_time':
+      continue
+    failing = s.metadata.get('failing_queries')
+    if not failing:
+      continue
+    iter_label = _GetIterationLabel(s.metadata)
+    for part in failing.split(';'):
+      sep = '' if part.startswith('/') else ':'
+      failures.append(f'{iter_label}{sep}{part}')
+  return {'failing_queries': ';'.join(failures)}
+
+
+def _GetAggregatedSamples(
+    measured_samples: list[sample.Sample],
+    base_metadata: MutableMapping[str, str],
+    total_iterations: int,
+) -> list[sample.Sample]:
+  """Gets median samples across zero-failure measured iterations."""
+  clean_samples = [
+      s for s in measured_samples if not s.metadata.get('failing_queries')
+  ]
+
+  samples = []
+  agg_metadata = dict(base_metadata)
+  agg_metadata['aggregation'] = 'median'
+  agg_metadata['failing_queries'] = ''
+
+  metric_mappings = [
+      (
+          'sparksql_cumulative_run_time',
+          'sparksql_aggregated_cumulative_run_time',
+          'seconds',
+      ),
+      (
+          'sparksql_total_wall_time',
+          'sparksql_aggregated_total_wall_time',
+          'seconds',
+      ),
+      ('sparksql_run_cost', 'sparksql_aggregated_run_cost', '$'),
+      (
+          'dpb_iteration_cluster_total_cost',
+          'dpb_aggregated_cluster_total_cost',
+          '$',
+      ),
+  ]
+
+  for src_metric, agg_metric, unit in metric_mappings:
+    values = [s.value for s in clean_samples if s.metric == src_metric]
+    # Require a strict majority of zero-failure, present samples per metric so
+    # missing samples and failing iterations are gated identically.
+    if len(values) * 2 > total_iterations:
+      samples.append(
+          sample.Sample(
+              agg_metric, statistics.median(values), unit, agg_metadata
+          )
+      )
+
+  return samples
+
+
+def _RunIterations(
+    benchmark_spec,
+    num_iterations: int,
+    iteration_key: str,
+    base_metadata: MutableMapping[str, str],
+) -> list[sample.Sample]:
+  """Runs multiple iterations of queries and returns collected samples."""
+  cluster = benchmark_spec.dpb_service
+  storage_service = cluster.storage_service
+  samples = []
+  for i in range(num_iterations):
+    iter_metadata = dict(base_metadata)
+    iter_metadata[iteration_key] = str(i + 1)
+    report_dir, job_result = _RunQueries(
+        benchmark_spec, iteration_label=_GetIterationLabel(iter_metadata)
+    )
+    query_samples = _GetQuerySamples(
+        storage_service, report_dir, job_result, iter_metadata
+    )
+    global_samples = _GetGlobalSamples(
+        query_samples, cluster, job_result, iter_metadata
+    )
+    samples.extend(query_samples)
+    samples.extend(global_samples)
+  return samples
 
 
 def _GetSampleMetadata(benchmark_spec):
@@ -366,10 +494,14 @@ def _GetSampleMetadata(benchmark_spec):
     metadata['run_type'] = 'THROUGHPUT'
   else:
     metadata['run_type'] = 'POWER'
+  metadata['total_iterations'] = str(_ITERATIONS.value)
+  metadata['total_warmup_iterations'] = str(_WARMUP_ITERATIONS.value)
   return metadata
 
 
-def _RunQueries(benchmark_spec) -> tuple[str, dpb_service.JobResult]:
+def _RunQueries(
+    benchmark_spec, iteration_label: str | None = None
+) -> tuple[str, dpb_service.JobResult]:
   """Runs queries. Returns storage path with metrics and JobResult object."""
   cluster = benchmark_spec.dpb_service
   report_dir = '/'.join([cluster.base_dir, f'report-{int(time.time()*1000)}'])
@@ -419,6 +551,8 @@ def _RunQueries(benchmark_spec) -> tuple[str, dpb_service.JobResult]:
   if dpb_sparksql_benchmark_helper.DUMP_SPARK_CONF.value:
     args += ['--dump-spark-conf', os.path.join(cluster.base_dir, 'spark-conf')]
   args += ['--run-uri', FLAGS.run_uri]
+  if iteration_label:
+    args += ['--iteration', iteration_label]
   jars = []
   job_result = cluster.SubmitJob(
       pyspark_file='/'.join([
@@ -481,24 +615,27 @@ def _GetGlobalSamples(
     run_times[query_id] = s.value
 
   samples = []
-  if FLAGS.dpb_sparksql_streams:
-    for i, stream in enumerate(dpb_sparksql_benchmark_helper.GetStreams()):
-      metadata[f'failing_queries_stream_{i}'] = ','.join(
-          sorted(set(stream) - passing_queries.get(i, set()))
-      )
-  else:
-    all_passing_queries = set()
-    for stream_passing_queries in passing_queries.values():
-      all_passing_queries.update(stream_passing_queries)
-    metadata['failing_queries'] = ','.join(
-        sorted(set(FLAGS.dpb_sparksql_order) - all_passing_queries)
+  failing_entries = []
+  for i, stream in enumerate(dpb_sparksql_benchmark_helper.GetStreams()):
+    failed = sorted(set(stream) - passing_queries.get(i, set()))
+    if not failed:
+      continue
+    failed_csv = ','.join(failed)
+    failing_entries.append(
+        f'/{i}:{failed_csv}' if FLAGS.dpb_sparksql_streams else failed_csv
+    )
+  metadata['failing_queries'] = ';'.join(failing_entries)
+  if metadata['failing_queries']:
+    logging.warning(
+        'SparkSQL %s failing queries: %s',
+        _GetIterationLabel(metadata),
+        metadata['failing_queries'],
     )
 
   cumulative_run_time = sum(run_times.values())
   cluster.cluster_duration = cumulative_run_time + (
       cluster.GetClusterCreateTime() or 0
   )
-  cluster.metadata.update(metadata)
 
   # TODO(user): Compute aggregated time for each query across streams and
   # iterations.
@@ -551,6 +688,17 @@ def _GetGlobalSamples(
         prefix='sparksql_',
         renames={'total_cost': 'run_cost'},
         metadata=metadata,
+    )
+
+  cluster_cost = cluster.GetClusterCost()
+  if cluster_cost is not None:
+    samples.append(
+        sample.Sample(
+            'dpb_iteration_cluster_total_cost',
+            cluster_cost,
+            '$',
+            metadata,
+        )
     )
   return samples
 

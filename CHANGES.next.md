@@ -135,6 +135,10 @@
     --aws_emr_applications=Spark,Hadoop,Hive to get some older benchmarks
     working).
 -   Set --record_log_publisher=False by default.
+-   Changed `dpb_sparksql_benchmark` failure metadata: removed
+    `failing_queries_stream_{i}` keys and unified `failing_queries` as
+    `;`-separated `([<iter>][/<stream>]:)<queries>` (e.g., `iter1/0:2,3`),
+    with cluster metadata now aggregating all iterations.
 
 ### New features:
 
