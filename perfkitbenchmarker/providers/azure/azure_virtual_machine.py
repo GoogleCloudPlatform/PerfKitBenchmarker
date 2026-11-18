@@ -151,6 +151,16 @@ NUM_LOCAL_VOLUMES: dict[str, int] = {
     'Standard_D192ds_v7': 6,
     'Standard_D248ds_v7': 5,
     'Standard_D372ds_v7': 6,
+    'Standard_D1pds_v7': 1,
+    'Standard_D2pds_v7': 1,
+    'Standard_D4pds_v7': 1,
+    'Standard_D8pds_v7': 1,
+    'Standard_D16pds_v7': 2,
+    'Standard_D32pds_v7': 4,
+    'Standard_D48pds_v7': 6,
+    'Standard_D64pds_v7': 4,
+    'Standard_D96pds_v7': 6,
+    'Standard_D128pds_v7': 4,
     # HPC series. HBv4 ships 2 x 1.8 TB and HBv5 8 x 1.8 TB local NVMe.
     'Standard_HB176rs_v4': 2,
     'Standard_HB368rs_v5': 8,
@@ -729,6 +739,8 @@ def _GetArmArch(machine_type) -> str | None:
       return 'neoverse-n1'
     elif generation == 6:
       return 'neoverse-n2'
+    elif generation == 7:
+      return 'neoverse-v3'
     else:
       raise ValueError('Unknown ARM machine type: ' + machine_type)
   return None
@@ -1383,7 +1395,7 @@ class AzureVirtualMachine(
     """Returns whether this vm supports NVMe."""
     generation = util.GetMachineSeriesNumber(self.machine_type)
     family = util.GetMachineFamily(self.machine_type)
-    if _MachineTypeIsArm(self.machine_type):
+    if _MachineTypeIsArm(self.machine_type) and generation < 7:
       return False
     return generation >= 6 or any(
         re.match(pattern, family) for pattern in EARLY_NVME_MACHINE_FAMILIES
