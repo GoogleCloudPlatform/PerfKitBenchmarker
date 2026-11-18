@@ -19,6 +19,7 @@ class TestAzureVirtualMachine(
 ):
   GEN1_IMAGE_URN = 'test_image_urn'
   GEN2_IMAGE_URN = 'test_image_urn-gen2'
+  ARM_IMAGE_URN = 'test_image_urn-arm64'
 
 
 class AzureVirtualMachineTest(pkb_common_test_case.PkbCommonTestCase):
@@ -172,6 +173,60 @@ class AzureVirtualMachineTest(pkb_common_test_case.PkbCommonTestCase):
     ), mock.patch.object(util, 'GetResourceTags', return_value={}):
       vm._PostCreate()
       self.assertEqual(vm.official_create_time, 1784116800)
+
+  @parameterized.named_parameters(
+      dict(
+          testcase_name='Gen5',
+          machine_type='Standard_D4ps_v5',
+          expected_arm_arch='neoverse-n1',
+      ),
+      dict(
+          testcase_name='Gen6',
+          machine_type='Standard_E4ps_v6',
+          expected_arm_arch='neoverse-n2',
+      ),
+      dict(
+          testcase_name='Gen7Dps',
+          machine_type='Standard_D4ps_v7',
+          expected_arm_arch='neoverse-v3',
+      ),
+      dict(
+          testcase_name='Gen7Eps',
+          machine_type='Standard_E4ps_v7',
+          expected_arm_arch='neoverse-v3',
+      ),
+      dict(
+          testcase_name='Gen7Dpds',
+          machine_type='Standard_D2pds_v7',
+          expected_arm_arch='neoverse-v3',
+      ),
+  )
+  def testArmArchitecture(self, machine_type, expected_arm_arch):
+    spec = azure_virtual_machine.AzureVmSpec(
+        _COMPONENT, machine_type=machine_type, zone='testing'
+    )
+    vm = TestAzureVirtualMachine(spec)
+    self.assertTrue(vm.is_aarch64)
+    self.assertEqual(vm.host_arch, expected_arm_arch)
+    self.assertEqual(vm.image, TestAzureVirtualMachine.ARM_IMAGE_URN)
+
+  def testNonArmArchitecture(self):
+    spec = azure_virtual_machine.AzureVmSpec(
+        _COMPONENT, machine_type='Standard_D4s_v7', zone='testing'
+    )
+    vm = TestAzureVirtualMachine(spec)
+    self.assertFalse(vm.is_aarch64)
+    self.assertFalse(hasattr(vm, 'host_arch'))
+    self.assertEqual(vm.image, TestAzureVirtualMachine.GEN2_IMAGE_URN)
+
+  def testUnknownArmArchitectureRaises(self):
+    spec = azure_virtual_machine.AzureVmSpec(
+        _COMPONENT, machine_type='Standard_D4ps_v8', zone='testing'
+    )
+    with self.assertRaisesRegex(
+        ValueError, 'Unknown ARM machine type: Standard_D4ps_v8'
+    ):
+      TestAzureVirtualMachine(spec)
 
 
 class AzurePublicIPAddressTest(pkb_common_test_case.PkbCommonTestCase):
