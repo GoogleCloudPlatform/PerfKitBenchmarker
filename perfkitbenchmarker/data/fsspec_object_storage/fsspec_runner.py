@@ -138,8 +138,10 @@ def _stream_write_file(
   """Streams a file of total_bytes to uri using an in-memory block buffer."""
   if chunk_buf is None:
     chunk_buf = os.urandom(block_bytes)
+  # s3fs requires write block_size >= 5 MiB for multipart upload validation.
+  open_block_bytes = max(block_bytes, 5 * 1024 * 1024)
   remaining = total_bytes
-  with fs.open(uri, 'wb', block_size=block_bytes) as f:
+  with fs.open(uri, 'wb', block_size=open_block_bytes) as f:
     while remaining > 0:
       to_write = min(remaining, block_bytes)
       f.write(chunk_buf[:to_write])
@@ -229,9 +231,10 @@ def run_seq_read(
       fs, proto, args.bucket, spec, args.enable_metadata_cache
   )
 
-  def _read_file(uri: str) -> tuple[list[float], int]:
+  def _read_file(uri: str) -> tuple[list[float], float, int]:
     bytes_read = 0
     block_latencies_ms = []
+    file_t0 = time.perf_counter()
     with fs.open(
         uri, 'rb', block_size=spec.block_bytes, cache_type=cache_type
     ) as f:
@@ -242,24 +245,37 @@ def run_seq_read(
           break
         block_latencies_ms.append((time.perf_counter() - t0) * 1000.0)
         bytes_read += len(chunk)
-    return block_latencies_ms, bytes_read
+    file_latency_ms = (time.perf_counter() - file_t0) * 1000.0
+    return block_latencies_ms, file_latency_ms, bytes_read
 
   start = time.perf_counter()
   with futures.ThreadPoolExecutor(max_workers=spec.num_workers) as pool:
     results = list(pool.map(_read_file, uris))
   duration_sec = time.perf_counter() - start
-  all_latencies_ms = []
+  all_block_latencies_ms = []
+  file_latencies_ms = []
   total_bytes = 0
-  for latencies, nbytes in results:
-    all_latencies_ms.extend(latencies)
+  for block_latencies, file_latency, nbytes in results:
+    all_block_latencies_ms.extend(block_latencies)
+    file_latencies_ms.append(file_latency)
     total_bytes += nbytes
-  return _build_metrics(
+  metrics = _build_metrics(
       spec.raw,
       duration_sec,
       total_bytes,
-      latencies_ms=all_latencies_ms,
+      latencies_ms=all_block_latencies_ms,
       latency_name='block_latency',
   )
+  if file_latencies_ms:
+    for pct, val in zip(
+        (50, 90, 99, 100), np.percentile(file_latencies_ms, [50, 90, 99, 100])
+    ):
+      metrics.append({
+          'metric': f'{spec.raw}_file_latency_p{pct}',
+          'value': val,
+          'unit': 'ms',
+      })
+  return metrics
 
 
 def run_rand_read(

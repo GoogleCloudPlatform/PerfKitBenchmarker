@@ -42,12 +42,13 @@ FLAGS = flags.FLAGS
 _SCENARIOS = flags.DEFINE_list(
     'fsspec_scenarios',
     [
-        'seq_5M_read_5G_files-1_workers-1',
         'seq_5M_read_5G_files-16_workers-16',
-        'seq_5M_read_5G_files-64_workers-64',
-        'seq_5M_read_5G_files-192_workers-192',
+        'seq_5M_read_100G_files-1_workers-1',
         'rand_4K_read_100G_ops-10000_workers-1',
-        'rand_4K_read_10M_files-10000_ops-10000_workers-1',
+        'rand_4K_read_100M_files-10000_ops-10000_workers-1',
+        'seq_8K_read_8K_files-10000_workers-1',
+        'seq_8K_read_8K_files-10000_workers-16',
+        'seq_16M_write_50G_files-1_workers-1',
     ],
     'Splittable fsspec scenario strings of the form '
     '<pattern>_<block_size>_<operation>_<file_size>'
