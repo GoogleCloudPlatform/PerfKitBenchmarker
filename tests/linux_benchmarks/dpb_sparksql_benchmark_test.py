@@ -117,6 +117,24 @@ def _Agg(
   return {k: v for k, v in metrics.items() if v is not None}
 
 
+def _Summary(
+    *,
+    clean_iterations: str,
+    quorum_met: str,
+    failing_queries: str = '',
+    warmup_failing_queries: str = '',
+    metrics_below_quorum: str = '',
+) -> dict[str, str]:
+  return {
+      'failing_queries': failing_queries,
+      'warmup_failing_queries': warmup_failing_queries,
+      'clean_iterations': clean_iterations,
+      'quorum_met': quorum_met,
+      'quorum_criterion': 'strict_majority',
+      'metrics_below_quorum': metrics_below_quorum,
+  }
+
+
 def _MakeJobResult(
     query_results: Mapping[str, float] | Sequence[Mapping[str, float]],
     run_time: float,
@@ -638,7 +656,14 @@ class DpbSparksqlBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     )
     self.assertDictEqual(
         agg_cost.metadata,
-        {**base_metadata, 'aggregation': 'median', 'failing_queries': ''},
+        {
+            **base_metadata,
+            'aggregation': 'median',
+            'failing_queries': '',
+            'clean_aggregated_iterations': '3',
+            'quorum_met': 'true',
+            'quorum_criterion': 'strict_majority',
+        },
     )
 
     upload_sample = next(
@@ -911,6 +936,109 @@ class DpbSparksqlBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
             for s in agg_samples
         ],
         [('median', '')] * len(agg_samples),
+    )
+
+  @parameterized.named_parameters(
+      dict(
+          testcase_name='WarmupFailureDoesNotCount',
+          warmup_iterations=1,
+          job_results=[
+              _MakeJobResult({'1': 10.0}, 15.0),
+              _MakeJobResult({'1': 10.0, '2': 20.0}, 35.0),
+              _MakeJobResult({'1': 30.0, '2': 40.0}, 75.0),
+              _MakeJobResult({'1': 50.0, '2': 60.0}, 115.0),
+          ],
+          expected_clean_aggregated_iterations=_Agg(cum=3, wall=3),
+          expected_failing_iterations=0,
+          expected_summary=_Summary(
+              clean_iterations='3',
+              quorum_met='true',
+              warmup_failing_queries='warmup1:2',
+          ),
+      ),
+      dict(
+          testcase_name='CostMissingOnOneCleanIteration',
+          job_results=[
+              _MakeJobResult({'1': 10.0, '2': 20.0}, 35.0),
+              _MakeJobResult({'1': 30.0, '2': 40.0}, 75.0),
+              _MakeJobResult({'1': 50.0, '2': 60.0}, 115.0),
+          ],
+          job_costs=[4.0, None, 6.0],
+          expected_clean_aggregated_iterations=_Agg(cum=3, wall=3, run_cost=2),
+          expected_failing_iterations=0,
+          expected_summary=_Summary(clean_iterations='3', quorum_met='true'),
+      ),
+      dict(
+          testcase_name='OneFailingIterationAndOneMissingCost',
+          job_results=[
+              _MakeJobResult({'1': 10.0}, 15.0),
+              _MakeJobResult({'1': 30.0, '2': 40.0}, 75.0),
+              _MakeJobResult({'1': 50.0, '2': 60.0}, 115.0),
+          ],
+          job_costs=[9.0, None, 5.0],
+          expected_clean_aggregated_iterations=_Agg(cum=2, wall=2),
+          expected_failing_iterations=1,
+          expected_summary=_Summary(
+              failing_queries='iter1:2',
+              clean_iterations='2',
+              quorum_met='true',
+              metrics_below_quorum='sparksql_aggregated_run_cost:1/3',
+          ),
+      ),
+      dict(
+          testcase_name='MostIterationsFail',
+          job_results=[
+              _MakeJobResult({'1': 10.0}, 15.0),
+              _MakeJobResult({'1': 30.0, '2': 40.0}, 75.0),
+              _MakeJobResult({'2': 60.0}, 65.0),
+          ],
+          job_costs=[9.0, None, 5.0],
+          expected_clean_aggregated_iterations=_Agg(),
+          expected_failing_iterations=2,
+          expected_summary=_Summary(
+              failing_queries='iter1:2;iter3:1',
+              clean_iterations='1',
+              quorum_met='false',
+          ),
+      ),
+  )
+  @flagsaver.flagsaver(
+      dpb_sparksql_order=['1', '2'],
+      dpb_sparksql_iterations=3,
+      dpb_sparksql_fetch_results_from_logs=True,
+  )
+  def testRunReportsQuorumOutcome(
+      self,
+      *,
+      job_results: list[dpb_service.JobResult],
+      expected_clean_aggregated_iterations: dict[str, float],
+      expected_failing_iterations: int,
+      expected_summary: dict[str, str],
+      warmup_iterations: int = 0,
+      job_costs: Sequence[float | None] | None = None,
+  ):
+    with flagsaver.flagsaver(
+        dpb_sparksql_warmup_iterations=warmup_iterations,
+        dpb_export_job_stats=job_costs is not None,
+    ):
+      dpb_svc = _FakeDpbService(job_results=job_results, job_costs=job_costs)
+      samples = dpb_sparksql_benchmark.Run(_MakeBenchmarkSpec(dpb_svc))
+
+    summary = next(
+        s for s in samples if s.metric == 'sparksql_run_failure_summary'
+    )
+    self.assertDictEqual(
+        {
+            s.metric: int(s.metadata['clean_aggregated_iterations'])
+            for s in samples
+            if 'aggregated' in s.metric
+        },
+        expected_clean_aggregated_iterations,
+    )
+    self.assertEqual(summary.value, expected_failing_iterations)
+    self.assertDictEqual(
+        {key: summary.metadata[key] for key in expected_summary},
+        expected_summary,
     )
 
   @parameterized.named_parameters(

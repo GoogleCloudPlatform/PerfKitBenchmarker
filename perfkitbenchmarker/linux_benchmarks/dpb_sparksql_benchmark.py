@@ -163,6 +163,31 @@ RESULTS_FROM_LOGS_SUPPORTED_DPB_SERVICES = (
     dpb_constants.GLUE,
 )
 
+# Aggregated metrics require zero-failure measured iterations to be a strict
+# majority of all measured iterations (clean iterations * 2 > total).
+_QUORUM_CRITERION = 'strict_majority'
+
+# (Per-iteration metric, aggregated metric, unit) tuples. Aggregated metrics are
+# medians across zero-failure measured iterations.
+_AGGREGATED_METRICS = (
+    (
+        'sparksql_cumulative_run_time',
+        'sparksql_aggregated_cumulative_run_time',
+        'seconds',
+    ),
+    (
+        'sparksql_total_wall_time',
+        'sparksql_aggregated_total_wall_time',
+        'seconds',
+    ),
+    ('sparksql_run_cost', 'sparksql_aggregated_run_cost', '$'),
+    (
+        'dpb_iteration_cluster_total_cost',
+        'dpb_aggregated_cluster_total_cost',
+        '$',
+    ),
+)
+
 
 class QueryResultsNotReadyError(Exception):
   """Used to signal a job is still running."""
@@ -347,16 +372,21 @@ def Run(benchmark_spec):
   """
   cluster = benchmark_spec.dpb_service
   metadata = _GetSampleMetadata(benchmark_spec)
-  all_samples = _RunIterations(
+  warmup_samples = _RunIterations(
       benchmark_spec, _WARMUP_ITERATIONS.value, 'warmup_iteration', metadata
   )
   measured_samples = _RunIterations(
       benchmark_spec, _ITERATIONS.value, 'iteration', metadata
   )
-  all_samples.extend(measured_samples)
+  all_samples = warmup_samples + measured_samples
 
   all_samples += _GetAggregatedSamples(
       measured_samples, metadata, _ITERATIONS.value
+  )
+  all_samples.append(
+      _GetRunFailureSummarySample(
+          warmup_samples, measured_samples, metadata, _ITERATIONS.value
+      )
   )
   all_samples += _GetPrepareSamples(benchmark_spec, metadata)
 
@@ -380,12 +410,19 @@ def _GetIterationLabel(metadata: Mapping[str, Any]) -> str:
   return f"iter{metadata.get('iteration', '1')}"
 
 
-def _GetFailingQueriesMetadata(
-    all_samples: list[sample.Sample],
-) -> dict[str, str]:
-  """Builds failing-query summary across all iterations for cluster metadata."""
+def _JoinFailingQueries(samples: list[sample.Sample]) -> str:
+  """Joins failing queries of iterations, prefixed by their iteration label.
+
+  Args:
+    samples: Samples of one or more iterations. Only their
+      sparksql_cumulative_run_time samples are inspected.
+
+  Returns:
+    A ';'-separated string like 'warmup1:2,3;iter2/0:3', or '' if no query
+    failed.
+  """
   failures = []
-  for s in all_samples:
+  for s in samples:
     if s.metric != 'sparksql_cumulative_run_time':
       continue
     failing = s.metadata.get('failing_queries')
@@ -395,7 +432,26 @@ def _GetFailingQueriesMetadata(
     for part in failing.split(';'):
       sep = '' if part.startswith('/') else ':'
       failures.append(f'{iter_label}{sep}{part}')
-  return {'failing_queries': ';'.join(failures)}
+  return ';'.join(failures)
+
+
+def _GetFailingQueriesMetadata(
+    all_samples: list[sample.Sample],
+) -> dict[str, str]:
+  """Builds failing-query summary across all iterations for cluster metadata."""
+  return {'failing_queries': _JoinFailingQueries(all_samples)}
+
+
+def _MeetsQuorum(clean_iterations: int, total_iterations: int) -> bool:
+  """Returns whether clean iterations are a strict majority of all of them."""
+  return clean_iterations * 2 > total_iterations
+
+
+def _GetCleanSamples(
+    measured_samples: list[sample.Sample],
+) -> list[sample.Sample]:
+  """Returns samples of measured iterations without failing queries."""
+  return [s for s in measured_samples if not s.metadata.get('failing_queries')]
 
 
 def _GetAggregatedSamples(
@@ -404,46 +460,89 @@ def _GetAggregatedSamples(
     total_iterations: int,
 ) -> list[sample.Sample]:
   """Gets median samples across zero-failure measured iterations."""
-  clean_samples = [
-      s for s in measured_samples if not s.metadata.get('failing_queries')
-  ]
+  clean_samples = _GetCleanSamples(measured_samples)
 
   samples = []
   agg_metadata = dict(base_metadata)
   agg_metadata['aggregation'] = 'median'
   agg_metadata['failing_queries'] = ''
+  # Aggregated samples are only emitted when they meet quorum.
+  agg_metadata['quorum_met'] = 'true'
+  agg_metadata['quorum_criterion'] = _QUORUM_CRITERION
 
-  metric_mappings = [
-      (
-          'sparksql_cumulative_run_time',
-          'sparksql_aggregated_cumulative_run_time',
-          'seconds',
-      ),
-      (
-          'sparksql_total_wall_time',
-          'sparksql_aggregated_total_wall_time',
-          'seconds',
-      ),
-      ('sparksql_run_cost', 'sparksql_aggregated_run_cost', '$'),
-      (
-          'dpb_iteration_cluster_total_cost',
-          'dpb_aggregated_cluster_total_cost',
-          '$',
-      ),
-  ]
-
-  for src_metric, agg_metric, unit in metric_mappings:
+  for src_metric, agg_metric, unit in _AGGREGATED_METRICS:
     values = [s.value for s in clean_samples if s.metric == src_metric]
     # Require a strict majority of zero-failure, present samples per metric so
     # missing samples and failing iterations are gated identically.
-    if len(values) * 2 > total_iterations:
+    if _MeetsQuorum(len(values), total_iterations):
+      metadata = dict(agg_metadata)
+      metadata['clean_aggregated_iterations'] = str(len(values))
       samples.append(
-          sample.Sample(
-              agg_metric, statistics.median(values), unit, agg_metadata
-          )
+          sample.Sample(agg_metric, statistics.median(values), unit, metadata)
       )
 
   return samples
+
+
+def _GetRunFailureSummarySample(
+    warmup_samples: list[sample.Sample],
+    measured_samples: list[sample.Sample],
+    base_metadata: MutableMapping[str, str],
+    total_iterations: int,
+) -> sample.Sample:
+  """Gets a run-level summary of failing queries and aggregation quorum.
+
+  The sample value is the number of measured iterations with failing queries.
+  Its metadata holds the failing queries of measured iterations
+  (failing_queries) and warmup iterations (warmup_failing_queries), the number
+  of measured iterations without failing queries (clean_iterations), and
+  whether those meet quorum (quorum_met). When they do, metrics_below_quorum
+  lists the aggregated metrics that still missed quorum because their samples
+  were missing on otherwise clean iterations, e.g.
+  'sparksql_aggregated_run_cost:1/3'.
+
+  Args:
+    warmup_samples: Samples of warmup iterations.
+    measured_samples: Samples of measured iterations.
+    base_metadata: Metadata shared by all samples of the run.
+    total_iterations: Number of measured iterations.
+
+  Returns:
+    The sparksql_run_failure_summary sample.
+  """
+  # Each iteration reports exactly one sparksql_cumulative_run_time sample.
+  iteration_samples = [
+      s for s in measured_samples if s.metric == 'sparksql_cumulative_run_time'
+  ]
+  failing_iterations = sum(
+      1 for s in iteration_samples if s.metadata.get('failing_queries')
+  )
+  clean_iterations = len(iteration_samples) - failing_iterations
+  quorum_met = _MeetsQuorum(clean_iterations, total_iterations)
+
+  metrics_below_quorum = []
+  if quorum_met:
+    clean_samples = _GetCleanSamples(measured_samples)
+    for src_metric, agg_metric, _ in _AGGREGATED_METRICS:
+      # Skip metrics not reported at all, e.g. costs on some DPB services.
+      if not any(s.metric == src_metric for s in measured_samples):
+        continue
+      clean_count = sum(1 for s in clean_samples if s.metric == src_metric)
+      if not _MeetsQuorum(clean_count, total_iterations):
+        metrics_below_quorum.append(
+            f'{agg_metric}:{clean_count}/{total_iterations}'
+        )
+
+  metadata = dict(base_metadata)
+  metadata['failing_queries'] = _JoinFailingQueries(measured_samples)
+  metadata['warmup_failing_queries'] = _JoinFailingQueries(warmup_samples)
+  metadata['clean_iterations'] = str(clean_iterations)
+  metadata['quorum_met'] = 'true' if quorum_met else 'false'
+  metadata['quorum_criterion'] = _QUORUM_CRITERION
+  metadata['metrics_below_quorum'] = ';'.join(metrics_below_quorum)
+  return sample.Sample(
+      'sparksql_run_failure_summary', failing_iterations, 'count', metadata
+  )
 
 
 def _RunIterations(
