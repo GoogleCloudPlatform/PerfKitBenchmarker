@@ -23,6 +23,7 @@ from absl.testing import parameterized
 import jinja2
 from perfkitbenchmarker import benchmark_spec as bm_spec
 from perfkitbenchmarker import configs
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.linux_benchmarks import cassandra_stress_benchmark
@@ -466,6 +467,312 @@ class CassandraStressLssdBenchmarkTest(
     self.assertEqual(metadata['key_cache_size'], '256MiB')
     self.assertEqual(metadata['disk_access_mode'], 'mmap')
     self.assertEqual(metadata['jvm_heap_size'], '32G')
+
+  @flagsaver.flagsaver(
+      cassandra_yaml_template_path='cassandra/cassandra-lssd.yaml.j2',
+      cassandra_key_cache_size='512MiB',
+      cassandra_disk_access_mode='mmap_index_only',
+      cassandra_jvm_heap_size=None,
+  )
+  def test_reconfigure_updates_yaml_and_clears_jvm_heap_without_wiping_data(
+      self,
+  ):
+    server_vm = self._CreateTestVm('server-0', '10.0.0.1')
+    rendered_files = {}
+
+    def capture_render(template_path, remote_path, context):
+      rendered_files[remote_path] = _render_jinja_file(template_path, context)
+
+    server_vm.RenderTemplate.side_effect = capture_render
+
+    cassandra.Reconfigure(
+        server_vm,
+        [server_vm],
+        custom_cassandra_conf={
+            'concurrent_reads': 128,
+            'concurrent_writes': 256,
+        },
+    )
+
+    parsed_yaml = yaml.safe_load(rendered_files['~/cassandra.yaml'])
+    self.assertEqual(parsed_yaml['key_cache_size'], '512MiB')
+    self.assertEqual(parsed_yaml['disk_access_mode'], 'mmap_index_only')
+    self.assertEqual(parsed_yaml['concurrent_reads'], 128)
+    self.assertEqual(parsed_yaml['concurrent_writes'], 256)
+    jvm_options_path = f'{cassandra.CASSANDRA_DIR}/conf/jvm-server.options'
+    commands = [call.args[0] for call in server_vm.RemoteCommand.call_args_list]
+    self.assertIn(f"sudo sed -i '/^-Xm[sx]/d' {jvm_options_path}", commands)
+    for cmd in commands:
+      self.assertNotIn('-Xms', cmd)
+      self.assertNotIn('mkdir ', cmd)
+      self.assertNotIn('apt ', cmd)
+
+  def test_start_passes_pidfile_flag(self):
+    server_vm = self._CreateTestVm('server-0', '10.0.0.1')
+
+    cassandra.Start(server_vm)
+
+    server_vm.RemoteCommand.assert_called_once_with(
+        f'{cassandra.GetCassandraPath()} -p {cassandra.CASSANDRA_PID}'
+    )
+
+  def test_stop_and_wait_drains_and_waits_for_daemon_exit(self):
+    server_vm = self._CreateTestVm('server-0', '10.0.0.1')
+    server_vm.RemoteCommandWithReturnCode.side_effect = [
+        ('1234\n', '', 0),
+        ('', '', 1),
+    ]
+    mock_sleep = self.enter_context(
+        mock.patch.object(time, 'sleep', autospec=True, spec_set=True)
+    )
+
+    cassandra.StopAndWait(server_vm)
+
+    self.assertLen(server_vm.RemoteCommand.call_args_list, 3)
+    self.assertEqual(
+        server_vm.RemoteCommand.call_args_list[0].args[0],
+        f'{cassandra.GetNodetoolPath()} drain',
+    )
+    self.assertIn(
+        cassandra.DAEMON_PATTERN,
+        server_vm.RemoteCommand.call_args_list[1].args[0],
+    )
+    self.assertEqual(
+        server_vm.RemoteCommand.call_args_list[2].args[0],
+        f'rm -f {cassandra.CASSANDRA_PID}',
+    )
+    self.assertEqual(server_vm.RemoteCommandWithReturnCode.call_count, 2)
+    mock_sleep.assert_called_once_with(1)
+
+  def test_stop_and_wait_escalates_to_sigkill_after_graceful_timeout(self):
+    server_vm = self._CreateTestVm('server-0', '10.0.0.1')
+    server_vm.RemoteCommandWithReturnCode.side_effect = [
+        ('1234\n', '', 0)
+    ] * (cassandra.STOP_TIMEOUT_SECONDS + 1) + [('', '', 1)]
+    self.enter_context(
+        mock.patch.object(time, 'sleep', autospec=True, spec_set=True)
+    )
+
+    cassandra.StopAndWait(server_vm)
+
+    commands = [call.args[0] for call in server_vm.RemoteCommand.call_args_list]
+    self.assertIn(
+        f"sudo pkill -9 -f '{cassandra.DAEMON_PATTERN}'",
+        commands,
+    )
+    self.assertEqual(commands[-1], f'rm -f {cassandra.CASSANDRA_PID}')
+
+  def test_stop_and_wait_raises_when_daemon_survives_sigkill(self):
+    server_vm = self._CreateTestVm('server-0', '10.0.0.1')
+    server_vm.RemoteCommandWithReturnCode.return_value = ('1234\n', '', 0)
+    self.enter_context(
+        mock.patch.object(time, 'sleep', autospec=True, spec_set=True)
+    )
+
+    with self.assertRaises(errors.VirtualMachine.VmStateError):
+      cassandra.StopAndWait(server_vm)
+
+    commands = [call.args[0] for call in server_vm.RemoteCommand.call_args_list]
+    self.assertNotIn(f'rm -f {cassandra.CASSANDRA_PID}', commands)
+
+  @flagsaver.flagsaver(
+      cassandra_reconfigure_on_run=True,
+      cassandra_concurrent_reads=128,
+      cassandra_concurrent_writes=256,
+      cassandra_concurrent_compactors=8,
+      cassandra_compaction_throughput_mb=0,
+      cassandra_stress_threads=['200'],
+      cassandra_stress_run_duration=None,
+  )
+  def test_run_with_reconfigure_on_run_restarts_cluster_and_applies_settings(
+      self,
+  ):
+    spec, server_vms, _ = self._CreateBenchmarkSpec()
+    for server_vm in server_vms:
+      server_vm.num_cpus = 16
+      server_vm.RemoteCommand.return_value = (
+          '20:11:37 up 1 day, 1 user, load average: 1.00, 2.00, 1.50',
+          '',
+      )
+    mock_stop_and_wait = self.enter_context(
+        mock.patch.object(
+            cassandra, 'StopAndWait', autospec=True, spec_set=True
+        )
+    )
+    mock_reconfigure = self.enter_context(
+        mock.patch.object(
+            cassandra, 'Reconfigure', autospec=True, spec_set=True
+        )
+    )
+    mock_start_cluster = self.enter_context(
+        mock.patch.object(
+            cassandra, 'StartCluster', autospec=True, spec_set=True
+        )
+    )
+    mock_update_compactors = self.enter_context(
+        mock.patch.object(
+            cassandra,
+            'UpdateCassandraConcurrentCompactorCount',
+            autospec=True,
+            spec_set=True,
+        )
+    )
+    mock_update_throughput = self.enter_context(
+        mock.patch.object(
+            cassandra,
+            'UpdateCassandraCompactionThroughput',
+            autospec=True,
+            spec_set=True,
+        )
+    )
+    self.enter_context(
+        mock.patch.object(
+            cassandra,
+            'GetPendingTaskCountFromCompactionStats',
+            autospec=True,
+            spec_set=True,
+            return_value=[0, 0],
+        )
+    )
+    self.enter_context(
+        mock.patch.object(
+            cassandra,
+            'GetCassandraVersion',
+            autospec=True,
+            spec_set=True,
+            return_value='5.0.0',
+        )
+    )
+    self.enter_context(
+        mock.patch.object(
+            cassandra, 'GetNodetoolStatus', autospec=True, spec_set=True
+        )
+    )
+    self.enter_context(
+        mock.patch.object(
+            cassandra_stress_benchmark,
+            'RunCassandraStressOnClient',
+            autospec=True,
+            spec_set=True,
+        )
+    )
+    self.enter_context(
+        mock.patch.object(
+            cassandra_stress_benchmark,
+            'CollectResultFile',
+            autospec=True,
+            spec_set=True,
+            side_effect=lambda vm, results: results.update({
+                metric: [100.0]
+                for metric in cassandra_stress_benchmark.RESULTS_METRICS
+            }),
+        )
+    )
+
+    samples = cassandra_stress_lssd_benchmark.Run(spec)
+
+    self.assertEqual(mock_stop_and_wait.call_count, 2)
+    self.assertEqual(mock_reconfigure.call_count, 2)
+    mock_reconfigure.assert_any_call(
+        server_vms[0],
+        [server_vms[0]],
+        {'concurrent_reads': 128, 'concurrent_writes': 256},
+    )
+    mock_start_cluster.assert_called_once_with(server_vms[0], [server_vms[1]])
+    mock_update_compactors.assert_any_call(server_vms[0], 8)
+    mock_update_throughput.assert_any_call(server_vms[0], 0)
+    max_op_sample = next(s for s in samples if s.metric == 'max_op_rate')
+    self.assertTrue(max_op_sample.metadata['reconfigure_on_run'])
+    self.assertEqual(
+        max_op_sample.metadata['num_cassandra_stress_threads'], 200
+    )
+
+  @flagsaver.flagsaver(
+      cassandra_reconfigure_on_run=False,
+      cassandra_stress_threads=['100', '200', '1000'],
+      cassandra_stress_run_duration=None,
+  )
+  def test_run_without_reconfigure_skips_restart_and_sorts_threads_numerically(
+      self,
+  ):
+    spec, server_vms, _ = self._CreateBenchmarkSpec()
+    for server_vm in server_vms:
+      server_vm.num_cpus = 16
+      server_vm.RemoteCommand.return_value = (
+          '20:11:37 up 1 day, 1 user, load average: 1.00, 2.00, 1.50',
+          '',
+      )
+    mock_stop_and_wait = self.enter_context(
+        mock.patch.object(
+            cassandra, 'StopAndWait', autospec=True, spec_set=True
+        )
+    )
+    mock_reconfigure = self.enter_context(
+        mock.patch.object(
+            cassandra, 'Reconfigure', autospec=True, spec_set=True
+        )
+    )
+    mock_start_cluster = self.enter_context(
+        mock.patch.object(
+            cassandra, 'StartCluster', autospec=True, spec_set=True
+        )
+    )
+    self.enter_context(
+        mock.patch.object(
+            cassandra,
+            'GetPendingTaskCountFromCompactionStats',
+            autospec=True,
+            spec_set=True,
+            return_value=[0, 0],
+        )
+    )
+    self.enter_context(
+        mock.patch.object(
+            cassandra,
+            'GetCassandraVersion',
+            autospec=True,
+            spec_set=True,
+            return_value='5.0.0',
+        )
+    )
+    self.enter_context(
+        mock.patch.object(
+            cassandra, 'GetNodetoolStatus', autospec=True, spec_set=True
+        )
+    )
+    recorded_threads = []
+    self.enter_context(
+        mock.patch.object(
+            cassandra_stress_benchmark,
+            'RunCassandraStressOnClient',
+            autospec=True,
+            spec_set=True,
+            side_effect=lambda *args: recorded_threads.append(
+                args[5]['num_cassandra_stress_threads']
+            ),
+        )
+    )
+    self.enter_context(
+        mock.patch.object(
+            cassandra_stress_benchmark,
+            'CollectResultFile',
+            autospec=True,
+            spec_set=True,
+            side_effect=lambda vm, results: results.update({
+                metric: [100.0]
+                for metric in cassandra_stress_benchmark.RESULTS_METRICS
+            }),
+        )
+    )
+
+    cassandra_stress_lssd_benchmark.Run(spec)
+
+    mock_stop_and_wait.assert_not_called()
+    mock_reconfigure.assert_not_called()
+    mock_start_cluster.assert_not_called()
+    # 100 -> 200 plateaus (op rate 100.0), so midpoint (100+200)//2=150 runs
+    # rather than crashing on str // int or sorting '1000' before '200'.
+    self.assertEqual(recorded_threads, [100, 200, 150])
 
 
 if __name__ == '__main__':

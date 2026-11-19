@@ -20,16 +20,20 @@ Cassandra homepage: http://cassandra.apache.org
 """
 
 
+from collections.abc import Mapping, Sequence
 import logging
 import os
 import posixpath
 import re
 import time
+from typing import Any
 from absl import flags
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_packages
+from perfkitbenchmarker import virtual_machine
+from perfkitbenchmarker import vm_util
 
 
 JNA_JAR_URL = (
@@ -82,6 +86,13 @@ CLUSTER_START_TRIES = 10
 CLUSTER_START_SLEEP = 30
 # Time, in seconds, to sleep between node starts.
 NODE_START_SLEEP = 30
+STOP_TIMEOUT_SECONDS = 60
+KILL_TIMEOUT_SECONDS = 10
+DAEMON_PATTERN = r'org\.apache\.cassandra\.service\.CassandraDaemon'
+
+
+class _CassandraDaemonStillRunningError(errors.Error):
+  """Raised while waiting for the Cassandra daemon process to exit."""
 
 
 @flags.validator('cassandra_jvm_heap_size')
@@ -89,10 +100,22 @@ def _ValidateJvmHeapSize(value):
   return value is None or bool(re.fullmatch(r'[1-9]\d*[MGmg]', value))
 
 
-def _ConfigureJvmHeap(vm, cassandra_conf_path, heap_size):
-  """Sets -Xms and -Xmx in jvm-server.options on 'vm'."""
+def _ClearJvmHeap(
+    vm: virtual_machine.BaseVirtualMachine, cassandra_conf_path: str
+) -> None:
+  """Removes explicit `-Xms` and `-Xmx` lines from `jvm-server.options`."""
   jvm_options_path = posixpath.join(cassandra_conf_path, 'jvm-server.options')
   vm.RemoteCommand(f"sudo sed -i '/^-Xm[sx]/d' {jvm_options_path}")
+
+
+def _ConfigureJvmHeap(
+    vm: virtual_machine.BaseVirtualMachine,
+    cassandra_conf_path: str,
+    heap_size: str,
+) -> None:
+  """Sets `-Xms` and `-Xmx` in `jvm-server.options` on `vm`."""
+  _ClearJvmHeap(vm, cassandra_conf_path)
+  jvm_options_path = posixpath.join(cassandra_conf_path, 'jvm-server.options')
   vm.RemoteCommand(
       f"printf '\\n-Xms{heap_size}\\n-Xmx{heap_size}\\n' |"
       f' sudo tee -a {jvm_options_path} >/dev/null'
@@ -179,20 +202,18 @@ def JujuInstall(vm, vm_group_name):
     unit.RemoteCommand('mkdir -p %s' % remote_path)
 
 
-def Configure(vm, seed_vms, custom_cassandra_conf=None):
-  """Configure Cassandra on 'vm'.
-
-  Args:
-    vm: VirtualMachine. The VM to configure.
-    seed_vms: List of VirtualMachine. The seed virtual machine(s).
-    custom_cassandra_conf: Dict. Custom configurations for Cassandra.
-  """
+def _RenderConfigFiles(
+    vm: virtual_machine.BaseVirtualMachine,
+    seed_vms: Sequence[virtual_machine.BaseVirtualMachine],
+    custom_cassandra_conf: Mapping[str, Any] | None = None,
+) -> None:
+  """Renders `cassandra.yaml` and `cassandra-rackdc.properties` onto `vm`."""
   if not custom_cassandra_conf:
     custom_cassandra_conf = {}
   context = {
       'ip_address': vm.internal_ip,
       'data_path': posixpath.join(vm.GetScratchDir(), 'cassandra'),
-      'seeds': ','.join(f'{vm.internal_ip}:7000' for vm in seed_vms),
+      'seeds': ','.join(f'{seed_vm.internal_ip}:7000' for seed_vm in seed_vms),
       'num_cpus': vm.NumCpusForBenchmark(),
       'cluster_name': 'Test cluster',
       'datacenter': 'datacenter',
@@ -214,11 +235,47 @@ def Configure(vm, seed_vms, custom_cassandra_conf=None):
     dest_path = posixpath.join(cassandra_conf_path, target_filename)
     vm.RenderTemplate(local_path, remote_path, context=context)
     vm.RemoteCommand(f'sudo cp {remote_path} {dest_path}')
+
+
+def Configure(
+    vm: virtual_machine.BaseVirtualMachine,
+    seed_vms: Sequence[virtual_machine.BaseVirtualMachine],
+    custom_cassandra_conf: Mapping[str, Any] | None = None,
+) -> None:
+  """Configure Cassandra on `vm`.
+
+  Args:
+    vm: The VM to configure.
+    seed_vms: The seed virtual machine(s).
+    custom_cassandra_conf: Custom configurations for Cassandra.
+  """
+  _RenderConfigFiles(vm, seed_vms, custom_cassandra_conf)
+  cassandra_conf_path = posixpath.join(CASSANDRA_DIR, 'conf')
   if CASSANDRA_JVM_HEAP_SIZE.value:
     _ConfigureJvmHeap(vm, cassandra_conf_path, CASSANDRA_JVM_HEAP_SIZE.value)
   vm.RemoteCommand(f'mkdir {vm.GetScratchDir()}/cassandra')
   vm.RemoteCommand(f'sudo chmod -R 755 {vm.GetScratchDir()}/cassandra')
   _SetupPy311(vm)
+
+
+def Reconfigure(
+    vm: virtual_machine.BaseVirtualMachine,
+    seed_vms: Sequence[virtual_machine.BaseVirtualMachine],
+    custom_cassandra_conf: Mapping[str, Any] | None = None,
+) -> None:
+  """Updates Cassandra config and JVM heap files without wiping data.
+
+  Args:
+    vm: The VM to reconfigure.
+    seed_vms: The seed virtual machine(s).
+    custom_cassandra_conf: Custom configurations for Cassandra.
+  """
+  _RenderConfigFiles(vm, seed_vms, custom_cassandra_conf)
+  cassandra_conf_path = posixpath.join(CASSANDRA_DIR, 'conf')
+  if CASSANDRA_JVM_HEAP_SIZE.value:
+    _ConfigureJvmHeap(vm, cassandra_conf_path, CASSANDRA_JVM_HEAP_SIZE.value)
+  else:
+    _ClearJvmHeap(vm, cassandra_conf_path)
 
 
 def _SetupPy311(vm):
@@ -247,7 +304,7 @@ def Start(vm):
   Args:
     vm: The target vm. Should already be configured via 'Configure'.
   """
-  vm.RemoteCommand(f'{GetCassandraPath()}')
+  vm.RemoteCommand(f'{GetCassandraPath()} -p {CASSANDRA_PID}')
 
 
 def CreateKeyspace(
@@ -306,6 +363,84 @@ def RunCql(
 def Stop(vm):
   """Stops Cassandra on 'vm'."""
   vm.RemoteCommand('kill $(cat {})'.format(CASSANDRA_PID), ignore_failure=True)
+
+
+def _CheckDaemonExited(vm: virtual_machine.BaseVirtualMachine) -> None:
+  """Raises if `CassandraDaemon` is still running or `pgrep` fails."""
+  stdout, stderr, retcode = vm.RemoteCommandWithReturnCode(
+      f"pgrep -f '{DAEMON_PATTERN}'", ignore_failure=True
+  )
+  if retcode == 1:
+    return
+  if retcode == 0:
+    pids = ' '.join(stdout.split())
+    raise _CassandraDaemonStillRunningError(
+        f'CassandraDaemon still running on {vm.name} (PIDs: {pids}).'
+    )
+  raise errors.VirtualMachine.VmStateError(
+      f'Failed checking CassandraDaemon on {vm.name} (exit {retcode}):'
+      f' {stderr}'
+  )
+
+
+@vm_util.Retry(
+    poll_interval=1,
+    max_retries=STOP_TIMEOUT_SECONDS,
+    timeout=-1,
+    fuzz=0,
+    log_errors=False,
+    retryable_exceptions=(_CassandraDaemonStillRunningError,),
+)
+def _WaitForGracefulExit(vm: virtual_machine.BaseVirtualMachine) -> None:
+  _CheckDaemonExited(vm)
+
+
+@vm_util.Retry(
+    poll_interval=1,
+    max_retries=KILL_TIMEOUT_SECONDS,
+    timeout=-1,
+    fuzz=0,
+    log_errors=False,
+    retryable_exceptions=(_CassandraDaemonStillRunningError,),
+)
+def _WaitForForcedExit(vm: virtual_machine.BaseVirtualMachine) -> None:
+  _CheckDaemonExited(vm)
+
+
+def StopAndWait(vm: virtual_machine.BaseVirtualMachine) -> None:
+  """Flushes memtables, stops Cassandra on `vm`, and waits for JVM exit.
+
+  Args:
+    vm: The VM running Cassandra.
+
+  Raises:
+    errors.VirtualMachine.VmStateError: If `CassandraDaemon` fails to exit.
+  """
+  vm.RemoteCommand(f'{GetNodetoolPath()} drain', ignore_failure=True)
+  vm.RemoteCommand(
+      f'if [ -f {CASSANDRA_PID} ]; then '
+      f'kill "$(cat {CASSANDRA_PID})" 2>/dev/null || true; '
+      'fi && '
+      f"(pkill -f '{DAEMON_PATTERN}' 2>/dev/null || true)"
+  )
+  try:
+    _WaitForGracefulExit(vm)
+  except vm_util.RetryError:
+    logging.warning(
+        'CassandraDaemon on %s did not exit within %ds; sending SIGKILL.',
+        vm.name,
+        STOP_TIMEOUT_SECONDS,
+    )
+    vm.RemoteCommand(
+        f"sudo pkill -9 -f '{DAEMON_PATTERN}'", ignore_failure=True
+    )
+    try:
+      _WaitForForcedExit(vm)
+    except vm_util.RetryError as exc:
+      raise errors.VirtualMachine.VmStateError(
+          f'CassandraDaemon on {vm.name} failed to exit after SIGKILL.'
+      ) from exc
+  vm.RemoteCommand(f'rm -f {CASSANDRA_PID}')
 
 
 def IsRunning(vm):

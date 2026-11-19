@@ -30,6 +30,7 @@ max op rate.
 """
 
 import collections
+from collections.abc import Callable, Mapping, Sequence
 import copy
 import dataclasses
 import logging
@@ -45,6 +46,7 @@ from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import units
@@ -287,6 +289,14 @@ CASSANDRA_COMPACTION_THROUGHPUT_MB = flags.DEFINE_integer(
     'Compaction throughput in MB/sec to use for the cassandra server.',
 )
 
+CASSANDRA_RECONFIGURE_ON_RUN = flags.DEFINE_bool(
+    'cassandra_reconfigure_on_run',
+    False,
+    'When True, re-renders cassandra.yaml and jvm-server.options, restarts'
+    ' the Cassandra cluster, and applies nodetool compaction settings at'
+    ' the start of Run() while preserving preloaded SSTables on disk.',
+)
+
 FLAGS = flags.FLAGS
 
 BENCHMARK_NAME = 'cassandra_stress'
@@ -371,7 +381,7 @@ AGGREGATED_METRICS = frozenset({
     'Total errors',
 })
 # Maximum value will be chosen between client vms.
-MAXIMUM_METRICS = {'latency max'}
+MAXIMUM_METRICS = frozenset({'latency max'})
 THREAD_INCREMENT_COUNT = 50
 MAX_MEDIAN_LATENCY_MS = 20
 MAX_ACCEPTED_COMPACTION_TIME = 30
@@ -544,6 +554,8 @@ def GenerateMetadataFromFlags(benchmark_spec, cassandra_vms, client_vms):
     metadata['disk_access_mode'] = cassandra.CASSANDRA_DISK_ACCESS_MODE.value
   if cassandra.CASSANDRA_JVM_HEAP_SIZE.value:
     metadata['jvm_heap_size'] = cassandra.CASSANDRA_JVM_HEAP_SIZE.value
+  if CASSANDRA_RECONFIGURE_ON_RUN.value:
+    metadata['reconfigure_on_run'] = True
 
   if FLAGS.cassandra_stress_command == USER_COMMAND:
     metadata.update({
@@ -645,16 +657,23 @@ def Prepare(benchmark_spec):
       is_row_cache_enabled=IS_ROW_CACHE_ENABLED.value,
       compaction_strategy=CASSANDRA_COMPACTION_STRATEGY.value,
   )
+  _ApplyCompactionSettings(cassandra_vms)
+  PreloadCassandraServer(cassandra_vms, client_vms, metadata)
+  WaitForCompactionTasks(cassandra_vms)
+
+
+def _ApplyCompactionSettings(
+    cassandra_vms: Sequence[linux_virtual_machine.BaseLinuxVirtualMachine],
+) -> None:
+  """Applies runtime compaction settings on all Cassandra server VMs."""
   for vm in cassandra_vms:
     cassandra.UpdateCassandraConcurrentCompactorCount(
         vm, _GetConcurrentCompactors(vm)
     )
-    if CASSANDRA_COMPACTION_THROUGHPUT_MB.value:
+    if CASSANDRA_COMPACTION_THROUGHPUT_MB.value is not None:
       cassandra.UpdateCassandraCompactionThroughput(
           vm, CASSANDRA_COMPACTION_THROUGHPUT_MB.value
       )
-  PreloadCassandraServer(cassandra_vms, client_vms, metadata)
-  WaitForCompactionTasks(cassandra_vms)
 
 
 def _GetConcurrentCompactors(vm):
@@ -674,8 +693,24 @@ def _ResultFilePath(vm):
   return posixpath.join(vm_util.VM_TMP_DIR, vm.hostname + '.stress_results.txt')
 
 
-def ConfigureCassandra(seed_vm, cassandra_vms):
+def ConfigureCassandra(
+    seed_vm: linux_virtual_machine.BaseLinuxVirtualMachine,
+    cassandra_vms: Sequence[linux_virtual_machine.BaseLinuxVirtualMachine],
+    configure_fn: (
+        Callable[
+            [
+                linux_virtual_machine.BaseLinuxVirtualMachine,
+                Sequence[linux_virtual_machine.BaseLinuxVirtualMachine],
+                Mapping[str, Any] | None,
+            ],
+            None,
+        ]
+        | None
+    ) = None,
+) -> None:
   """Configure cassandra configuration files."""
+  if configure_fn is None:
+    configure_fn = cassandra.Configure
   configure_tasks = []
 
   for vm in cassandra_vms:
@@ -686,11 +721,29 @@ def ConfigureCassandra(seed_vm, cassandra_vms):
         'concurrent_writes': _GetConcurrentWrites(vm),
     }
     configure_tasks.append((
-        cassandra.Configure,
+        configure_fn,
         [vm, [seed_vm], custom_cassandra_conf],
         {},
     ))
   background_tasks.RunParallelThreads(configure_tasks, max_concurrency=10)
+
+
+def ReconfigureClusterForRun(
+    cassandra_vms: Sequence[linux_virtual_machine.BaseLinuxVirtualMachine],
+) -> None:
+  """Updates server configs and restarts the cluster without wiping data."""
+  seed_vm = cassandra_vms[0]
+  logging.info(
+      'Reconfiguring Cassandra cluster in-place across %d server VMs.',
+      len(cassandra_vms),
+  )
+  background_tasks.RunThreaded(cassandra.StopAndWait, cassandra_vms)
+  ConfigureCassandra(
+      seed_vm, cassandra_vms, configure_fn=cassandra.Reconfigure
+  )
+  cassandra.StartCluster(seed_vm, cassandra_vms[1:])
+  _ApplyCompactionSettings(cassandra_vms)
+  WaitForCompactionTasks(cassandra_vms)
 
 
 @dataclasses.dataclass
@@ -1066,13 +1119,19 @@ def Run(benchmark_spec):
     A list of sample.Sample objects.
   """
   cassandra_vms, client_vms = ParseVmGroups(benchmark_spec.vm_groups)
+  if CASSANDRA_RECONFIGURE_ON_RUN.value:
+    ReconfigureClusterForRun(cassandra_vms)
   metadata = GenerateMetadataFromFlags(
       benchmark_spec, cassandra_vms, client_vms
   )
   metadata['cassandra_version'] = cassandra.GetCassandraVersion(
       benchmark_spec.vm_groups[CASSANDRA_GROUP][0]
   )
-  threads = CASSANDRA_STRESS_THREADS.value or [1] + list(range(100, 1001, 100))
+  threads = (
+      [int(t) for t in CASSANDRA_STRESS_THREADS.value]
+      if CASSANDRA_STRESS_THREADS.value
+      else [1] + list(range(100, 1001, 100))
+  )
   samples = RunCassandraStressOnFixedThreads(
       client_vms, cassandra_vms, metadata, threads
   )
@@ -1192,16 +1251,27 @@ def RunCassandraStress(
   cpu_utilization_client_avg, cpu_utilization_client_max = GetCpuUtilization(
       client_vms, CASSANDRA_STRESS_RUN_DURATION.value
   )
-  cpu_utilization_client_avg_mean = round(
-      sum(cpu_utilization_client_avg) / len(cpu_utilization_client_avg), 2
-  )
-  if cpu_utilization_client_avg_mean > 70:
-    raise errors.Benchmarks.RunError(
-        'average client cpu utilization is high:'
-        f' {cpu_utilization_client_avg_mean}'
+  if cpu_utilization_client_avg:
+    cpu_utilization_client_avg_mean = round(
+        sum(cpu_utilization_client_avg) / len(cpu_utilization_client_avg), 2
     )
+    if cpu_utilization_client_avg_mean > 70:
+      raise errors.Benchmarks.RunError(
+          'average client cpu utilization is high:'
+          f' {cpu_utilization_client_avg_mean}'
+      )
 
   op_rate = GetOperationRate(current_samples)
+  cluster_avg = (
+      round(sum(cpu_utilization_avg) / len(cpu_utilization_avg), 2)
+      if cpu_utilization_avg
+      else 0.0
+  )
+  cluster_max = (
+      round(sum(cpu_utilization_max) / len(cpu_utilization_max), 2)
+      if cpu_utilization_max
+      else 0.0
+  )
   thread_data[threads] = {
       'operation_rate': op_rate,
       'median_latency': GetMedianLatency(current_samples),
@@ -1210,12 +1280,8 @@ def RunCassandraStress(
       ),
       'cpu_utilization_avg_servers': cpu_utilization_avg,
       'cpu_utilization_max_servers': cpu_utilization_max,
-      'cpu_utilization_cluster_avg': round(
-          sum(cpu_utilization_avg) / len(cpu_utilization_avg), 2
-      ),
-      'cpu_utilization_cluster_max': round(
-          sum(cpu_utilization_max) / len(cpu_utilization_max), 2
-      ),
+      'cpu_utilization_cluster_avg': cluster_avg,
+      'cpu_utilization_cluster_max': cluster_max,
       'cpu_utilization_client_avg': cpu_utilization_client_avg,
       'cpu_utilization_client_max': cpu_utilization_client_max,
   }

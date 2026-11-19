@@ -766,3 +766,8 @@
     and cleanup remote commands.
 -   Quote Maven arguments in `google_cloud_bigtable_client.Install`.
 -   Quote `--google_cloud_cbt_cli_version` in `google_cloud_cbt.Install`.
+-   Add `--cassandra_reconfigure_on_run` to `cassandra_stress` to re-render
+    server configuration files and restart the Cassandra cluster at the start of
+    `Run()` without wiping preloaded data, and fix integer parsing for
+    `--cassandra_stress_threads` and `0` (unthrottled) handling for
+    `--cassandra_compaction_throughput_mb`.
