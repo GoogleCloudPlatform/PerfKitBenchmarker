@@ -15,7 +15,6 @@
 
 from absl import flags
 
-
 NONE = 'None'
 READ_ONLY = 'ReadOnly'
 READ_WRITE = 'ReadWrite'
@@ -187,6 +186,15 @@ AZURE_SECURE_BOOT = flags.DEFINE_bool(
     None,
     'Enable/Disable secure boot of the VM to allow unsigned operating systems'
     ' and drivers. Defaults to None to fallback to Azure default behavior',
+)
+AZURE_VM_PROCESSOR_MODE = flags.DEFINE_enum(
+    'azure_vm_processor_mode',
+    'opportunistic',
+    ['opportunistic', 'deterministic'],
+    'Only supported on select recent Azure VM types. Defaults to'
+    ' opportunistic, the opposite of the server default. See'
+    ' https://learn.microsoft.com/en-us/azure/virtual-machines/vm-processor-mode'
+    ' for more information.',
 )
 flags.DEFINE_boolean(
     'azure_aks_auto_node_provisioning',

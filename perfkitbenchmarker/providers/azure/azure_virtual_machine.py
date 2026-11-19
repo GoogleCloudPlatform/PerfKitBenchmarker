@@ -773,6 +773,7 @@ class AzureVirtualMachine(
   low_priority_status_code: int | None
   spot_early_termination: bool
   nic_mtu: int | None
+  processor_mode: str | None
 
   def __init__(self, vm_spec):
     """Initialize an Azure virtual machine.
@@ -846,6 +847,9 @@ class AzureVirtualMachine(
     self.is_aarch64 = bool(arm_arch)
     if arm_arch:
       self.host_arch = arm_arch
+    self.processor_mode = None
+    if self.SupportsProcessorMode():
+      self.processor_mode = azure_flags.AZURE_VM_PROCESSOR_MODE.value
     self.hypervisor_generation = 2
     if vm_spec.image:
       self.image = vm_spec.image
@@ -1027,6 +1031,8 @@ class AzureVirtualMachine(
         create_cmd.extend(['--disk-controller-type', 'NVMe'])
       else:
         create_cmd.extend(['--disk-controller-type', 'SCSI'])
+    if self.processor_mode:
+      create_cmd.extend(['--processor-mode', self.processor_mode])
     if self.boot_startup_script:
       create_cmd.extend(['--custom-data', self.boot_startup_script])
 
@@ -1353,6 +1359,8 @@ class AzureVirtualMachine(
       result['num_vms_per_host'] = self.num_vms_per_host
     if self.nic_mtu is not None:
       result['nic_mtu'] = self.nic_mtu
+    if self.processor_mode is not None:
+      result['processor_mode'] = self.processor_mode
     return result
 
   def _UpdateInterruptibleVmStatusThroughMetadataService(self):
@@ -1401,6 +1409,12 @@ class AzureVirtualMachine(
         re.match(pattern, family) for pattern in EARLY_NVME_MACHINE_FAMILIES
     )
 
+  def SupportsProcessorMode(self) -> bool:
+    """Returns whether this VM supports processor mode."""
+    return (
+        self.is_aarch64 and util.GetMachineSeriesNumber(self.machine_type) >= 7
+    )
+
 
 class Debian12BasedAzureVirtualMachine(
     AzureVirtualMachine, linux_virtual_machine.Debian12Mixin
@@ -1424,6 +1438,7 @@ class Ubuntu2004BasedAzureVirtualMachine(
     AzureVirtualMachine, linux_virtual_machine.Ubuntu2004Mixin
 ):
   """Deprecated Ubuntu 20.04 based Azure VM."""
+
   GEN2_IMAGE_URN = (
       'Canonical:0001-com-ubuntu-server-focal:20_04-lts-gen2:latest'
   )

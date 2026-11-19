@@ -4,6 +4,7 @@ import json
 import unittest
 from unittest import mock
 
+from absl.testing import flagsaver
 from absl.testing import parameterized
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
@@ -26,27 +27,33 @@ class AzureVirtualMachineTest(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     super().setUp()
-    self.enter_context(
+    mock_get_network = self.enter_context(
         mock.patch(
             azure_virtual_machine.__name__
             + '.azure_network.AzureNetwork.GetNetwork'
         )
     )
+    mock_get_network.return_value.subnets = [mock.MagicMock()]
+    mock_get_network.return_value.placement_group = None
     self.enter_context(
         mock.patch(
             azure_virtual_machine.__name__
             + '.azure_network.AzureFirewall.GetFirewall'
         )
     )
-    self.enter_context(
+    mock_get_rg = self.enter_context(
         mock.patch(
             azure_virtual_machine.__name__ + '.azure_network.GetResourceGroup'
         )
     )
+    mock_get_rg.return_value.args = ['--resource-group', 'test_rg']
+    mock_get_rg.return_value.timeout_minutes = 60
     self.mock_cmd = self.enter_context(
-        mock.patch.object(vm_util, 'IssueCommand')
+        mock.patch.object(vm_util, 'IssueCommand', return_value=('', '', 0))
     )
-    self.enter_context(mock.patch.object(util, 'GetResourceTags'))
+    self.enter_context(
+        mock.patch.object(util, 'GetResourceTags', return_value={})
+    )
 
   @parameterized.named_parameters(
       {
@@ -227,6 +234,75 @@ class AzureVirtualMachineTest(pkb_common_test_case.PkbCommonTestCase):
         ValueError, 'Unknown ARM machine type: Standard_D4ps_v8'
     ):
       TestAzureVirtualMachine(spec)
+
+  @parameterized.named_parameters(
+      dict(
+          testcase_name='ArmGen7DpsDefault',
+          machine_type='Standard_D4ps_v7',
+          processor_mode=None,
+          expected_processor_mode='opportunistic',
+      ),
+      dict(
+          testcase_name='ArmGen7EpsDefault',
+          machine_type='Standard_E4ps_v7',
+          processor_mode=None,
+          expected_processor_mode='opportunistic',
+      ),
+      dict(
+          testcase_name='ArmGen7DpdsDefault',
+          machine_type='Standard_D2pds_v7',
+          processor_mode=None,
+          expected_processor_mode='opportunistic',
+      ),
+      dict(
+          testcase_name='ArmGen7Deterministic',
+          machine_type='Standard_D4ps_v7',
+          processor_mode='deterministic',
+          expected_processor_mode='deterministic',
+      ),
+      dict(
+          testcase_name='ArmGen5NotSupported',
+          machine_type='Standard_D4ps_v5',
+          processor_mode=None,
+          expected_processor_mode=None,
+      ),
+      dict(
+          testcase_name='NonArmGen7DasNotSupported',
+          machine_type='Standard_D4as_v7',
+          processor_mode=None,
+          expected_processor_mode=None,
+      ),
+  )
+  def testProcessorMode(
+      self, machine_type, processor_mode, expected_processor_mode
+  ):
+    flag_overrides = (
+        {'azure_vm_processor_mode': processor_mode}
+        if processor_mode is not None
+        else {}
+    )
+    with flagsaver.flagsaver(**flag_overrides):
+      spec = azure_virtual_machine.AzureVmSpec(
+          _COMPONENT, machine_type=machine_type, zone='testing'
+      )
+      vm = TestAzureVirtualMachine(spec)
+      self.assertEqual(vm.processor_mode, expected_processor_mode)
+      vm.SetDiskSpec(None, 0)
+      vm._Create()
+      vm.created = True
+      create_cmd = self.mock_cmd.call_args[0][0]
+      metadata = vm.GetResourceMetadata()
+
+      if expected_processor_mode is not None:
+        self.assertContainsExactSubsequence(
+            create_cmd, ['--processor-mode', expected_processor_mode]
+        )
+        self.assertEqual(
+            metadata.get('processor_mode'), expected_processor_mode
+        )
+      else:
+        self.assertNotIn('--processor-mode', create_cmd)
+        self.assertNotIn('processor_mode', metadata)
 
 
 class AzurePublicIPAddressTest(pkb_common_test_case.PkbCommonTestCase):
