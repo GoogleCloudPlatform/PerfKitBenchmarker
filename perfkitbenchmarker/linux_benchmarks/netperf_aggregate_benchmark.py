@@ -46,6 +46,14 @@ flags.register_validator(
     'netperf_aggregate_benchmarks',
     lambda benchmarks: benchmarks and set(benchmarks).issubset(ALL_BENCHMARKS),
 )
+_CONNECTED_UDP = flags.DEFINE_boolean(
+    'netperf_aggregate_connected_udp',
+    True,
+    'If true, the RRAGG test and find_max_burst.sh run the test-specific '
+    'netperf options -n and -N so that both netperf and netserver connect() '
+    'their UDP data sockets and do not pass a destination address on every '
+    'send.',
+)
 
 FLAGS = flags.FLAGS
 
@@ -93,6 +101,17 @@ def PrepareNetperfAggregate(vm):
         ' /opt/pkb/netperf-netperf-2.7.0/doc/examples/runemomniaggdemo.sh'
     )
 
+  if _CONNECTED_UDP.value:
+    # Only the RRAGG command line in runemomniaggdemo.sh uses "-T udp".
+    vm.RemoteCommand(
+        'sed -i "s/-e 1 -T udp -u /-e 1 -T udp -n -N -u /"'
+        f' {os.path.join(netperf.NETPERF_EXAMPLE_DIR, REMOTE_SCRIPT)}'
+    )
+    vm.RemoteCommand(
+        "sed -i 's/-S 1M`$/-S 1M -n -N`/'"
+        f' {os.path.join(netperf.NETPERF_EXAMPLE_DIR, "find_max_burst.sh")}'
+    )
+
   port_end = PORT_START
 
   if vm_util.ShouldRunOnExternalIpAddress():
@@ -135,7 +154,9 @@ def ParseNetperfAggregateOutput(stdout, test_type):
   # Don't modify the metadata dict that was passed in
 
   logging.info('Parsing netperf aggregate output')
-  metadata = {}
+  metadata = {
+      'netperf_aggregate_connected_udp': _CONNECTED_UDP.value,
+  }
   aggregate_samples = []
 
   for line in stdout.splitlines():

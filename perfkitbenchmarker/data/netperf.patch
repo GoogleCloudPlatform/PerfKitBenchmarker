@@ -300,6 +300,31 @@ diff -u -r netperf-2.6.0/src/nettest_omni.c netperf-2.6.0-patch/src/nettest_omni
      case 'W':
        /* set the "width" of the user space data */
        /* buffer. This will be the number of */
+diff -u -r netperf-netperf-2.7.0/src/nettest_omni.c netperf-netperf-2.7.0-patch/src/nettest_omni.c
+--- netperf-netperf-2.7.0/src/nettest_omni.c    2026-11-18 01:05:16.087998373 +0000
++++ netperf-netperf-2.7.0-patch/src/nettest_omni.c      2026-11-18 01:06:48.287536380 +0000
+@@ -3685,6 +3685,11 @@
+       if (want_defer_accept)
+ 	omni_request->flags |= OMNI_WANT_DEFER_ACCEPT;
+ 
++      /* tell the netserver to connect() its UDP socket (test-specific
++	 -N) so it does not pass a destination on every send */
++      if (remote_connected)
++	omni_request->flags |= OMNI_USE_CONNECTED;
++
+ }
+ 
+ 
+@@ -5074,6 +5079,9 @@
+ #endif
+   direction       = omni_request->direction;
+   use_pktinfo = (omni_request->flags) & OMNI_USE_PKTINFO;
++  /* honor -N from the remote netperf: connect() the UDP data socket
++     before the first send so later sends pass no destination */
++  need_to_connect = (omni_request->flags) & OMNI_USE_CONNECTED;
+ 
+   /* let's be quite certain the fill file string is null terminated */
+   omni_request->fill_file[sizeof(omni_request->fill_file) - 1] = '\0';
 diff -u -r netperf-2.6.0/doc/examples/runemomniaggdemo.sh netperf-2.6.0-patch/doc/examples/runemomniaggdemo.sh
 --- netperf-2.6.0/doc/examples/runemomniaggdemo.sh 2020-01-13 13:37:25.111724897 -0600
 +++ netperf-2.6.0-patch/doc/examples/runemomniaggdemo.sh 2020-01-13 13:38:21.111724897 -0600
@@ -358,6 +383,28 @@ diff -u -r netperf-2.6.0/doc/examples/runemomniaggdemo.sh netperf-2.6.0-patch/do
  
  # UDP_RR for TPC/PPS using single-byte transactions. we do not use
  # TCP_RR any longer because any packet losses or other matters
+
+diff -u -r netperf-netperf-2.7.0/doc/examples/runemomniaggdemo.sh netperf-netperf-2.7.0-patch/doc/examples/runemomniaggdemo.sh
+--- netperf-netperf-2.7.0/doc/examples/runemomniaggdemo.sh	2026-11-19 17:02:10.766368802 +0000
++++ netperf-netperf-2.7.0-patch/doc/examples/runemomniaggdemo.sh	2026-11-19 17:02:11.070055454 +0000
+@@ -33,7 +33,7 @@
+ 	TARGET=${REMOTE_HOSTS[`expr $i % $NUM_REMOTE_HOSTS`]}
+ 	echo "Starting netperfs on localhost targeting ${TARGET} for $TEST" | tee -a $TESTLOG
+ 	id=`printf "%.5d" $i`
+-	$NETPERF -H $TARGET $NETPERF_CMD 2>&1 > netperf_${TEST}_${id}_to_${TARGET}.out &
++	$NETPERF -H $TARGET $NETPERF_CMD -H $TARGET 2>&1 > netperf_${TEST}_${id}_to_${TARGET}.out &
+ 
+     # give it a moment to get going
+ 	sleep 1
+@@ -90,7 +90,7 @@
+ 	TARGET=${REMOTE_HOSTS[`expr $i % $NUM_REMOTE_HOSTS`]}
+ 	echo "Starting netperfs on localhost targeting ${TARGET} for $TEST" | tee -a $TESTLOG
+ 	id=`printf "%.5d" $i`
+-	$NETPERF -H $TARGET $NETPERF_CMD 2>&1 > netperf_${TEST}_${id}_to_${TARGET}.out &
++	$NETPERF -H $TARGET $NETPERF_CMD -H $TARGET 2>&1 > netperf_${TEST}_${id}_to_${TARGET}.out &
+ 
+     # give it a moment to get going
+ 	sleep 1
 
 diff -u -r netperf-2.7.0/config.guess  netperf-2.7.0-patch/config.guess
 --- netperf-2.7.0/config.guess  2015-07-20 17:39:35.000000000 +0000
