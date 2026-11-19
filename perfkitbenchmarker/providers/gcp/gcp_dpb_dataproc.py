@@ -18,6 +18,7 @@ at https://cloud.google.com/dataproc/
 """
 
 import datetime
+import functools
 import json
 import logging
 import os
@@ -691,6 +692,9 @@ class GcpDpbDataprocServerless(
         run_time=(done_time - start_time).total_seconds(),
         pending_time=(start_time - pending_time).total_seconds(),
         fetch_output_fn=lambda: (None, job_stderr),
+        fetch_costs_fn=functools.partial(
+            self._CalculateBatchCosts, self.batch_name
+        ),
     )
 
   def GetJobProperties(self) -> Dict[str, str]:
@@ -834,9 +838,10 @@ class GcpDpbDataprocServerless(
           self.spec.dataproc_serverless_lightning_engine_runtime
       )
 
-  def CalculateLastJobCosts(self) -> dpb_service.JobCosts:
+  def _CalculateBatchCosts(self, batch_name: str) -> dpb_service.JobCosts:
+    """Calculates the costs of a batch from its approximate usage."""
     fetch_batch_cmd = self.DataprocGcloudCommand(
-        'batches', 'describe', self.batch_name
+        'batches', 'describe', batch_name
     )
 
     @vm_util.Retry(

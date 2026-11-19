@@ -88,7 +88,7 @@ class AwsDpbEmrTestCase(pkb_common_test_case.PkbCommonTestCase):
         mock.patch.object(vm_util, 'IssueCommand', autospec=True)
     )
 
-  def testGlueCalculateLastJobCosts(self):
+  def testGlueFetchCosts(self):
     dpb_glue = aws_dpb_glue.AwsDpbGlue(GLUE_SPEC)
 
     create_job_response = {'Name': 'pkb-deadbeef-0'}
@@ -111,7 +111,7 @@ class AwsDpbEmrTestCase(pkb_common_test_case.PkbCommonTestCase):
       # The actual prices are expected to change over time, but we don't want to
       # update the test every time.
       aws_dpb_glue_prices.GLUE_PRICES = {'us-east-1': 0.44}
-      dpb_glue.SubmitJob(
+      job_result = dpb_glue.SubmitJob(
           pyspark_file='s3://test/hello.py',
           job_type=dpb_constants.PYSPARK_JOB_TYPE,
           job_arguments=[],
@@ -125,7 +125,7 @@ class AwsDpbEmrTestCase(pkb_common_test_case.PkbCommonTestCase):
         compute_unit_name='DPU*hr',
     )
 
-    self.assertEqual(dpb_glue.CalculateLastJobCosts(), expected_costs)
+    self.assertEqual(job_result.FetchCosts(), expected_costs)
 
   def testGluePricesSchema(self):
     for region, price in aws_dpb_glue_prices.GLUE_PRICES.items():

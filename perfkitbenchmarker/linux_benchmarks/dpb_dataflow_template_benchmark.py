@@ -30,7 +30,6 @@ from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
-from perfkitbenchmarker.providers.gcp import gcp_dpb_dataflow
 from perfkitbenchmarker.providers.gcp import util
 
 BENCHMARK_NAME = 'dpb_dataflow_template_benchmark'
@@ -132,7 +131,7 @@ def Run(benchmark_spec):
   results = []
 
   start_time = datetime.datetime.now()
-  dpb_service_instance.SubmitJob(
+  job_result = dpb_service_instance.SubmitJob(
       template_gcs_location=template_gcs_location,
       job_poll_interval=30,
       job_arguments=template_params,
@@ -162,10 +161,7 @@ def Run(benchmark_spec):
   for name, value in stats.items():
     results.append(sample.Sample(name, value, 'number', metadata))
 
-  costs = dpb_service_instance.CalculateLastJobCosts(
-      gcp_dpb_dataflow.DATAFLOW_TYPE_STREAMING
-  )
-  results += costs.GetSamples(metadata)
+  results += job_result.FetchCosts().GetSamples(metadata)
 
   return results
 

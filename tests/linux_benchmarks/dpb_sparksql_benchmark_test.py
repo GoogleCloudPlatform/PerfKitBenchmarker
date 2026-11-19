@@ -1,4 +1,6 @@
 from collections.abc import Mapping, Sequence
+import dataclasses
+import functools
 import json
 import sys
 import types
@@ -53,6 +55,8 @@ class _FakeDpbService:
     self.metadata: dict[str, Any] = {}
     self.submitted_job_args: list[list[str]] = []
     self.observed_cost_durations: list[float | None] = []
+    # Number of jobs submitted when each job's costs were fetched.
+    self.jobs_submitted_at_cost_fetches: list[int] = []
     self._job_results = iter(job_results)
     self._job_costs = iter(
         dpb_service.JobCosts(total_cost=cost) for cost in job_costs or ()
@@ -67,7 +71,15 @@ class _FakeDpbService:
       self, *, job_arguments, **unused_kwargs
   ) -> dpb_service.JobResult:
     self.submitted_job_args.append(list(job_arguments))
-    return next(self._job_results)
+    costs = next(self._job_costs, dpb_service.JobCosts())
+    return dataclasses.replace(
+        next(self._job_results),
+        fetch_costs_fn=functools.partial(self._FetchCosts, costs),
+    )
+
+  def _FetchCosts(self, costs: dpb_service.JobCosts) -> dpb_service.JobCosts:
+    self.jobs_submitted_at_cost_fetches.append(len(self.submitted_job_args))
+    return costs
 
   def GetResourceMetadata(self) -> dict[str, str]:
     return {'cluster_name': 'test_cluster'}
@@ -82,9 +94,6 @@ class _FakeDpbService:
     if self._cost_per_second is None or self.cluster_duration is None:
       return None
     return self.cluster_duration * self._cost_per_second
-
-  def CalculateLastJobCosts(self) -> dpb_service.JobCosts:
-    return next(self._job_costs, dpb_service.JobCosts())
 
 
 def _BaseMetadata(
@@ -792,6 +801,42 @@ class DpbSparksqlBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertDictEqual(
         {s.metric: s.value for s in samples if 'aggregated' in s.metric},
         expected_aggregated,
+    )
+
+  @flagsaver.flagsaver(
+      dpb_sparksql_order=['1', '2'],
+      dpb_sparksql_warmup_iterations=1,
+      dpb_sparksql_iterations=3,
+      dpb_sparksql_fetch_results_from_logs=True,
+      dpb_export_job_stats=True,
+  )
+  def testRunFetchesJobCostsAfterAllIterations(self):
+    dpb_svc = _FakeDpbService(
+        job_results=[
+            _MakeJobResult({'1': 10.0, '2': 20.0}, 35.0) for _ in range(4)
+        ],
+        job_costs=[0.5, 1.0, 3.0, 2.0],
+    )
+
+    samples = dpb_sparksql_benchmark.Run(_MakeBenchmarkSpec(dpb_svc))
+
+    self.assertEqual(dpb_svc.jobs_submitted_at_cost_fetches, [4, 4, 4, 4])
+    self.assertEqual(
+        [
+            (
+                s.value,
+                s.metadata.get('warmup_iteration'),
+                s.metadata.get('iteration'),
+            )
+            for s in samples
+            if s.metric == 'sparksql_run_cost'
+        ],
+        [
+            (0.5, '1', None),
+            (1.0, None, '1'),
+            (3.0, None, '2'),
+            (2.0, None, '3'),
+        ],
     )
 
   @parameterized.named_parameters(

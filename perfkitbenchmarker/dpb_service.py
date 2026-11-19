@@ -183,6 +183,7 @@ class JobSubmissionError(errors.Benchmarks.RunError):
 
 
 FetchOutputFn: TypeAlias = Callable[[], tuple[str | None, str | None]]
+FetchCostsFn: TypeAlias = Callable[[], 'JobCosts']
 
 
 @dataclasses.dataclass
@@ -198,6 +199,9 @@ class JobResult:
       values correspond to stdout and stderr respectively. This is called by
       FetchOutput which updates stdout and stderr if their respective value in
       this callback's return tuple is not None. Defaults to a no-op.
+    fetch_costs_fn: Callback expected to return the costs of the job, which some
+      services only publish hours after it ends. This is called by FetchCosts,
+      which returns no costs if it is None.
   """
 
   run_time: float
@@ -205,6 +209,7 @@ class JobResult:
   stdout: str = ''
   stderr: str = ''
   fetch_output_fn: FetchOutputFn = lambda: (None, None)
+  fetch_costs_fn: FetchCostsFn | None = None
 
   def FetchOutput(self):
     """Populates stdout and stderr according to fetch_output_fn callback."""
@@ -213,6 +218,10 @@ class JobResult:
       self.stdout = stdout
     if stderr is not None:
       self.stderr = stderr
+
+  def FetchCosts(self) -> 'JobCosts':
+    """Returns the job costs according to fetch_costs_fn callback."""
+    return self.fetch_costs_fn() if self.fetch_costs_fn else JobCosts()
 
   @property
   def wall_time(self) -> float:
@@ -693,14 +702,6 @@ class BaseDpbService(resource.BaseResource):
   def GetServiceWrapperScriptsToUpload(self) -> List[str]:
     """Gets service wrapper scripts to upload alongside benchmark scripts."""
     return []
-
-  def CalculateLastJobCosts(self) -> JobCosts:
-    """Returns the cost of last job submitted.
-
-    Returns:
-      A dpb_service.JobCosts object.
-    """
-    return JobCosts()
 
   def GetClusterDuration(self) -> float | None:
     """Gets how much time the cluster has been running in seconds.

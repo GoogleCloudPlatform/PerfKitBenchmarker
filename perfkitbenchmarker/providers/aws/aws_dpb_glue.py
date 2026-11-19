@@ -55,9 +55,6 @@ class AwsDpbGlue(
     self.storage_service.PrepareService(location=self.region)
     self.role = FLAGS.aws_glue_job_role
     self._job_counter = 0
-
-    # Last job run cost
-    self._run_cost = dpb_service.JobCosts()
     self._FillMetadata()
 
   @property
@@ -108,7 +105,7 @@ class AwsDpbGlue(
       started_on = result['JobRun']['StartedOn']
       completed_on = result['JobRun']['CompletedOn']
       execution_time = result['JobRun']['ExecutionTime']
-      self._run_cost = self._ComputeJobRunCost(
+      run_cost = self._ComputeJobRunCost(
           result['JobRun'].get('DPUSeconds'),
           result['JobRun'].get('MaxCapacity'),
           result['JobRun'].get('ExecutionTime'),
@@ -117,6 +114,7 @@ class AwsDpbGlue(
           run_time=execution_time,
           pending_time=completed_on - started_on - execution_time,
           fetch_output_fn=lambda: (None, self._FetchStderr(job_run_id)),
+          fetch_costs_fn=lambda: run_cost,
       )
 
   def SubmitJob(
@@ -241,9 +239,6 @@ class AwsDpbGlue(
   def GetServiceWrapperScriptsToUpload(self) -> List[str]:
     """Gets service wrapper scripts to upload alongside benchmark scripts."""
     return [self.SPARK_SQL_GLUE_WRAPPER_SCRIPT]
-
-  def CalculateLastJobCosts(self) -> dpb_service.JobCosts:
-    return self._run_cost
 
   def _ComputeJobRunCost(
       self,

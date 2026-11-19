@@ -372,12 +372,16 @@ def Run(benchmark_spec):
   """
   cluster = benchmark_spec.dpb_service
   metadata = _GetSampleMetadata(benchmark_spec)
-  warmup_samples = _RunIterations(
+  warmup_samples, warmup_jobs = _RunIterations(
       benchmark_spec, _WARMUP_ITERATIONS.value, 'warmup_iteration', metadata
   )
-  measured_samples = _RunIterations(
+  measured_samples, measured_jobs = _RunIterations(
       benchmark_spec, _ITERATIONS.value, 'iteration', metadata
   )
+  # Fetch job costs only once all iterations ran, as some DPB services publish
+  # them hours after a job ends.
+  warmup_samples += _FetchJobCostSamples(warmup_jobs)
+  measured_samples += _FetchJobCostSamples(measured_jobs)
   all_samples = warmup_samples + measured_samples
 
   all_samples += _GetAggregatedSamples(
@@ -545,16 +549,21 @@ def _GetRunFailureSummarySample(
   )
 
 
+# An iteration's sample metadata and job result, to fetch its job costs later.
+_IterationJob = tuple[dict[str, str], dpb_service.JobResult]
+
+
 def _RunIterations(
     benchmark_spec,
     num_iterations: int,
     iteration_key: str,
     base_metadata: MutableMapping[str, str],
-) -> list[sample.Sample]:
-  """Runs multiple iterations of queries and returns collected samples."""
+) -> tuple[list[sample.Sample], list[_IterationJob]]:
+  """Runs iterations of queries, returning their samples and jobs."""
   cluster = benchmark_spec.dpb_service
   storage_service = cluster.storage_service
   samples = []
+  jobs = []
   for i in range(num_iterations):
     iter_metadata = dict(base_metadata)
     iter_metadata[iteration_key] = str(i + 1)
@@ -569,6 +578,20 @@ def _RunIterations(
     )
     samples.extend(query_samples)
     samples.extend(global_samples)
+    if FLAGS.dpb_export_job_stats:
+      jobs.append((iter_metadata, job_result))
+  return samples, jobs
+
+
+def _FetchJobCostSamples(jobs: list[_IterationJob]) -> list[sample.Sample]:
+  """Fetches the costs of iterations' jobs as samples."""
+  samples = []
+  for metadata, job_result in jobs:
+    samples += job_result.FetchCosts().GetSamples(
+        prefix='sparksql_',
+        renames={'total_cost': 'run_cost'},
+        metadata=metadata,
+    )
   return samples
 
 
@@ -778,16 +801,6 @@ def _GetGlobalSamples(
           metadata,
       )
   )
-
-  if FLAGS.dpb_export_job_stats:
-    # Run cost of the job last DPB service job (non-empty for Serverless DPB
-    # services implementations only).
-    costs = cluster.CalculateLastJobCosts()
-    samples += costs.GetSamples(
-        prefix='sparksql_',
-        renames={'total_cost': 'run_cost'},
-        metadata=metadata,
-    )
 
   cluster_cost = cluster.GetClusterCost()
   if cluster_cost is not None:
