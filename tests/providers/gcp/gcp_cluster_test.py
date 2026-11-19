@@ -453,10 +453,10 @@ class GcpClusterTest(pkb_common_test_case.PkbCommonTestCase):
           job_name='k8s-job',
           num_workers=2,
           worker_machine_type='a4-highgpu-8g',
+          job_timeout=3600,
           env={
-              'LD_LIBRARY_PATH': (
-                  '/usr/local/gib/lib64:/usr/local/nvidia/lib64'
-              ),
+              'LD_LIBRARY_PATH': '/usr/local/gib/lib64:/usr/local/nvidia/lib64',
+              'OMPI_MCA_btl': 'self,tcp',
               'OMPI_MCA_btl_tcp_if_include': 'eth0',
               'NCCL_SOCKET_IFNAME': 'eth0',
               'NCCL_DEBUG': 'INFO',
@@ -472,7 +472,7 @@ class GcpClusterTest(pkb_common_test_case.PkbCommonTestCase):
       mock_wait.assert_called_once_with(
           'job/k8s-job',
           ['condition=complete', 'condition=failed'],
-          timeout=3600,
+          timeout=3660,
       )
       self.assertSequenceEqual(
           [
@@ -550,20 +550,40 @@ class GcpClusterTest(pkb_common_test_case.PkbCommonTestCase):
             side_effect=errors.VmUtil.IssueCommandTimeoutError('timed out'),
         ),
         mock.patch.object(
-            kubectl, 'RunKubectlCommand', return_value=('deleted', '', 0)
+            kubectl,
+            'RunKubectlCommand',
+            side_effect=[
+                ('partial hang logs', '', 0),
+                ('deleted', '', 0),
+            ],
         ) as mock_kubectl,
     ):
       with self.assertRaises(errors.VmUtil.IssueCommandTimeoutError):
         k8s_cluster.RunJob('nccl_cluster', command='./all_reduce_perf')
-      mock_kubectl.assert_called_once_with(
+      self.assertSequenceEqual(
           [
-              'delete',
-              'service/k8s-job',
-              'job.batch/k8s-job',
-              '--ignore-not-found=true',
-              '--wait=true',
+              mock.call(
+                  [
+                      'logs',
+                      '-l',
+                      'job-name=k8s-job,batch.kubernetes.io/job-completion-index=0',
+                      '--tail=-1',
+                  ],
+                  raise_on_failure=False,
+                  raise_on_timeout=False,
+              ),
+              mock.call(
+                  [
+                      'delete',
+                      'service/k8s-job',
+                      'job.batch/k8s-job',
+                      '--ignore-not-found=true',
+                      '--wait=true',
+                  ],
+                  raise_on_failure=False,
+              ),
           ],
-          raise_on_failure=False,
+          mock_kubectl.mock_calls,
       )
 
   def testGkeK8sClusterRegionalZoneRaisesInvalidValue(self):
@@ -590,6 +610,7 @@ class GcpClusterTest(pkb_common_test_case.PkbCommonTestCase):
     with self.assertRaises(errors.Config.InvalidValue):
       gcp_cluster.A4K8sCluster(k8s_spec)
 
+  @flagsaver.flagsaver(kubeconfig='/tmp/test-kubeconfig')
   def testGkeK8sClusterPostCreateGetsCredentials(self):
     k8s_cluster = self._CreateA4K8sCluster()
     with mock.patch.object(
@@ -597,6 +618,18 @@ class GcpClusterTest(pkb_common_test_case.PkbCommonTestCase):
     ) as mock_issue_retryable:
       k8s_cluster._PostCreate()
       mock_issue_retryable.assert_called_once()
+      self.assertEqual(
+          mock_issue_retryable.call_args.kwargs['env']['KUBECONFIG'],
+          '/tmp/test-kubeconfig',
+      )
+
+  @flagsaver.flagsaver(kubeconfig=None)
+  def testK8sClusterInitLeavesKubeconfigFlagUnset(self):
+    k8s_cluster = self._CreateA4K8sCluster()
+    self.assertIsNone(FLAGS.kubeconfig)
+    self.assertIsNone(k8s_cluster.kubeconfig)
+    with flagsaver.flagsaver(kubeconfig='/tmp/stage-kubeconfig'):
+      self.assertEqual(k8s_cluster.kubeconfig, '/tmp/stage-kubeconfig')
 
   def testA4K8sClusterRenderClusterConfigSpotAndReservation(self):
     with flagsaver.flagsaver(

@@ -16,6 +16,11 @@ spec:
   completions: {{ num_workers }}
   completionMode: Indexed
   backoffLimit: 0
+  activeDeadlineSeconds: {{ job_timeout | default(7200, true) }}
+  # Requires Kubernetes >= 1.33 (batch/v1 Job successPolicy GA).
+  successPolicy:
+    rules:
+    - succeededIndexes: "0"
   template:
     metadata:
       labels:
@@ -26,7 +31,7 @@ spec:
       restartPolicy: Never
 {%- if worker_machine_type is defined and worker_machine_type %}
       nodeSelector:
-        node.kubernetes.io/instance-type: {{ worker_machine_type }}
+        {{ node_selector_label | default('node.kubernetes.io/instance-type') }}: {{ worker_machine_type }}
 {%- endif %}
       affinity:
         podAntiAffinity:
@@ -69,9 +74,9 @@ spec:
         volumeMounts:
         - name: dshm
           mountPath: /dev/shm
-{%- if (gpus_per_node is defined and gpus_per_node) or (cpus_per_task is defined and cpus_per_task) or (resource_claim_template is defined and resource_claim_template) %}
+{%- if (gpus_per_node is defined and gpus_per_node) or (cpus_per_task is defined and cpus_per_task) or (extra_resources is defined and extra_resources) or (resource_claim_template is defined and resource_claim_template) %}
         resources:
-{%- if (gpus_per_node is defined and gpus_per_node) or (cpus_per_task is defined and cpus_per_task) %}
+{%- if (gpus_per_node is defined and gpus_per_node) or (cpus_per_task is defined and cpus_per_task) or (extra_resources is defined and extra_resources) %}
           limits:
 {%- if gpus_per_node is defined and gpus_per_node %}
             nvidia.com/gpu: {{ gpus_per_node }}
@@ -79,12 +84,22 @@ spec:
 {%- if cpus_per_task is defined and cpus_per_task %}
             cpu: {{ cpus_per_task }}
 {%- endif %}
+{%- if extra_resources is defined and extra_resources %}
+{%- for key, value in extra_resources.items() %}
+            {{ key }}: {{ value }}
+{%- endfor %}
+{%- endif %}
           requests:
 {%- if gpus_per_node is defined and gpus_per_node %}
             nvidia.com/gpu: {{ gpus_per_node }}
 {%- endif %}
 {%- if cpus_per_task is defined and cpus_per_task %}
             cpu: {{ cpus_per_task }}
+{%- endif %}
+{%- if extra_resources is defined and extra_resources %}
+{%- for key, value in extra_resources.items() %}
+            {{ key }}: {{ value }}
+{%- endfor %}
 {%- endif %}
 {%- endif %}
 {%- if resource_claim_template is defined and resource_claim_template %}
@@ -102,15 +117,27 @@ spec:
           export {{ key }}="{{ value }}"
 {%- endfor %}
 {%- endif %}
+          # Container image requirements for this operator-less K8s Indexed Job:
+          #   1. openssh-server (/usr/sbin/sshd) and openssh-client (ssh):
+          #      Pod 0 runs sshd in the background and launches remote MPI ranks
+          #      on pods 0..N-1 over the headless Service DNS names
+          #      (<job_name>-<i>.<job_name>) without needing mpi-operator.
+          #      Non-zero pods run `exec sshd -D` in the foreground until K8s
+          #      terminates them via `successPolicy` (when pod 0 succeeds) or
+          #      `backoffLimit: 0` / `activeDeadlineSeconds` (on failure/timeout).
+          #   2. Passwordless root-to-root SSH baked into the image:
+          #      Pre-generate /root/.ssh/id_rsa and copy id_rsa.pub into
+          #      /root/.ssh/authorized_keys (chmod 700 /root/.ssh, 600
+          #      authorized_keys) and set StrictHostKeyChecking no /
+          #      UserKnownHostsFile /dev/null in /etc/ssh/ssh_config. Because
+          #      every pod runs the same image, pod 0 can authenticate to all
+          #      peer pods without mounting an operator-managed SSH Secret.
+          #   3. OpenMPI (mpirun) installed and on PATH.
+          #   4. WORKDIR set to the benchmark binary directory (e.g. the
+          #      nccl-tests build directory so `./all_reduce_perf` resolves).
           mkdir -p /run/sshd
-          /usr/sbin/sshd -p 222
           if [ "${JOB_COMPLETION_INDEX:-0}" = "0" ]; then
-            cleanup() {
-              for i in $(seq 1 $(({{ num_workers }} - 1))); do
-                ssh -p 222 -o StrictHostKeyChecking=no {{ job_name }}-${i}.{{ job_name }} "touch /tmp/job_done" 2>/dev/null || true
-              done
-            }
-            trap cleanup EXIT
+            /usr/sbin/sshd -p 222
             rm -f /tmp/hostfile
             for i in $(seq 0 $(({{ num_workers }} - 1))); do
               PEER="{{ job_name }}-${i}.{{ job_name }}"
@@ -119,8 +146,13 @@ spec:
               done
               echo "${PEER} port=222 slots={{ ntasks_per_node | default(gpus_per_node | default(1)) }}" >> /tmp/hostfile
             done
+            # OpenMPI's plm_rsh launcher starts remote ranks via a clean SSH
+            # non-login shell, which strips container ENV vars not explicitly
+            # forwarded via `-x`. The `env` loop below forwards runtime job env
+            # vars, while `compgen -v` also discovers and forwards tuning ENV
+            # vars baked into the Dockerfile (e.g. NCCL_*, UCX_*, SHARP_*).
             ENV_ARGS="{% if env %}{% for key in env %}-x {{ key }} {% endfor %}{% endif %}"
-            for var in $(compgen -v | grep -E '^(NCCL_|OMPI_|FI_|CUDA_|LD_LIBRARY_PATH$|PATH$)'); do
+            for var in $(compgen -v | grep -E '^(NCCL_|OMPI_|FI_|CUDA_|UCX_|SHARP_|LD_LIBRARY_PATH$|PATH$)'); do
               ENV_ARGS="${ENV_ARGS} -x ${var}"
             done
             mpirun \
@@ -129,12 +161,9 @@ spec:
               ${ENV_ARGS} \
               -mca plm_rsh_no_tree_spawn 1 \
               --mca orte_keep_fqdn_hostnames 1 \
-              --mca btl self,tcp \
               --bind-to none \
               --mca plm_rsh_agent "ssh -q -o LogLevel=ERROR -o StrictHostKeyChecking=no -p 222" \
               {{ command }}
           else
-            while [ ! -f /tmp/job_done ]; do
-              sleep 2
-            done
+            exec /usr/sbin/sshd -D -p 222
           fi

@@ -149,7 +149,7 @@ def Run(benchmark_spec):
           f'--maxbytes {FLAGS.nccl_maxbytes} '
           f'--stepfactor {FLAGS.nccl_stepfactor} '
           f'--ngpus {FLAGS.nccl_ngpus} '
-          f'--check {FLAGS.nccl_check} '
+          f'--check {int(FLAGS.nccl_check)} '
           f'--nthreads {FLAGS.nccl_nthreads} '
           f'--iters {FLAGS.nccl_iters}'
       )

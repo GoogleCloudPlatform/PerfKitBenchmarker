@@ -291,7 +291,8 @@ class GkeK8sCluster(cluster.K8sCluster):
         self, 'container', 'clusters', 'get-credentials', self.name
     )
     env = os.environ.copy()
-    env['KUBECONFIG'] = self.kubeconfig
+    if self.kubeconfig:
+      env['KUBECONFIG'] = self.kubeconfig
     cmd.IssueRetryable(env=env)
 
 
@@ -310,6 +311,7 @@ class A4K8sCluster(GkeK8sCluster):
   # gIB and GKE NVIDIA driver library paths in LD_LIBRARY_PATH.
   DEFAULT_JOB_ENV = {
       'LD_LIBRARY_PATH': '/usr/local/gib/lib64:/usr/local/nvidia/lib64',
+      'OMPI_MCA_btl': 'self,tcp',
       'OMPI_MCA_btl_tcp_if_include': 'eth0',
       'NCCL_SOCKET_IFNAME': 'eth0',
   }

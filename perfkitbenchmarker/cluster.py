@@ -41,10 +41,12 @@ from perfkitbenchmarker.configs import spec
 from perfkitbenchmarker.configs import vm_group_decoders
 from perfkitbenchmarker.resources.container_service import container_registry
 from perfkitbenchmarker.resources.container_service import kubectl
+from perfkitbenchmarker.resources.container_service import kubernetes  # pylint: disable=unused-import
 from perfkitbenchmarker.resources.container_service import kubernetes_commands
 
 
 FLAGS = flags.FLAGS
+_K8S_JOB_WAIT_GRACE_SECONDS = 60
 _PREPROVISIONED_CONTAINER_REGISTRY = flags.DEFINE_string(
     'preprovisioned_container_registry',
     None,
@@ -696,14 +698,21 @@ class K8sCluster(BaseCluster):
     self.default_pool_machine_type: str = (
         self.default_pool_spec.machine_type
     )
-    if not FLAGS.kubeconfig:
-      FLAGS.kubeconfig = vm_util.PrependTempDir(f'kubeconfig{FLAGS.run_uri}')
-    self.kubeconfig: str = FLAGS.kubeconfig
     self.k8s_version: str | None = None
     self.num_nodes: int = self.num_workers
     self._container_registry: (
         container_registry.BaseContainerRegistry | None
     ) = None
+
+  @property
+  def kubeconfig(self) -> str | None:
+    """Returns the kubeconfig path managed by PKB's --kubeconfig flag.
+
+    PKB's `kubernetes._SetKubeConfig` `benchmark_start` handler populates
+    `FLAGS.kubeconfig` and persists it in `benchmark_spec.config.flags` so it
+    survives across `--run_stage` boundaries via `RedirectGlobalFlags()`.
+    """
+    return FLAGS.kubeconfig
 
   def _DeleteDependencies(self):
     super()._DeleteDependencies()
@@ -812,8 +821,30 @@ class K8sCluster(BaseCluster):
     k8s_job_name = job_name.replace('_', '-')
     context['job_name'] = k8s_job_name
     context.setdefault('worker_machine_type', self.worker_machine_type)
+    if timeout is not None:
+      context.setdefault('job_timeout', timeout)
+    wait_timeout = (
+        timeout + _K8S_JOB_WAIT_GRACE_SECONDS
+        if timeout is not None
+        else vm_util.DEFAULT_TIMEOUT
+    )
+    def _GetPod0Logs(**kubectl_kwargs: Any) -> tuple[str, str]:
+      stdout, stderr, _ = kubectl.RunKubectlCommand(
+          [
+              'logs',
+              '-l',
+              (
+                  f'job-name={k8s_job_name},'
+                  'batch.kubernetes.io/job-completion-index=0'
+              ),
+              '--tail=-1',
+          ],
+          **kubectl_kwargs,
+      )
+      return stdout, stderr
 
     resources: list[str] = []
+    logs_captured = False
     try:
       resources = list(
           kubernetes_commands.ApplyManifest(template_path, **context)
@@ -821,14 +852,10 @@ class K8sCluster(BaseCluster):
       condition = kubernetes_commands.WaitForResourceForMultiConditions(
           f'job/{k8s_job_name}',
           ['condition=complete', 'condition=failed'],
-          timeout=timeout,
+          timeout=wait_timeout,
       )
-      stdout, stderr, _ = kubectl.RunKubectlCommand([
-          'logs',
-          '-l',
-          f'job-name={k8s_job_name},batch.kubernetes.io/job-completion-index=0',
-          '--tail=-1',
-      ])
+      stdout, stderr = _GetPod0Logs()
+      logs_captured = True
       if condition == 'condition=failed':
         raise errors.VirtualMachine.RemoteCommandError(
             f'Kubernetes job {k8s_job_name} failed.\n'
@@ -837,6 +864,18 @@ class K8sCluster(BaseCluster):
       return stdout, stderr
     finally:
       if resources:
+        if not logs_captured:
+          stdout, stderr = _GetPod0Logs(
+              raise_on_failure=False, raise_on_timeout=False
+          )
+          if stdout or stderr:
+            logging.warning(
+                'Pod 0 logs for Kubernetes job %s before cleanup:\n'
+                'STDOUT: %s\nSTDERR: %s',
+                k8s_job_name,
+                stdout,
+                stderr,
+            )
         kubectl.RunKubectlCommand(
             ['delete', *resources, '--ignore-not-found=true', '--wait=true'],
             raise_on_failure=False,

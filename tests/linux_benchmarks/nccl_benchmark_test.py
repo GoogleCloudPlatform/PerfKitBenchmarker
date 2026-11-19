@@ -126,12 +126,46 @@ class NcclBenchmarkTest(unittest.TestCase, test_util.SamplesTestMixin):
           'nccl_cluster',
           command=(
               './all_reduce_perf --minbytes 8 --maxbytes 256M --stepfactor 2 '
-              '--ngpus 1 --check False --nthreads 1 --iters 20'
+              '--ngpus 1 --check 0 --nthreads 1 --iters 20'
           ),
           env={'NCCL_DEBUG': 'INFO'},
           gpus_per_node=8,
       )
       self.assertTrue(samples)
+
+  @mock.patch('time.time', mock.MagicMock(return_value=1550279509.59))
+  def testNcclClusterRunWithCheckEnabled(self):
+    benchmark_spec = mock.MagicMock()
+    benchmark_spec.cluster.gpus_per_node = 8
+    benchmark_spec.cluster.RunJob.return_value = (self.contents, '')
+    with (
+        mock.patch.object(
+            nccl_benchmark, 'CreateMetadataDict', return_value={}
+        ),
+        mock.patch.object(nccl_cluster_benchmark, 'FLAGS') as mock_flags,
+    ):
+      mock_flags.nccl_extra_params = []
+      mock_flags.nccl_extra_params_spaceseplist = []
+      mock_flags.nccl_operations = ['all_reduce']
+      mock_flags.nccl_minbytes = '8'
+      mock_flags.nccl_maxbytes = '256M'
+      mock_flags.nccl_stepfactor = 2
+      mock_flags.nccl_ngpus = 1
+      mock_flags.nccl_check = True
+      mock_flags.nccl_nthreads = 1
+      mock_flags.nccl_iters = 20
+
+      nccl_cluster_benchmark.Run(benchmark_spec)
+
+      benchmark_spec.cluster.RunJob.assert_called_once_with(
+          'nccl_cluster',
+          command=(
+              './all_reduce_perf --minbytes 8 --maxbytes 256M --stepfactor 2 '
+              '--ngpus 1 --check 1 --nthreads 1 --iters 20'
+          ),
+          env={},
+          gpus_per_node=8,
+      )
 
   def testSlurmJobTemplateRender(self):
     rendered = vm_util.ReadAndRenderJinja2Template(
@@ -143,7 +177,7 @@ class NcclBenchmarkTest(unittest.TestCase, test_util.SamplesTestMixin):
         image='/opt/apps/a4.sqsh',
         command=(
             './all_reduce_perf --minbytes 8 --maxbytes 256M --stepfactor 2 '
-            '--ngpus 1 --check False --nthreads 1 --iters 20'
+            '--ngpus 1 --check 0 --nthreads 1 --iters 20'
         ),
         gpus_per_node=8,
     )
@@ -168,7 +202,7 @@ class NcclBenchmarkTest(unittest.TestCase, test_util.SamplesTestMixin):
         '  --wait=60 \\\n'
         '  --kill-on-bad-exit=1 \\\n'
         '  ./all_reduce_perf --minbytes 8 --maxbytes 256M --stepfactor 2 '
-        '--ngpus 1 --check False --nthreads 1 --iters 20',
+        '--ngpus 1 --check 0 --nthreads 1 --iters 20',
     )
 
   def testSlurmJobTemplateRenderOptionalVars(self):
