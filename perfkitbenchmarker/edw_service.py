@@ -559,6 +559,8 @@ class EdwClientInterface:
 class BaseConversationalAnalyticsClientInterface(EdwClientInterface):
   """Base class for Conversational Analytics EDW client interfaces."""
 
+  allow_empty_sql_results: bool = False
+
   @property
   def fetches_results_immediately(self) -> bool:
     """Returns True if the client fetches query results immediately."""
@@ -599,12 +601,15 @@ class BaseConversationalAnalyticsClientInterface(EdwClientInterface):
     error_msg = None
     if not text_response:
       error_msg = f"'text_response' is missing or empty. Got: {text_response!r}"
-    elif not generated_sql:
-      error_msg = f"'generated_sql' is missing or empty. Got: {generated_sql!r}"
-    elif self.fetches_results_immediately and not retrieved_data:
-      error_msg = (
-          f"'retrieved_data' is missing or empty. Got: {retrieved_data!r}"
-      )
+    elif not self.allow_empty_sql_results:
+      if not generated_sql:
+        error_msg = (
+            f"'generated_sql' is missing or empty. Got: {generated_sql!r}"
+        )
+      elif self.fetches_results_immediately and not retrieved_data:
+        error_msg = (
+            f"'retrieved_data' is missing or empty. Got: {retrieved_data!r}"
+        )
 
     metadata = {
         'question': query_name,
@@ -627,10 +632,6 @@ class BaseConversationalAnalyticsClientInterface(EdwClientInterface):
       metadata['error'] = f'Conversational Analytics query failed: {error_msg}'
       return -1.0, metadata
 
-    logging.info(
-        'Conversational Analytics Response: %s',
-        metadata.get('text_response', ''),
-    )
     return execution_time, metadata
 
   def _GetConversationalAnalyticsCommand(self, remote_query_file: str) -> str:
@@ -642,13 +643,12 @@ class BaseConversationalAnalyticsClientInterface(EdwClientInterface):
   ) -> tuple[float, dict[str, Any]]:
     """Executes a single conversational analytics question."""
     assert self.client_vm is not None
-    logging.info('Conversational Analytics Question: %s', query_name)
 
     remote_query_file = self._GetQueryFileName(query_name)
     vm_util.CreateRemoteFile(self.client_vm, query_name, remote_query_file)
 
     cmd = self._GetConversationalAnalyticsCommand(remote_query_file)
-    stdout, _ = self.client_vm.RemoteCommand(cmd)
+    stdout, _ = self.client_vm.RemoteCommand(cmd, suppress_logging=True)
 
     try:
       results = json.loads(stdout)

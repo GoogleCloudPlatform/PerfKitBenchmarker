@@ -689,7 +689,8 @@ class BigqueryTestCase(pkb_common_test_case.PkbCommonTestCase):
             'source .venv/bin/activate && python3 bq_ca_driver.py single '
             f'--project={PROJECT_ID} --chat_mode=data_agent --agent=AGENT_ID '
             '--credentials_file=SERVICE_ACCOUNT_KEY_FILE --print_results '
-            f'--query_file={expected_query_file}'
+            f'--query_file={expected_query_file}',
+            suppress_logging=True,
         ),
     ])
     mock_vm.PushFile.assert_called_once_with(mock.ANY, expected_query_file)
@@ -791,7 +792,8 @@ class BigqueryTestCase(pkb_common_test_case.PkbCommonTestCase):
             'source .venv/bin/activate && python3 bq_ca_driver.py single '
             f'--project={PROJECT_ID} --chat_mode=data_agent --agent=AGENT_ID '
             '--credentials_file=SERVICE_ACCOUNT_KEY_FILE --print_results '
-            f'--query_file={expected_query_file}'
+            f'--query_file={expected_query_file}',
+            suppress_logging=True,
         ),
     ])
     mock_vm.PushFile.assert_called_once_with(mock.ANY, expected_query_file)

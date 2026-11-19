@@ -15,6 +15,7 @@
 
 import builtins
 import copy
+import json
 import unittest
 from unittest import mock
 from absl import flags
@@ -329,6 +330,75 @@ class BaseClaudeConversationalAnalyticsClientInterfaceTest(
 
   def testGetMetadataReportsClaudeCaClient(self):
     self.assertEqual(self.client.GetMetadata()['ca_client'], 'claude')
+
+  def testParseAllowsEmptySqlAndResultsWhenOptedIn(self):
+    self.client.allow_empty_sql_results = True
+    results = {
+        'query_wall_time_in_secs': 4.2,
+        'details': {
+            'job_id': 'job_empty',
+            'query_results': {
+                'text_response': 'Not present in this estate',
+                'generated_sql': '',
+                'retrieved_data': [],
+            },
+        },
+    }
+    execution_time, metadata = self.client._ParseConversationalAnalyticsResults(
+        results, 'unanswerable query'
+    )
+    self.assertEqual(execution_time, 4.2)
+    self.assertNotIn('error', metadata)
+    self.assertEqual(metadata['text_response'], 'Not present in this estate')
+
+  def testParseStillFailsOnEmptyTextResponseWhenEmptySqlAllowed(self):
+    self.client.allow_empty_sql_results = True
+    results = {
+        'query_wall_time_in_secs': 4.2,
+        'details': {
+            'query_results': {
+                'text_response': '',
+                'generated_sql': '',
+                'retrieved_data': [],
+            },
+        },
+    }
+    execution_time, metadata = self.client._ParseConversationalAnalyticsResults(
+        results, 'empty text query'
+    )
+    self.assertEqual(execution_time, -1.0)
+    self.assertIn("'text_response' is missing or empty", metadata['error'])
+
+  def testExecuteQuerySuppressesCommandLogging(self):
+    self.client.client_vm = mock.MagicMock()
+    self.client.client_vm.RemoteCommand.return_value = (
+        json.dumps({
+            'query_wall_time_in_secs': 1.5,
+            'details': {
+                'query_results': {
+                    'text_response': '42',
+                    'generated_sql': 'SELECT 42',
+                    'retrieved_data': [['42']],
+                }
+            },
+        }),
+        '',
+    )
+    with (
+        mock.patch.object(
+            self.client,
+            '_GetConversationalAnalyticsCommand',
+            return_value='run_ca --query_file=./q.txt',
+        ),
+        mock.patch.object(edw_service.vm_util, 'CreateRemoteFile'),
+    ):
+      execution_time, metadata = self.client.ExecuteQuery('What is 6*7?')
+
+    self.assertEqual(execution_time, 1.5)
+    self.assertEqual(metadata['text_response'], '42')
+    self.client.client_vm.RemoteCommand.assert_called_once_with(
+        'run_ca --query_file=./q.txt', suppress_logging=True
+    )
 
 
 if __name__ == '__main__':
