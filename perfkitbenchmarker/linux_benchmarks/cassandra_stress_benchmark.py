@@ -53,7 +53,6 @@ from perfkitbenchmarker import units
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import cassandra
 
-
 NUM_KEYS_PER_CORE = 2000000
 # Adding wait between prefill and the test workload to give some time
 # for the data to propagate and for the cluster to stabilize.
@@ -295,6 +294,19 @@ CASSANDRA_RECONFIGURE_ON_RUN = flags.DEFINE_bool(
     'When True, re-renders cassandra.yaml and jvm-server.options, restarts'
     ' the Cassandra cluster, and applies nodetool compaction settings at'
     ' the start of Run() while preserving preloaded SSTables on disk.',
+)
+
+# Because Cassandra snapshots create hardlinks to preloaded SSTables, compaction
+# during write-heavy `Run()` trials cannot reclaim the snapshotted blocks; the
+# data disk must be at least 3x the preloaded dataset size (1x hardlinked
+# snapshot + 1x compacted SSTables + 1x compaction headroom).
+CASSANDRA_CREATE_SNAPSHOT = flags.DEFINE_bool(
+    'cassandra_create_snapshot',
+    False,
+    'When True, captures a hardlink snapshot of preloaded keyspace1 SSTables'
+    ' at the end of Prepare() (verifying >= 3x dataset disk capacity).'
+    ' Subsequent Run() invocations with --cassandra_reconfigure_on_run=True'
+    ' automatically restore that clean snapshot when present.',
 )
 
 FLAGS = flags.FLAGS
@@ -556,6 +568,8 @@ def GenerateMetadataFromFlags(benchmark_spec, cassandra_vms, client_vms):
     metadata['jvm_heap_size'] = cassandra.CASSANDRA_JVM_HEAP_SIZE.value
   if CASSANDRA_RECONFIGURE_ON_RUN.value:
     metadata['reconfigure_on_run'] = True
+  if CASSANDRA_CREATE_SNAPSHOT.value:
+    metadata['create_snapshot'] = True
 
   if FLAGS.cassandra_stress_command == USER_COMMAND:
     metadata.update({
@@ -660,6 +674,16 @@ def Prepare(benchmark_spec):
   _ApplyCompactionSettings(cassandra_vms)
   PreloadCassandraServer(cassandra_vms, client_vms, metadata)
   WaitForCompactionTasks(cassandra_vms)
+  if CASSANDRA_CREATE_SNAPSHOT.value:
+    # Snapshot SSTables are hardlinks whose disk space is not reclaimed by
+    # compaction during subsequent `Run()` trials; `CreateSnapshot` verifies
+    # >= 3x dataset total disk capacity (1x hardlinked snapshot + 1x compacted
+    # SSTables + 1x compaction headroom).
+    logging.info(
+        'Capturing clean post-preload snapshot across %d Cassandra server VMs.',
+        len(cassandra_vms),
+    )
+    background_tasks.RunThreaded(cassandra.CreateSnapshot, cassandra_vms)
 
 
 def _ApplyCompactionSettings(
@@ -730,20 +754,47 @@ def ConfigureCassandra(
 
 def ReconfigureClusterForRun(
     cassandra_vms: Sequence[linux_virtual_machine.BaseLinuxVirtualMachine],
-) -> None:
-  """Updates server configs and restarts the cluster without wiping data."""
+) -> bool:
+  """Restores any clean snapshot and updates server configs before Run().
+
+  Args:
+    cassandra_vms: Cassandra server VMs in the cluster.
+
+  Returns:
+    True if a clean snapshot was found and restored across `cassandra_vms`.
+  """
+  if not CASSANDRA_RECONFIGURE_ON_RUN.value:
+    return False
   seed_vm = cassandra_vms[0]
   logging.info(
-      'Reconfiguring Cassandra cluster in-place across %d server VMs.',
+      'Reconfiguring Cassandra cluster for Run() across %d server VMs.',
       len(cassandra_vms),
   )
   background_tasks.RunThreaded(cassandra.StopAndWait, cassandra_vms)
-  ConfigureCassandra(
-      seed_vm, cassandra_vms, configure_fn=cassandra.Reconfigure
+  has_snapshots = background_tasks.RunThreaded(
+      cassandra.HasSnapshot, cassandra_vms
   )
+  if any(has_snapshots) and not all(has_snapshots):
+    snapshot_by_vm = {
+        vm.name: present for vm, present in zip(cassandra_vms, has_snapshots)
+    }
+    raise errors.VirtualMachine.VmStateError(
+        'Inconsistent Cassandra snapshot state across server VMs:'
+        f' {snapshot_by_vm}'
+    )
+  restored_snapshot = all(has_snapshots)
+  if restored_snapshot:
+    logging.info(
+        'Restoring clean snapshot (%s) across %d Cassandra server VMs.',
+        cassandra.CLEAN_SNAPSHOT_TAG,
+        len(cassandra_vms),
+    )
+    background_tasks.RunThreaded(cassandra.RestoreSnapshot, cassandra_vms)
+  ConfigureCassandra(seed_vm, cassandra_vms, configure_fn=cassandra.Reconfigure)
   cassandra.StartCluster(seed_vm, cassandra_vms[1:])
   _ApplyCompactionSettings(cassandra_vms)
   WaitForCompactionTasks(cassandra_vms)
+  return restored_snapshot
 
 
 @dataclasses.dataclass
@@ -1119,11 +1170,12 @@ def Run(benchmark_spec):
     A list of sample.Sample objects.
   """
   cassandra_vms, client_vms = ParseVmGroups(benchmark_spec.vm_groups)
-  if CASSANDRA_RECONFIGURE_ON_RUN.value:
-    ReconfigureClusterForRun(cassandra_vms)
+  restored_snapshot = ReconfigureClusterForRun(cassandra_vms)
   metadata = GenerateMetadataFromFlags(
       benchmark_spec, cassandra_vms, client_vms
   )
+  if restored_snapshot:
+    metadata['restored_clean_snapshot'] = True
   metadata['cassandra_version'] = cassandra.GetCassandraVersion(
       benchmark_spec.vm_groups[CASSANDRA_GROUP][0]
   )

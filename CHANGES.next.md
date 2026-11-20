@@ -773,3 +773,5 @@
     `--cassandra_compaction_throughput_mb`.
 -   Propagate `--google_bigtable_admin_endpoint` across all `gcloud bigtable`
     commands.
+-   Add `--cassandra_create_snapshot` to `cassandra_stress` to capture a clean
+    post-preload snapshot.

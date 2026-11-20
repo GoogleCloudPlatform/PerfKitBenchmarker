@@ -12,6 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
+import pathlib
+import subprocess
+import tempfile
 import threading
 import time
 import unittest
@@ -42,9 +46,7 @@ def _render_jinja_file(template_path: str, context: dict[str, object]) -> str:
   return template.render(context)
 
 
-class CassandraStressLssdBenchmarkTest(
-    pkb_common_test_case.PkbCommonTestCase
-):
+class CassandraStressLssdBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
 
   def _CreateTestVm(self, name: str, ip: str):
     vm = mock.create_autospec(
@@ -55,6 +57,7 @@ class CassandraStressLssdBenchmarkTest(
     vm.internal_ip = ip
     vm.NumCpusForBenchmark.return_value = 16
     vm.GetScratchDir.return_value = '/scratch'
+    vm.RemoteCommandWithReturnCode.return_value = ('', '', 1)
     return vm
 
   def _CreateBenchmarkSpec(self):
@@ -87,9 +90,7 @@ class CassandraStressLssdBenchmarkTest(
         )
     )
     mock_configure = self.enter_context(
-        mock.patch.object(
-            cassandra, 'Configure', autospec=True, spec_set=True
-        )
+        mock.patch.object(cassandra, 'Configure', autospec=True, spec_set=True)
     )
     self.enter_context(
         mock.patch.object(
@@ -303,9 +304,7 @@ class CassandraStressLssdBenchmarkTest(
         mock.patch.object(cassandra, 'Stop', autospec=True, spec_set=True)
     )
     mock_clean = self.enter_context(
-        mock.patch.object(
-            cassandra, 'CleanNode', autospec=True, spec_set=True
-        )
+        mock.patch.object(cassandra, 'CleanNode', autospec=True, spec_set=True)
     )
 
     cassandra_stress_lssd_benchmark.Cleanup(spec)
@@ -419,7 +418,7 @@ class CassandraStressLssdBenchmarkTest(
         f"sudo sed -i '/^-Xm[sx]/d' {jvm_options_path}"
     )
     server_vm.RemoteCommand.assert_any_call(
-        f"printf '\\n-Xms16G\\n-Xmx16G\\n' |"
+        "printf '\\n-Xms16G\\n-Xmx16G\\n' |"
         f' sudo tee -a {jvm_options_path} >/dev/null'
     )
 
@@ -546,9 +545,9 @@ class CassandraStressLssdBenchmarkTest(
 
   def test_stop_and_wait_escalates_to_sigkill_after_graceful_timeout(self):
     server_vm = self._CreateTestVm('server-0', '10.0.0.1')
-    server_vm.RemoteCommandWithReturnCode.side_effect = [
-        ('1234\n', '', 0)
-    ] * (cassandra.STOP_TIMEOUT_SECONDS + 1) + [('', '', 1)]
+    server_vm.RemoteCommandWithReturnCode.side_effect = [('1234\n', '', 0)] * (
+        cassandra.STOP_TIMEOUT_SECONDS + 1
+    ) + [('', '', 1)]
     self.enter_context(
         mock.patch.object(time, 'sleep', autospec=True, spec_set=True)
     )
@@ -773,6 +772,447 @@ class CassandraStressLssdBenchmarkTest(
     # 100 -> 200 plateaus (op rate 100.0), so midpoint (100+200)//2=150 runs
     # rather than crashing on str // int or sorting '1000' before '200'.
     self.assertEqual(recorded_threads, [100, 200, 150])
+
+  def test_create_snapshot_checks_headroom_clears_tag_and_snapshots(self):
+    server_vm = self._CreateTestVm('server-0', '10.0.0.1')
+    server_vm.RemoteCommand.side_effect = [
+        (
+            (
+                '10737418240\t/scratch/cassandra/data/keyspace1\n'
+                'Avail\n'
+                '53687091200\n'
+            ),
+            '',
+        ),
+        ('', ''),
+    ]
+
+    cassandra.CreateSnapshot(server_vm)
+
+    nodetool = cassandra.GetNodetoolPath()
+    self.assertLen(server_vm.RemoteCommand.call_args_list, 2)
+    self.assertEqual(
+        server_vm.RemoteCommand.call_args_list[0].args[0],
+        'du -sb /scratch/cassandra/data/keyspace1 &&'
+        ' df -B1 --output=avail /scratch/cassandra/data/keyspace1',
+    )
+    self.assertEqual(
+        server_vm.RemoteCommand.call_args_list[1],
+        mock.call(
+            f'{nodetool} clearsnapshot -t pkb_clean -- keyspace1',
+            ignore_failure=True,
+        ),
+    )
+    server_vm.RobustRemoteCommand.assert_called_once_with(
+        f'{nodetool} snapshot -t pkb_clean -- keyspace1'
+    )
+
+  def test_create_snapshot_fails_fast_when_disk_space_below_3x_dataset(self):
+    server_vm = self._CreateTestVm('server-0', '10.0.0.1')
+    # 140 GiB dataset with only 210 GiB free (< 280 GiB required for 3x total).
+    gib = 1024**3
+    server_vm.RemoteCommand.return_value = (
+        f'{140 * gib}\t/scratch/cassandra/data/keyspace1\nAvail\n{210 * gib}\n',
+        '',
+    )
+
+    with self.assertRaisesRegex(
+        errors.Benchmarks.PrepareException,
+        r'dataset is 140\.0 GiB.*280\.0 GiB free',
+    ):
+      cassandra.CreateSnapshot(server_vm)
+
+    server_vm.RobustRemoteCommand.assert_not_called()
+
+  @parameterized.parameters(
+      ('', 'keyspace1'),
+      ('.', 'keyspace1'),
+      ('..', 'keyspace1'),
+      ('-flag', 'keyspace1'),
+      ('bad;tag', 'keyspace1'),
+      ('pkb_clean', '.'),
+      ('pkb_clean', '..'),
+      ('pkb_clean', '-flag'),
+      ('pkb_clean', 'bad keyspace'),
+  )
+  def test_snapshot_helpers_reject_unsafe_tokens(
+      self, snapshot_tag: str, keyspace: str
+  ):
+    server_vm = self._CreateTestVm('server-0', '10.0.0.1')
+
+    with self.assertRaises(ValueError):
+      cassandra.CreateSnapshot(
+          server_vm, snapshot_tag=snapshot_tag, keyspace=keyspace
+      )
+    with self.assertRaises(ValueError):
+      cassandra.HasSnapshot(
+          server_vm, snapshot_tag=snapshot_tag, keyspace=keyspace
+      )
+    with self.assertRaises(ValueError):
+      cassandra.RestoreSnapshot(
+          server_vm, snapshot_tag=snapshot_tag, keyspace=keyspace
+      )
+    server_vm.RemoteCommand.assert_not_called()
+    server_vm.RobustRemoteCommand.assert_not_called()
+
+  def test_has_snapshot_detects_complete_missing_and_partial_snapshots(self):
+    with tempfile.TemporaryDirectory() as scratch_dir:
+      server_vm = self._CreateTestVm('server-0', '10.0.0.1')
+      server_vm.GetScratchDir.return_value = scratch_dir
+
+      def run_local(cmd: str, ignore_failure: bool = False):
+        result = subprocess.run(
+            ['bash', '-c', cmd], capture_output=True, text=True, check=False
+        )
+        if result.returncode != 0 and not ignore_failure:
+          raise errors.VirtualMachine.RemoteCommandError(result.stderr)
+        return (result.stdout, result.stderr)
+
+      server_vm.RemoteCommand.side_effect = run_local
+      keyspace_dir = (
+          pathlib.Path(scratch_dir) / 'cassandra' / 'data' / 'keyspace1'
+      )
+      self.assertFalse(cassandra.HasSnapshot(server_vm))
+
+      table_a = keyspace_dir / 'standard1-aaa'
+      table_b = keyspace_dir / 'standard2-bbb'
+      table_a.mkdir(parents=True, exist_ok=True)
+      table_b.mkdir(parents=True, exist_ok=True)
+      self.assertFalse(cassandra.HasSnapshot(server_vm))
+
+      # Snapshot on only 1 of 2 tables must raise VmStateError.
+      (table_a / 'snapshots' / 'pkb_clean').mkdir(parents=True, exist_ok=True)
+      with self.assertRaisesRegex(
+          errors.VirtualMachine.VmStateError, 'Partial snapshot'
+      ):
+        cassandra.HasSnapshot(server_vm)
+
+      (table_b / 'snapshots' / 'pkb_clean').mkdir(parents=True, exist_ok=True)
+      self.assertTrue(cassandra.HasSnapshot(server_vm))
+
+  def test_restore_snapshot_replaces_mutated_sstables_and_preserves_snapshot(
+      self,
+  ):
+    with tempfile.TemporaryDirectory() as scratch_dir:
+      server_vm = self._CreateTestVm('server-0', '10.0.0.1')
+      server_vm.GetScratchDir.return_value = scratch_dir
+      scratch_path = pathlib.Path(scratch_dir)
+      table_dir = (
+          scratch_path / 'cassandra' / 'data' / 'keyspace1' / 'standard1-abc123'
+      )
+      snap_dir = table_dir / 'snapshots' / 'pkb_clean'
+      commitlog_dir = scratch_path / 'cassandra' / 'commitlog'
+      saved_caches_dir = scratch_path / 'cassandra' / 'saved_caches'
+      hints_dir = scratch_path / 'hints with spaces'
+      for directory in (snap_dir, commitlog_dir, saved_caches_dir, hints_dir):
+        directory.mkdir(parents=True, exist_ok=True)
+
+      clean_data = snap_dir / 'nb-1-big-Data.db'
+      clean_index = snap_dir / 'nb-1-big-Index.db'
+      clean_data.write_text('clean-preload-sstable', encoding='utf-8')
+      clean_index.write_text('clean-preload-index', encoding='utf-8')
+      (snap_dir / 'manifest.json').write_text('{}', encoding='utf-8')
+      (snap_dir / 'schema.cql').write_text('CREATE TABLE ...', encoding='utf-8')
+
+      # Simulate post-trial mutated SSTables, txn logs, commitlog, caches, hints
+      (table_dir / 'nb-99-big-Data.db').write_text('mutated', encoding='utf-8')
+      (table_dir / 'nb_txn_compaction_1.log').write_text('tx', encoding='utf-8')
+      (commitlog_dir / 'CommitLog-7-1.log').write_text('wal', encoding='utf-8')
+      (saved_caches_dir / 'KeyCache-g.db').write_text('cache', encoding='utf-8')
+      (hints_dir / 'hint-1.crc32').write_text('hint', encoding='utf-8')
+
+      remote_cmds = []
+      robust_cmds = []
+
+      def run_remote(cmd: str, ignore_failure: bool = False):
+        remote_cmds.append(cmd)
+        if cmd == 'sync':
+          return ('', '')
+        result = subprocess.run(
+            ['bash', '-c', cmd], capture_output=True, text=True, check=False
+        )
+        if result.returncode != 0 and not ignore_failure:
+          raise errors.VirtualMachine.RemoteCommandError(result.stderr)
+        return (result.stdout, result.stderr)
+
+      def run_robust(cmd: str):
+        robust_cmds.append(cmd)
+        subprocess.run(['bash', '-c', cmd], check=True)
+        return ('', '')
+
+      server_vm.RemoteCommand.side_effect = run_remote
+      server_vm.RobustRemoteCommand.side_effect = run_robust
+
+      cassandra.RestoreSnapshot(server_vm, hints_dir=str(hints_dir))
+
+      self.assertEqual(remote_cmds[-1], 'sync')
+      self.assertLen(robust_cmds, 4)
+      server_vm.DropCaches.assert_called_once_with()
+      restored_files = sorted(
+          p.name for p in table_dir.iterdir() if p.is_file()
+      )
+      self.assertEqual(
+          restored_files, ['nb-1-big-Data.db', 'nb-1-big-Index.db']
+      )
+      self.assertEqual(
+          os.stat(table_dir / 'nb-1-big-Data.db').st_ino,
+          os.stat(clean_data).st_ino,
+      )
+      # Snapshot remains intact for subsequent trials.
+      self.assertTrue(clean_data.is_file())
+      self.assertEqual(list(commitlog_dir.iterdir()), [])
+      self.assertEqual(list(saved_caches_dir.iterdir()), [])
+      self.assertEqual(list(hints_dir.iterdir()), [])
+
+  def test_restore_snapshot_fails_fast_without_wiping_data_if_snapshot_missing(
+      self,
+  ):
+    with tempfile.TemporaryDirectory() as scratch_dir:
+      server_vm = self._CreateTestVm('server-0', '10.0.0.1')
+      server_vm.GetScratchDir.return_value = scratch_dir
+      table_dir = (
+          pathlib.Path(scratch_dir)
+          / 'cassandra'
+          / 'data'
+          / 'keyspace1'
+          / 'standard1-abc123'
+      )
+      table_dir.mkdir(parents=True, exist_ok=True)
+      existing_sstable = table_dir / 'nb-1-big-Data.db'
+      existing_sstable.write_text('keep-me', encoding='utf-8')
+
+      def run_local(cmd: str, ignore_failure: bool = False):
+        result = subprocess.run(
+            ['bash', '-c', cmd], capture_output=True, text=True, check=False
+        )
+        if result.returncode != 0 and not ignore_failure:
+          raise errors.VirtualMachine.RemoteCommandError(result.stderr)
+        return (result.stdout, result.stderr)
+
+      server_vm.RemoteCommand.side_effect = run_local
+
+      with self.assertRaisesRegex(
+          errors.VirtualMachine.VmStateError, 'Snapshot .* missing'
+      ):
+        cassandra.RestoreSnapshot(server_vm)
+
+      self.assertTrue(existing_sstable.is_file())
+      server_vm.RobustRemoteCommand.assert_not_called()
+      server_vm.DropCaches.assert_not_called()
+
+  @flagsaver.flagsaver(
+      lssd_workload_precondition_disk=False,
+      cassandra_create_snapshot=True,
+  )
+  def test_prepare_captures_clean_snapshot_after_compaction_when_enabled(self):
+    spec, server_vms, _ = self._CreateBenchmarkSpec()
+    self._StubPrepareCollaborators()
+    events = []
+    lock = threading.Lock()
+    mock_wait_compaction = self.enter_context(
+        mock.patch.object(
+            cassandra_stress_benchmark,
+            'WaitForCompactionTasks',
+            autospec=True,
+            spec_set=True,
+            side_effect=lambda vms: events.append(
+                ('wait_compaction', len(vms))
+            ),
+        )
+    )
+    mock_create_snapshot = self.enter_context(
+        mock.patch.object(
+            cassandra,
+            'CreateSnapshot',
+            autospec=True,
+            spec_set=True,
+        )
+    )
+
+    def record_snapshot(vm):
+      with lock:
+        events.append(('snapshot', vm.name))
+
+    mock_create_snapshot.side_effect = record_snapshot
+
+    cassandra_stress_lssd_benchmark.Prepare(spec)
+
+    mock_wait_compaction.assert_called_once_with(server_vms)
+    self.assertCountEqual(
+        [call.args[0] for call in mock_create_snapshot.call_args_list],
+        server_vms,
+    )
+    self.assertEqual(events[0], ('wait_compaction', 2))
+
+  @flagsaver.flagsaver(
+      cassandra_reconfigure_on_run=True,
+      cassandra_stress_threads=['200'],
+      cassandra_stress_run_duration=None,
+  )
+  def test_run_reconfigure_auto_restores_snapshot_when_present(self):
+    spec, server_vms, _ = self._CreateBenchmarkSpec()
+    for server_vm in server_vms:
+      server_vm.num_cpus = 16
+      server_vm.RemoteCommand.return_value = (
+          '20:11:37 up 1 day, 1 user, load average: 1.00, 2.00, 1.50',
+          '',
+      )
+    events = []
+    lock = threading.Lock()
+
+    def record(stage: str):
+      def _fn(vm, *unused_args, **unused_kwargs):
+        with lock:
+          events.append((stage, vm.name))
+
+      return _fn
+
+    self.enter_context(
+        mock.patch.object(
+            cassandra,
+            'StopAndWait',
+            autospec=True,
+            spec_set=True,
+            side_effect=record('stop'),
+        )
+    )
+    self.enter_context(
+        mock.patch.object(
+            cassandra,
+            'HasSnapshot',
+            autospec=True,
+            spec_set=True,
+            return_value=True,
+        )
+    )
+    self.enter_context(
+        mock.patch.object(
+            cassandra,
+            'RestoreSnapshot',
+            autospec=True,
+            spec_set=True,
+            side_effect=record('restore'),
+        )
+    )
+    self.enter_context(
+        mock.patch.object(
+            cassandra,
+            'Reconfigure',
+            autospec=True,
+            spec_set=True,
+            side_effect=record('reconfigure'),
+        )
+    )
+    self.enter_context(
+        mock.patch.object(
+            cassandra,
+            'StartCluster',
+            autospec=True,
+            spec_set=True,
+            side_effect=lambda seed_vm, rest: events.append(
+                ('start_cluster', seed_vm.name)
+            ),
+        )
+    )
+    self.enter_context(
+        mock.patch.object(
+            cassandra,
+            'UpdateCassandraConcurrentCompactorCount',
+            autospec=True,
+            spec_set=True,
+        )
+    )
+    self.enter_context(
+        mock.patch.object(
+            cassandra,
+            'GetPendingTaskCountFromCompactionStats',
+            autospec=True,
+            spec_set=True,
+            return_value=[0, 0],
+        )
+    )
+    self.enter_context(
+        mock.patch.object(
+            cassandra,
+            'GetCassandraVersion',
+            autospec=True,
+            spec_set=True,
+            return_value='5.0.0',
+        )
+    )
+    self.enter_context(
+        mock.patch.object(
+            cassandra, 'GetNodetoolStatus', autospec=True, spec_set=True
+        )
+    )
+    self.enter_context(
+        mock.patch.object(
+            cassandra_stress_benchmark,
+            'RunCassandraStressOnClient',
+            autospec=True,
+            spec_set=True,
+        )
+    )
+    self.enter_context(
+        mock.patch.object(
+            cassandra_stress_benchmark,
+            'CollectResultFile',
+            autospec=True,
+            spec_set=True,
+            side_effect=lambda vm, results: results.update({
+                metric: [100.0]
+                for metric in cassandra_stress_benchmark.RESULTS_METRICS
+            }),
+        )
+    )
+
+    samples = cassandra_stress_lssd_benchmark.Run(spec)
+
+    stop_indices = [i for i, e in enumerate(events) if e[0] == 'stop']
+    restore_indices = [i for i, e in enumerate(events) if e[0] == 'restore']
+    reconfig_indices = [
+        i for i, e in enumerate(events) if e[0] == 'reconfigure'
+    ]
+    start_idx = next(i for i, e in enumerate(events) if e[0] == 'start_cluster')
+    self.assertLen(stop_indices, 2)
+    self.assertLen(restore_indices, 2)
+    self.assertLen(reconfig_indices, 2)
+    self.assertLess(max(stop_indices), min(restore_indices))
+    self.assertLess(max(restore_indices), min(reconfig_indices))
+    self.assertLess(max(reconfig_indices), start_idx)
+    max_op_sample = next(s for s in samples if s.metric == 'max_op_rate')
+    self.assertTrue(max_op_sample.metadata['restored_clean_snapshot'])
+    self.assertTrue(max_op_sample.metadata['reconfigure_on_run'])
+
+  @flagsaver.flagsaver(cassandra_reconfigure_on_run=True)
+  def test_run_reconfigure_raises_on_inconsistent_snapshot_across_nodes(self):
+    _, server_vms, _ = self._CreateBenchmarkSpec()
+    self.enter_context(
+        mock.patch.object(
+            cassandra, 'StopAndWait', autospec=True, spec_set=True
+        )
+    )
+    self.enter_context(
+        mock.patch.object(
+            cassandra,
+            'HasSnapshot',
+            autospec=True,
+            spec_set=True,
+            side_effect=lambda vm: vm.name == 'server-0',
+        )
+    )
+    mock_restore = self.enter_context(
+        mock.patch.object(
+            cassandra, 'RestoreSnapshot', autospec=True, spec_set=True
+        )
+    )
+
+    with self.assertRaisesRegex(
+        errors.VirtualMachine.VmStateError, 'Inconsistent Cassandra snapshot'
+    ):
+      cassandra_stress_benchmark.ReconfigureClusterForRun(server_vms)
+
+    mock_restore.assert_not_called()
 
 
 if __name__ == '__main__':

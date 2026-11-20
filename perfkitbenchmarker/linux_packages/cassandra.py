@@ -19,14 +19,14 @@ See 'perfkitbenchmarker/data/cassandra/' for configuration files used.
 Cassandra homepage: http://cassandra.apache.org
 """
 
-
 from collections.abc import Mapping, Sequence
 import logging
 import os
 import posixpath
 import re
+import shlex
 import time
-from typing import Any
+from typing import Any, TYPE_CHECKING
 from absl import flags
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import data
@@ -35,6 +35,10 @@ from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 
+if TYPE_CHECKING:
+  # pylint: disable=g-import-not-at-top
+  from perfkitbenchmarker import linux_virtual_machine
+  # pylint: enable=g-import-not-at-top
 
 JNA_JAR_URL = (
     'https://maven.java.net/content/repositories/releases/'
@@ -89,6 +93,18 @@ NODE_START_SLEEP = 30
 STOP_TIMEOUT_SECONDS = 60
 KILL_TIMEOUT_SECONDS = 10
 DAEMON_PATTERN = r'org\.apache\.cassandra\.service\.CassandraDaemon'
+CLEAN_SNAPSHOT_TAG = 'pkb_clean'
+DEFAULT_KEYSPACE = 'keyspace1'
+HINTS_DIR = posixpath.join(CASSANDRA_DIR, 'data', 'hints')
+_SAFE_SNAPSHOT_TOKEN_RE = re.compile(r'[A-Za-z0-9_][A-Za-z0-9_.-]*')
+# Cassandra snapshots create hardlinks under `snapshots/<tag>/`, so original
+# preloaded SSTable blocks are never reclaimed when background compaction merges
+# SSTables during write-heavy `Run()` trials. Total disk size must therefore be
+# at least 3x the preloaded dataset size: 1x pinned hardlinked snapshot SSTables
+# + 1x active/compacted SSTables + 1x temporary compaction headroom (i.e. >= 2x
+# dataset free space remaining on disk right after preload completes).
+MIN_SNAPSHOT_FREE_SPACE_MULTIPLIER = 2
+_GIB = 1024**3
 
 
 class _CassandraDaemonStillRunningError(errors.Error):
@@ -378,8 +394,7 @@ def _CheckDaemonExited(vm: virtual_machine.BaseVirtualMachine) -> None:
         f'CassandraDaemon still running on {vm.name} (PIDs: {pids}).'
     )
   raise errors.VirtualMachine.VmStateError(
-      f'Failed checking CassandraDaemon on {vm.name} (exit {retcode}):'
-      f' {stderr}'
+      f'Failed checking CassandraDaemon on {vm.name} (exit {retcode}): {stderr}'
   )
 
 
@@ -519,6 +534,236 @@ def CleanNode(vm):
   """
   data_path = posixpath.join(vm.GetScratchDir(), 'cassandra')
   vm.RemoteCommand('rm -rf {}'.format(data_path))
+
+
+def _ValidateSnapshotToken(value: str, field_name: str) -> None:
+  """Rejects snapshot tags or keyspace names with unsafe or traversal tokens."""
+  if (
+      not value
+      or value in ('.', '..')
+      or not _SAFE_SNAPSHOT_TOKEN_RE.fullmatch(value)
+  ):
+    raise ValueError(f'Invalid Cassandra {field_name}: {value!r}')
+
+
+def _CheckSnapshotDiskHeadroom(
+    vm: 'linux_virtual_machine.BaseLinuxVirtualMachine',
+    keyspace_dir: str,
+) -> None:
+  """Ensures free disk space is >= 2x dataset (`>= 3x` total capacity).
+
+  Because hardlinked snapshot SSTables prevent compaction from reclaiming
+  original data blocks during subsequent write-heavy `Run()` trials, peak disk
+  usage reaches ~3x dataset size (1x pinned snapshot + 1x compacted SSTables +
+  1x compaction headroom).
+
+  Args:
+    vm: Running Cassandra server VM.
+    keyspace_dir: Path to the keyspace data directory on `vm`.
+
+  Raises:
+    errors.Benchmarks.PrepareException: Free space is below 2x dataset size.
+  """
+  quoted_dir = shlex.quote(keyspace_dir)
+  stdout, _ = vm.RemoteCommand(
+      f'du -sb {quoted_dir} && df -B1 --output=avail {quoted_dir}'
+  )
+  lines = [line.strip() for line in stdout.splitlines() if line.strip()]
+  if len(lines) < 2:
+    raise errors.Benchmarks.PrepareException(
+        f'Unable to determine disk headroom for {keyspace_dir} on {vm.name}:'
+        f' {stdout!r}'
+    )
+  dataset_bytes = int(lines[0].split()[0])
+  avail_bytes = int(lines[-1])
+  required_free_bytes = MIN_SNAPSHOT_FREE_SPACE_MULTIPLIER * dataset_bytes
+  if avail_bytes < required_free_bytes:
+    raise errors.Benchmarks.PrepareException(
+        f'Insufficient disk space on {vm.name} ({keyspace_dir}) for Cassandra'
+        f' snapshot: dataset is {dataset_bytes / _GIB:.1f} GiB, available free'
+        f' space is {avail_bytes / _GIB:.1f} GiB, but at least'
+        f' {required_free_bytes / _GIB:.1f} GiB free (>= 3x dataset total'
+        ' capacity) is required because snapshot hardlinks prevent compaction'
+        ' from reclaiming preloaded SSTable blocks. Increase disk size or'
+        ' reduce --cassandra_stress_preload_num_keys.'
+    )
+
+
+def CreateSnapshot(
+    vm: 'linux_virtual_machine.BaseLinuxVirtualMachine',
+    snapshot_tag: str = CLEAN_SNAPSHOT_TAG,
+    keyspace: str = DEFAULT_KEYSPACE,
+) -> None:
+  """Flushes memtables and captures a hardlink snapshot of `keyspace` on `vm`.
+
+  Verifies >= 3x dataset total disk capacity (1x hardlinked snapshot + 1x
+  compacted SSTables + 1x compaction headroom) before creating the snapshot.
+
+  Args:
+    vm: Running Cassandra server VM.
+    snapshot_tag: Snapshot directory name created under `snapshots/`.
+    keyspace: Keyspace whose tables should be snapshotted.
+  """
+  _ValidateSnapshotToken(snapshot_tag, 'snapshot_tag')
+  _ValidateSnapshotToken(keyspace, 'keyspace')
+  keyspace_dir = posixpath.join(
+      vm.GetScratchDir(), 'cassandra', 'data', keyspace
+  )
+  _CheckSnapshotDiskHeadroom(vm, keyspace_dir)
+  nodetool = shlex.quote(GetNodetoolPath())
+  quoted_tag = shlex.quote(snapshot_tag)
+  quoted_keyspace = shlex.quote(keyspace)
+  vm.RemoteCommand(
+      f'{nodetool} clearsnapshot -t {quoted_tag} -- {quoted_keyspace}',
+      ignore_failure=True,
+  )
+  vm.RobustRemoteCommand(
+      f'{nodetool} snapshot -t {quoted_tag} -- {quoted_keyspace}'
+  )
+
+
+def _GetSnapshotTableDirs(
+    vm: 'linux_virtual_machine.BaseLinuxVirtualMachine',
+    keyspace_dir: str,
+    snapshot_tag: str,
+) -> tuple[list[str], set[str]]:
+  """Returns `(table_dirs, snap_dirs_present)` under `keyspace_dir` on `vm`."""
+  q_keyspace = shlex.quote(keyspace_dir)
+  q_snap_pattern = shlex.quote(f'*/snapshots/{snapshot_tag}')
+  tables_out, _ = vm.RemoteCommand(
+      f'find {q_keyspace} -mindepth 1 -maxdepth 1 -type d',
+      ignore_failure=True,
+  )
+  table_dirs = sorted(
+      line.strip() for line in tables_out.splitlines() if line.strip()
+  )
+  if not table_dirs:
+    return [], set()
+  snaps_out, _ = vm.RemoteCommand(
+      f'find {q_keyspace} -mindepth 3 -maxdepth 3 -type d -path'
+      f' {q_snap_pattern}',
+      ignore_failure=True,
+  )
+  raw_snaps = {line.strip() for line in snaps_out.splitlines() if line.strip()}
+  expected_snaps = {
+      posixpath.join(table_dir, 'snapshots', snapshot_tag)
+      for table_dir in table_dirs
+  }
+  return table_dirs, expected_snaps & raw_snaps
+
+
+def HasSnapshot(
+    vm: 'linux_virtual_machine.BaseLinuxVirtualMachine',
+    snapshot_tag: str = CLEAN_SNAPSHOT_TAG,
+    keyspace: str = DEFAULT_KEYSPACE,
+) -> bool:
+  """Returns True if every table in `keyspace` on `vm` has `snapshot_tag`.
+
+  Args:
+    vm: Cassandra server VM.
+    snapshot_tag: Snapshot directory name under each table's `snapshots/` dir.
+    keyspace: Keyspace to inspect.
+
+  Returns:
+    True when at least one table exists and every table has `snapshot_tag`;
+    False when no table has `snapshot_tag` (or `keyspace` dir is absent).
+
+  Raises:
+    errors.VirtualMachine.VmStateError: Snapshot exists on only a subset of
+      tables.
+  """
+  _ValidateSnapshotToken(snapshot_tag, 'snapshot_tag')
+  _ValidateSnapshotToken(keyspace, 'keyspace')
+  keyspace_dir = posixpath.join(
+      vm.GetScratchDir(), 'cassandra', 'data', keyspace
+  )
+  table_dirs, present_snaps = _GetSnapshotTableDirs(
+      vm, keyspace_dir, snapshot_tag
+  )
+  if not table_dirs or not present_snaps:
+    return False
+  if len(present_snaps) != len(table_dirs):
+    raise errors.VirtualMachine.VmStateError(
+        f'Partial snapshot {snapshot_tag!r} on {vm.name}'
+        f' ({len(present_snaps)}/{len(table_dirs)} tables).'
+    )
+  return True
+
+
+def _RestoreTableSstables(
+    vm: 'linux_virtual_machine.BaseLinuxVirtualMachine',
+    table_dirs: Sequence[str],
+    snapshot_tag: str,
+) -> None:
+  """Replaces table files in `table_dirs` with `snapshot_tag` hardlinks."""
+  for table_dir in table_dirs:
+    q_table = shlex.quote(table_dir)
+    q_snap = shlex.quote(posixpath.join(table_dir, 'snapshots', snapshot_tag))
+    vm.RobustRemoteCommand(
+        f'find {q_table} -maxdepth 1 -type f -delete && '
+        f'find {q_snap} -maxdepth 1 -type f '
+        "! -name 'manifest.json' ! -name 'schema.cql' "
+        f'-exec ln -t {q_table} {{}} +'
+    )
+
+
+def _ClearRuntimeDirectories(
+    vm: 'linux_virtual_machine.BaseLinuxVirtualMachine',
+    directories: Sequence[str],
+) -> None:
+  """Deletes transient files inside `directories` while Cassandra is stopped."""
+  for directory in directories:
+    q_dir = shlex.quote(directory)
+    vm.RobustRemoteCommand(
+        f'test ! -d {q_dir} || find {q_dir} -mindepth 1 -delete'
+    )
+
+
+def RestoreSnapshot(
+    vm: 'linux_virtual_machine.BaseLinuxVirtualMachine',
+    snapshot_tag: str = CLEAN_SNAPSHOT_TAG,
+    keyspace: str = DEFAULT_KEYSPACE,
+    hints_dir: str = HINTS_DIR,
+) -> None:
+  """Restores `keyspace` SSTables from `snapshot_tag` while daemon is stopped.
+
+  Verifies snapshot presence across all tables, restores SSTable hardlinks,
+  clears transient runtime directories, and drops OS page caches (`DropCaches`)
+  so repeated `Run()` trials start from an identical disk and cache state.
+  `StopAndWait(vm)` must be called before `RestoreSnapshot(vm)`.
+
+  Args:
+    vm: Stopped Cassandra server VM.
+    snapshot_tag: Snapshot directory name under each table's `snapshots/` dir.
+    keyspace: Keyspace whose tables should be restored.
+    hints_dir: Hinted handoff directory to clear while stopped.
+
+  Raises:
+    errors.VirtualMachine.VmStateError: `snapshot_tag` is missing on any table.
+  """
+  _ValidateSnapshotToken(snapshot_tag, 'snapshot_tag')
+  _ValidateSnapshotToken(keyspace, 'keyspace')
+  data_path = posixpath.join(vm.GetScratchDir(), 'cassandra')
+  keyspace_dir = posixpath.join(data_path, 'data', keyspace)
+  table_dirs, present_snaps = _GetSnapshotTableDirs(
+      vm, keyspace_dir, snapshot_tag
+  )
+  if not table_dirs or len(present_snaps) != len(table_dirs):
+    raise errors.VirtualMachine.VmStateError(
+        f'Snapshot {snapshot_tag!r} missing under {keyspace_dir} on {vm.name}'
+        f' ({len(present_snaps)}/{len(table_dirs)} tables).'
+    )
+  _RestoreTableSstables(vm, table_dirs, snapshot_tag)
+  _ClearRuntimeDirectories(
+      vm,
+      (
+          posixpath.join(data_path, 'commitlog'),
+          posixpath.join(data_path, 'saved_caches'),
+          hints_dir,
+      ),
+  )
+  vm.RemoteCommand('sync')
+  vm.DropCaches()
 
 
 def _StartCassandraIfNotRunning(vm):
