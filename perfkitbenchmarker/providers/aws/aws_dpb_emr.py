@@ -116,10 +116,6 @@ class _AwsDpbEmrServerlessJobRun:
   storage_gb_hour: float | None = None
   vcpu_hour: float | None = None
 
-  def __bool__(self):
-    """Returns if this represents a job run or is just a dummy placeholder."""
-    return None not in (self.application_id, self.job_run_id, self.region)
-
   def HasStats(self):
     """Returns whether there are stats collected for the job run."""
     return None not in (
@@ -638,9 +634,6 @@ class AwsDpbEmrServerless(
           'release-versions.html'
       )
     self.role = FLAGS.aws_emr_serverless_role
-
-    # Last job usage info
-    self._job_run = _AwsDpbEmrServerlessJobRun()
     self._FillMetadata()
 
   @property
@@ -743,43 +736,39 @@ class AwsDpbEmrServerless(
         ]
     )
     result = json.loads(stdout)
-    self._job_run = _AwsDpbEmrServerlessJobRun(
+    job_run = _AwsDpbEmrServerlessJobRun(
         application_id=result['applicationId'],
         job_run_id=result['jobRunId'],
         region=self.region,
     )
-    return self._WaitForJob(self._job_run, EMR_TIMEOUT, job_poll_interval)
-
-  def CalculateLastJobCosts(self) -> dpb_service.JobCosts:
-    @vm_util.Retry(
-        fuzz=0,
-        retryable_exceptions=(EMRRetryableException,),
-    )
-    def WaitTilUsageMetricsAvailable():
-      self._CallGetJobRunApi(self._job_run)
-      if not self._job_run.HasStats():
-        raise EMRRetryableException(
-            'Usage metrics not ready yet for EMR Serverless '
-            f'application_id={self._job_run.application_id!r} '
-            f'job_run_id={self._job_run.job_run_id!r}'
-        )
-
-    if not self._job_run:
-      return _AwsDpbEmrServerlessJobRun().ComputeJobRunCost()
-    if not self._job_run.HasStats():
-      try:
-        WaitTilUsageMetricsAvailable()
-      except vm_util.TimeoutExceededRetryError:
-        logging.warning('Timeout exceeded for retrieving usage metrics.')
-    return self._job_run.ComputeJobRunCost()
+    return self._WaitForJob(job_run, EMR_TIMEOUT, job_poll_interval)
 
   def _CalculateJobRunCosts(
       self, job_run: _AwsDpbEmrServerlessJobRun
   ) -> dpb_service.JobCosts:
-    """Calculates the costs of a job run, making it the last job run."""
-    # CalculateLastJobCosts waits for the usage metrics of the last job run.
-    self._job_run = job_run
-    return self.CalculateLastJobCosts()
+    """Calculates the costs of a job run, waiting for its usage metrics."""
+
+    @vm_util.Retry(
+        fuzz=0,
+        retryable_exceptions=(EMRRetryableException,),
+    )
+    def WaitTilUsageMetricsAvailable() -> _AwsDpbEmrServerlessJobRun:
+      job_run_with_stats = self._ParseCostMetrics(
+          job_run, self._GetJobRun(job_run) or {}
+      )
+      if not job_run_with_stats.HasStats():
+        raise EMRRetryableException(
+            'Usage metrics not ready yet for EMR Serverless '
+            f'application_id={job_run.application_id!r} '
+            f'job_run_id={job_run.job_run_id!r}'
+        )
+      return job_run_with_stats
+
+    try:
+      return WaitTilUsageMetricsAvailable().ComputeJobRunCost()
+    except vm_util.TimeoutExceededRetryError:
+      logging.warning('Timeout exceeded for retrieving usage metrics.')
+      return dpb_service.JobCosts()
 
   def GetJobProperties(self) -> Dict[str, str]:
     result = {'spark.dynamicAllocation.enabled': 'FALSE'}
@@ -857,6 +846,28 @@ class AwsDpbEmrServerless(
       self, job_run: _AwsDpbEmrServerlessJobRun
   ) -> dpb_service.JobResult | None:
     """Performs EMR Serverless GetJobRun API call."""
+    result = self._GetJobRun(job_run)
+    if result is None:
+      return None
+    state = result['jobRun']['state']
+    if state in ('FAILED', 'CANCELLED'):
+      raise dpb_service.JobSubmissionError(result['jobRun'].get('stateDetails'))
+    if state == 'SUCCESS':
+      start_time = result['jobRun']['createdAt']
+      end_time = result['jobRun']['updatedAt']
+      return dpb_service.JobResult(
+          run_time=end_time - start_time,
+          fetch_output_fn=lambda: (
+              self._FetchLogs(job_run.application_id, job_run.job_run_id),  # pyrefly: ignore[bad-argument-type]
+              None,
+          ),
+          fetch_costs_fn=functools.partial(self._CalculateJobRunCosts, job_run),
+      )
+
+  def _GetJobRun(
+      self, job_run: _AwsDpbEmrServerlessJobRun
+  ) -> dict[str, Any] | None:
+    """Gets a job run with the GetJobRun API, or None if rate limited."""
     cmd = self.cmd_prefix + [
         'emr-serverless',
         'get-job-run',
@@ -875,24 +886,7 @@ class AwsDpbEmrServerless(
       raise errors.VmUtil.IssueCommandError(
           f'Getting JobRun status failed:\n{stderr}'
       )
-    result = json.loads(stdout)
-    state = result['jobRun']['state']
-    if state in ('FAILED', 'CANCELLED'):
-      raise dpb_service.JobSubmissionError(result['jobRun'].get('stateDetails'))
-    if state == 'SUCCESS':
-      start_time = result['jobRun']['createdAt']
-      end_time = result['jobRun']['updatedAt']
-      self._job_run = self._ParseCostMetrics(result)
-      return dpb_service.JobResult(
-          run_time=end_time - start_time,
-          fetch_output_fn=lambda: (
-              self._FetchLogs(job_run.application_id, job_run.job_run_id),  # pyrefly: ignore[bad-argument-type]
-              None,
-          ),
-          fetch_costs_fn=functools.partial(
-              self._CalculateJobRunCosts, self._job_run
-          ),
-      )
+    return json.loads(stdout)
 
   def _FetchLogs(self, application_id: str, job_run_id: str) -> str | None:
     local_stdout_path = os.path.join(
@@ -941,14 +935,16 @@ class AwsDpbEmrServerless(
     return 'default-disk'
 
   def _ParseCostMetrics(
-      self, get_job_run_result: dict[Any, Any]
+      self,
+      job_run: _AwsDpbEmrServerlessJobRun,
+      get_job_run_result: dict[Any, Any],
   ) -> _AwsDpbEmrServerlessJobRun:
     """Parses usage metrics from an EMR s8s GetJobRun API response."""
     resource_utilization = get_job_run_result.get('jobRun', {}).get(
         'totalResourceUtilization', {}
     )
     return dataclasses.replace(
-        self._job_run,
+        job_run,
         memory_gb_hour=resource_utilization.get('memoryGBHour'),
         storage_gb_hour=resource_utilization.get('storageGBHour'),
         vcpu_hour=resource_utilization.get('vCPUHour'),

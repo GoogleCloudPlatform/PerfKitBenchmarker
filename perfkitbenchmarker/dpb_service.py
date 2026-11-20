@@ -703,14 +703,6 @@ class BaseDpbService(resource.BaseResource):
     """Gets service wrapper scripts to upload alongside benchmark scripts."""
     return []
 
-  def CalculateLastJobCosts(self) -> JobCosts:
-    """Returns the cost of last job submitted.
-
-    Returns:
-      A dpb_service.JobCosts object.
-    """
-    return JobCosts()
-
   def GetClusterDuration(self) -> float | None:
     """Gets how much time the cluster has been running in seconds.
 

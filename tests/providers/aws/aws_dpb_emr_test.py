@@ -182,12 +182,14 @@ class AwsDpbEmrTestCase(pkb_common_test_case.PkbCommonTestCase):
       'EMR_SERVERLESS_PRICES',
       new=_EMR_SERVERLESS_PRICES,
   )
-  def testEmrServerlessCalculateLastJobCosts(self):
+  def testEmrServerlessFetchCosts(self):
     emr_serverless = aws_dpb_emr.AwsDpbEmrServerless(SERVERLESS_SPEC)
+    # GetJobRun is called when the job finishes and when fetching its costs.
     self.issue_cmd_mock.side_effect = [
         (json.dumps(_EMR_SERVERLESS_CREATE_APPLICATION_RESPONSE), '', 0),
         (json.dumps(_EMR_SERVERLESS_GET_APPLICATION_RESPONSE), '', 0),
         (json.dumps(_EMR_SERVERLESS_START_JOB_RUN_RESPONSE), '', 0),
+    ] + [
         (
             json.dumps(
                 _GetJobRunMockPayload(
@@ -198,8 +200,8 @@ class AwsDpbEmrTestCase(pkb_common_test_case.PkbCommonTestCase):
             ),
             '',
             0,
-        ),
-    ]
+        )
+    ] * 2
     job_result = emr_serverless.SubmitJob(
         pyspark_file='s3://test/hello.py',
         job_type=dpb_constants.PYSPARK_JOB_TYPE,
@@ -219,7 +221,6 @@ class AwsDpbEmrTestCase(pkb_common_test_case.PkbCommonTestCase):
         memory_unit_name='GB*hr',
         storage_unit_name='GB*hr',
     )
-    self.assertEqual(emr_serverless.CalculateLastJobCosts(), expected_costs)
     self.assertEqual(job_result.FetchCosts(), expected_costs)
 
   def testEmrServerlessPricesSchema(self):
@@ -257,7 +258,7 @@ class AwsDpbEmrTestCase(pkb_common_test_case.PkbCommonTestCase):
             0,
         ),
     ]
-    emr_serverless.SubmitJob(
+    job_result = emr_serverless.SubmitJob(
         pyspark_file='s3://test/hello.py',
         job_type=dpb_constants.PYSPARK_JOB_TYPE,
     )
@@ -276,7 +277,7 @@ class AwsDpbEmrTestCase(pkb_common_test_case.PkbCommonTestCase):
         memory_unit_name='GB*hr',
         storage_unit_name='GB*hr',
     )
-    self.assertEqual(emr_serverless.CalculateLastJobCosts(), expected_costs)
+    self.assertEqual(job_result.FetchCosts(), expected_costs)
 
   @freezegun.freeze_time('2024-02-16', auto_tick_seconds=60.0)
   @mock.patch.object(time, 'sleep')
@@ -292,12 +293,12 @@ class AwsDpbEmrTestCase(pkb_common_test_case.PkbCommonTestCase):
         (json.dumps(_EMR_SERVERLESS_GET_APPLICATION_RESPONSE), '', 0),
         (json.dumps(_EMR_SERVERLESS_START_JOB_RUN_RESPONSE), '', 0),
     ] + [(json.dumps(_GetJobRunMockPayload()), '', 0)] * 100
-    emr_serverless.SubmitJob(
+    job_result = emr_serverless.SubmitJob(
         pyspark_file='s3://test/hello.py',
         job_type=dpb_constants.PYSPARK_JOB_TYPE,
     )
     expected_costs = dpb_service.JobCosts()
-    self.assertEqual(emr_serverless.CalculateLastJobCosts(), expected_costs)
+    self.assertEqual(job_result.FetchCosts(), expected_costs)
 
   def testEmrServerlessMetadata(self):
     emr_serverless = aws_dpb_emr.AwsDpbEmrServerless(SERVERLESS_SPEC)

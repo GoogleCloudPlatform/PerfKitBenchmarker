@@ -838,9 +838,6 @@ class GcpDpbDataprocServerless(
           self.spec.dataproc_serverless_lightning_engine_runtime
       )
 
-  def CalculateLastJobCosts(self) -> dpb_service.JobCosts:
-    return self._CalculateBatchCosts(self.batch_name)
-
   def _CalculateBatchCosts(self, batch_name: str) -> dpb_service.JobCosts:
     """Calculates the costs of a batch from its approximate usage."""
     fetch_batch_cmd = self.DataprocGcloudCommand(

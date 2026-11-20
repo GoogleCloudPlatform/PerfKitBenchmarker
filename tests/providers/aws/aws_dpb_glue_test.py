@@ -88,7 +88,7 @@ class AwsDpbEmrTestCase(pkb_common_test_case.PkbCommonTestCase):
         mock.patch.object(vm_util, 'IssueCommand', autospec=True)
     )
 
-  def testGlueCalculateLastJobCosts(self):
+  def testGlueFetchCosts(self):
     dpb_glue = aws_dpb_glue.AwsDpbGlue(GLUE_SPEC)
 
     create_job_response = {'Name': 'pkb-deadbeef-0'}
@@ -125,7 +125,6 @@ class AwsDpbEmrTestCase(pkb_common_test_case.PkbCommonTestCase):
         compute_unit_name='DPU*hr',
     )
 
-    self.assertEqual(dpb_glue.CalculateLastJobCosts(), expected_costs)
     self.assertEqual(job_result.FetchCosts(), expected_costs)
 
   def testGluePricesSchema(self):

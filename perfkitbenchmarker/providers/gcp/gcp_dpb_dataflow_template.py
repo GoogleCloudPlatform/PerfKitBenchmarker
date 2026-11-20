@@ -22,10 +22,13 @@ See details at: https://cloud.google.com/dataflow/
 """
 
 import datetime
+import functools
 import json
 import logging
+import time
 
 from absl import flags
+from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker.providers.gcp import gcp_dpb_dataflow
@@ -91,6 +94,7 @@ class GcpDpbDataflowTemplate(gcp_dpb_dataflow.GcpDpbDataflow):
         'format': 'json',
     }
 
+    start_time = time.time()
     stdout, _, _ = cmd.Issue()
 
     # Parse output to retrieve submitted job ID
@@ -103,8 +107,14 @@ class GcpDpbDataflowTemplate(gcp_dpb_dataflow.GcpDpbDataflow):
 
     logging.info('Dataflow job ID: %s', self.job_id)
     # TODO(user): return JobResult() with pre-computed time stats.
-    return self._WaitForJob(
+    self._WaitForJob(
         job_input_sub, FLAGS.dpb_dataflow_timeout, job_poll_interval
+    )
+    return dpb_service.JobResult(
+        run_time=time.time() - start_time,
+        fetch_costs_fn=functools.partial(
+            self._CalculateJobCosts, gcp_dpb_dataflow.DATAFLOW_TYPE_STREAMING
+        ),
     )
 
   def _GetCompletedJob(self, job_id):

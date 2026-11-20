@@ -258,9 +258,11 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     if FLAGS.dpb_dataflow_service_account_key:
       env['GOOGLE_APPLICATION_CREDENTIALS'] = self._local_service_account_path
 
+    start_time = time.time()
     _, stderr, _ = vm_util.IssueCommand(
         cmd, timeout=FLAGS.dpb_dataflow_timeout, env=env
     )
+    run_time = time.time() - start_time
 
     # Parse output to retrieve submitted job ID
     match = re.search(r'Submitted job: (.\S*)', stderr)
@@ -273,6 +275,13 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
 
     self.job_id = match.group(1)
     logging.info('Dataflow job ID: %s', self.job_id)
+    # Dataflow does not report the job run time here, so use the command's.
+    return dpb_service.JobResult(
+        run_time=run_time,
+        fetch_costs_fn=functools.partial(
+            self._CalculateJobCosts, DATAFLOW_TYPE_BATCH
+        ),
+    )
 
   def _FillMetadata(self) -> None:
     """Get a dict to initialize this DPB service instance's metadata."""
@@ -304,12 +313,12 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     # and/or BillableStreamingDataProcessed when applicable
     return stats
 
-  def CalculateLastJobCosts(
+  def _CalculateJobCosts(
       self, pricing_type=DATAFLOW_TYPE_BATCH
   ) -> dpb_service.JobCosts:
     if pricing_type not in (DATAFLOW_TYPE_BATCH, DATAFLOW_TYPE_STREAMING):
       raise ValueError(
-          f'Invalid type provided to CalculateLastJobCosts(): {pricing_type}'
+          f'Invalid type provided to _CalculateJobCosts(): {pricing_type}'
       )
 
     # For some reason, pytype doesn't play well with functools.cached_property
