@@ -108,15 +108,17 @@ class AwsDpbGlue(
       started_on = result['JobRun']['StartedOn']
       completed_on = result['JobRun']['CompletedOn']
       execution_time = result['JobRun']['ExecutionTime']
-      self._run_cost = self._ComputeJobRunCost(
+      run_cost = self._ComputeJobRunCost(
           result['JobRun'].get('DPUSeconds'),
           result['JobRun'].get('MaxCapacity'),
           result['JobRun'].get('ExecutionTime'),
       )
+      self._run_cost = run_cost
       return dpb_service.JobResult(
           run_time=execution_time,
           pending_time=completed_on - started_on - execution_time,
           fetch_output_fn=lambda: (None, self._FetchStderr(job_run_id)),
+          fetch_costs_fn=lambda: run_cost,
       )
 
   def SubmitJob(

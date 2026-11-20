@@ -18,6 +18,7 @@ Clusters can be created and deleted.
 
 import collections
 import dataclasses
+import functools
 import gzip
 import json
 import logging
@@ -772,6 +773,14 @@ class AwsDpbEmrServerless(
         logging.warning('Timeout exceeded for retrieving usage metrics.')
     return self._job_run.ComputeJobRunCost()
 
+  def _CalculateJobRunCosts(
+      self, job_run: _AwsDpbEmrServerlessJobRun
+  ) -> dpb_service.JobCosts:
+    """Calculates the costs of a job run, making it the last job run."""
+    # CalculateLastJobCosts waits for the usage metrics of the last job run.
+    self._job_run = job_run
+    return self.CalculateLastJobCosts()
+
   def GetJobProperties(self) -> Dict[str, str]:
     result = {'spark.dynamicAllocation.enabled': 'FALSE'}
     if self.spec.emr_serverless_core_count:
@@ -879,6 +888,9 @@ class AwsDpbEmrServerless(
           fetch_output_fn=lambda: (
               self._FetchLogs(job_run.application_id, job_run.job_run_id),  # pyrefly: ignore[bad-argument-type]
               None,
+          ),
+          fetch_costs_fn=functools.partial(
+              self._CalculateJobRunCosts, self._job_run
           ),
       )
 

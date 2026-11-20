@@ -200,7 +200,7 @@ class AwsDpbEmrTestCase(pkb_common_test_case.PkbCommonTestCase):
             0,
         ),
     ]
-    emr_serverless.SubmitJob(
+    job_result = emr_serverless.SubmitJob(
         pyspark_file='s3://test/hello.py',
         job_type=dpb_constants.PYSPARK_JOB_TYPE,
     )
@@ -220,6 +220,7 @@ class AwsDpbEmrTestCase(pkb_common_test_case.PkbCommonTestCase):
         storage_unit_name='GB*hr',
     )
     self.assertEqual(emr_serverless.CalculateLastJobCosts(), expected_costs)
+    self.assertEqual(job_result.FetchCosts(), expected_costs)
 
   def testEmrServerlessPricesSchema(self):
     # Checking schema of EMR_SERVERLESS_PRICES
