@@ -14,6 +14,8 @@
 """Tests for perfkitbenchmarker.providers.gcp.gcp_bigtable."""
 
 import inspect
+import json
+import os
 import unittest
 from unittest import mock
 
@@ -415,6 +417,184 @@ class GcpBigtableTestCase(pkb_common_test_case.PkbCommonTestCase):
 
     # Assert
     self.assertEqual(expected_qps, actual_qps)
+
+  @flagsaver.flagsaver
+  def testGetClustersDescriptionDefaultEndpointDoesNotOverrideEnv(self):
+    mock_issue = self.enter_context(
+        mock.patch.object(
+            vm_util,
+            'IssueCommand',
+            return_value=('[]', '', 0),
+            autospec=True,
+            spec_set=True,
+        )
+    )
+
+    clusters = gcp_bigtable.GetClustersDescription(NAME, PROJECT)
+
+    self.assertEmpty(clusters)
+    _, issue_kwargs = mock_issue.call_args
+    self.assertNotIn('env', issue_kwargs)
+
+  @parameterized.named_parameters(
+      dict(
+          testcase_name='BareHostname',
+          admin_endpoint='test-bigtableadmin.googleapis.com',
+          expected_url='https://test-bigtableadmin.googleapis.com/',
+      ),
+      dict(
+          testcase_name='HttpsWithoutTrailingSlash',
+          admin_endpoint='https://test-bigtableadmin.googleapis.com',
+          expected_url='https://test-bigtableadmin.googleapis.com/',
+      ),
+      dict(
+          testcase_name='HttpsWithTrailingSlash',
+          admin_endpoint='https://test-bigtableadmin.googleapis.com/',
+          expected_url='https://test-bigtableadmin.googleapis.com/',
+      ),
+      dict(
+          testcase_name='HttpLocalhost',
+          admin_endpoint='http://localhost:8086',
+          expected_url='http://localhost:8086/',
+      ),
+  )
+  def testGetClustersDescriptionPropagatesNormalizedAdminEndpoint(
+      self, admin_endpoint, expected_url
+  ):
+    clusters_output = [
+        {
+            'defaultStorageType': 'SSD',
+            'location': f'projects/{PROJECT}/locations/us-west1-a',
+            'name': (
+                f'projects/{PROJECT}/instances/{NAME}/clusters/{NAME}-0'
+            ),
+            'serveNodes': 3,
+            'state': 'READY',
+        },
+        {
+            'defaultStorageType': 'SSD',
+            'location': f'projects/{PROJECT}/locations/us-west1-b',
+            'name': (
+                f'projects/{PROJECT}/instances/other_instance/'
+                'clusters/other_instance-0'
+            ),
+            'serveNodes': 5,
+            'state': 'READY',
+        },
+    ]
+    self.enter_context(
+        mock.patch.dict(
+            os.environ, {'EXISTING_TEST_ENV': 'existing_value'}, clear=False
+        )
+    )
+    mock_issue = self.enter_context(
+        mock.patch.object(
+            vm_util,
+            'IssueCommand',
+            return_value=(json.dumps(clusters_output), '', 0),
+            autospec=True,
+            spec_set=True,
+        )
+    )
+
+    with flagsaver.as_parsed(google_bigtable_admin_endpoint=admin_endpoint):
+      clusters = gcp_bigtable.GetClustersDescription(NAME, PROJECT)
+
+    self.assertNotIn(
+        'CLOUDSDK_API_ENDPOINT_OVERRIDES_BIGTABLEADMIN', os.environ
+    )
+    self.assertEqual(
+        clusters,
+        [{
+            'defaultStorageType': 'SSD',
+            'location': f'projects/{PROJECT}/locations/us-west1-a',
+            'name': f'{NAME}-0',
+            'serveNodes': 3,
+            'state': 'READY',
+            'zone': 'us-west1-a',
+        }],
+    )
+    cmd_args, issue_kwargs = mock_issue.call_args
+    self.assertContainsSubsequence(
+        cmd_args[0], ['bigtable', 'clusters', 'list']
+    )
+    self.assertNotIn('--zone', cmd_args[0])
+    self.assertEqual(
+        issue_kwargs['env']['CLOUDSDK_API_ENDPOINT_OVERRIDES_BIGTABLEADMIN'],
+        expected_url,
+    )
+    self.assertEqual(
+        issue_kwargs['env']['EXISTING_TEST_ENV'], 'existing_value'
+    )
+
+  @flagsaver.as_parsed(
+      run_uri='test_uri',
+      google_bigtable_zone=ZONE,
+      project=PROJECT,
+      google_bigtable_admin_endpoint='test-bigtableadmin.googleapis.com',
+  )
+  def testCreateUpdatesLabelsUsingCustomAdminEndpoint(self):
+    expected_name = 'pkb-bigtable-test_uri'
+    instance = GetTestBigtableInstance(spec=_TEST_BENCHMARK_SPEC_MINIMAL)
+    ready_json = VALID_JSON_BASE.format(project=PROJECT, name=expected_name)
+    mock_issue = self.enter_context(
+        mock.patch.object(
+            vm_util,
+            'IssueCommand',
+            side_effect=[
+                ('', '', 0),
+                ('{"labels": {}}', '', 0),
+                (ready_json, '', 0),
+            ],
+            autospec=True,
+            spec_set=True,
+        )
+    )
+    self.enter_context(
+        mock.patch.object(
+            util,
+            'GetDefaultTags',
+            return_value={'benchmark': 'test_benchmark'},
+            autospec=True,
+            spec_set=True,
+        )
+    )
+    self.enter_context(
+        mock.patch.object(
+            util,
+            'GetAccessToken',
+            return_value='test_token',
+            autospec=True,
+            spec_set=True,
+        )
+    )
+    response = requests.Response()
+    response.status_code = 200
+    mock_request = self.enter_context(
+        mock.patch.object(
+            requests,
+            'patch',
+            return_value=response,
+            autospec=True,
+            spec_set=True,
+        )
+    )
+
+    instance.Create()
+
+    self.assertLen(mock_issue.call_args_list, 3)
+    for _, call_kwargs in mock_issue.call_args_list:
+      self.assertEqual(
+          call_kwargs['env']['CLOUDSDK_API_ENDPOINT_OVERRIDES_BIGTABLEADMIN'],
+          'https://test-bigtableadmin.googleapis.com/',
+      )
+    mock_request.assert_called_once_with(
+        f'https://test-bigtableadmin.googleapis.com/v2/projects/{PROJECT}'
+        f'/instances/{expected_name}',
+        headers={'Authorization': 'Bearer test_token'},
+        params={'updateMask': 'labels'},
+        json={'labels': {'benchmark': 'test_benchmark'}},
+    )
 
 
 if __name__ == '__main__':

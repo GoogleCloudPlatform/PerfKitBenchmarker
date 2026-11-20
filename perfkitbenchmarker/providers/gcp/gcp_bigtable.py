@@ -19,6 +19,7 @@ Clusters can be created and deleted.
 import datetime
 import json
 import logging
+import os
 import time
 from typing import Any, Dict, List
 
@@ -34,6 +35,8 @@ import requests
 
 FLAGS = flags.FLAGS
 
+_DEFAULT_ADMIN_ENDPOINT = 'bigtableadmin.googleapis.com'
+
 ENDPOINT = flags.DEFINE_string(
     'google_bigtable_endpoint',
     'bigtable.googleapis.com',
@@ -41,7 +44,7 @@ ENDPOINT = flags.DEFINE_string(
 )
 ADMIN_ENDPOINT = flags.DEFINE_string(
     'google_bigtable_admin_endpoint',
-    'bigtableadmin.googleapis.com',
+    _DEFAULT_ADMIN_ENDPOINT,
     'Google API endpoint for Cloud Bigtable table administration.',
 )
 flags.DEFINE_string(
@@ -415,7 +418,7 @@ class GcpBigtableInstance(non_relational_db.BaseNonRelationalDb):
     """Updates the labels of the current instance."""
     header = {'Authorization': f'Bearer {util.GetAccessToken()}'}
     url = (
-        f'https://{ADMIN_ENDPOINT.value}/v2/'
+        f'{_GetAdminEndpointUrl()}v2/'
         f'projects/{self.project}/instances/{self.name}'
     )
     # Keep any existing labels
@@ -626,9 +629,43 @@ class GcpBigtableInstance(non_relational_db.BaseNonRelationalDb):
     return int(sum(result) * self.node_count)
 
 
+def _GetAdminEndpointUrl() -> str:
+  """Returns the normalized Bigtable Admin API URL with trailing slash."""
+  endpoint = ADMIN_ENDPOINT.value
+  if not endpoint.startswith(('http://', 'https://')):
+    endpoint = f'https://{endpoint}'
+  if not endpoint.endswith('/'):
+    endpoint = f'{endpoint}/'
+  return endpoint
+
+
+class _BigtableGcloudCommand(util.GcloudCommand):
+  """`GcloudCommand` that honors `--google_bigtable_admin_endpoint`."""
+
+  def _WithAdminEndpointEnv(self, kwargs: dict[str, Any]) -> dict[str, Any]:
+    if ADMIN_ENDPOINT.value != _DEFAULT_ADMIN_ENDPOINT:
+      kwargs = dict(kwargs)
+      kwargs['env'] = {
+          **os.environ,
+          **(kwargs.get('env') or {}),
+          'CLOUDSDK_API_ENDPOINT_OVERRIDES_BIGTABLEADMIN': (
+              _GetAdminEndpointUrl()
+          ),
+      }
+    return kwargs
+
+  def Issue(self, **kwargs: Any) -> tuple[str, str, int]:
+    """See base class."""
+    return super().Issue(**self._WithAdminEndpointEnv(kwargs))
+
+  def IssueRetryable(self, **kwargs: Any) -> tuple[str, str]:
+    """See base class."""
+    return super().IssueRetryable(**self._WithAdminEndpointEnv(kwargs))
+
+
 def _GetBigtableGcloudCommand(instance, *args) -> util.GcloudCommand:
   """Returns gcloud bigtable commmand without the zone argument."""
-  cmd = util.GcloudCommand(instance, *args)
+  cmd = _BigtableGcloudCommand(instance, *args)
   # The zone flag makes this command fail.
   cmd.flags['zone'] = []
   return cmd
@@ -647,7 +684,7 @@ def GetClustersDescription(instance_name, project):
   Returns:
     A list of cluster descriptions dicts.
   """
-  cmd = util.GcloudCommand(None, 'bigtable', 'clusters', 'list')
+  cmd = _GetBigtableGcloudCommand(None, 'bigtable', 'clusters', 'list')
   cmd.flags['instances'] = instance_name
   cmd.flags['project'] = project
   stdout, stderr, retcode = cmd.Issue(raise_on_failure=False)

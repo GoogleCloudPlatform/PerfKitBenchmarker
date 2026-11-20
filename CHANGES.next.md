@@ -771,3 +771,5 @@
     `Run()` without wiping preloaded data, and fix integer parsing for
     `--cassandra_stress_threads` and `0` (unthrottled) handling for
     `--cassandra_compaction_throughput_mb`.
+-   Propagate `--google_bigtable_admin_endpoint` across all `gcloud bigtable`
+    commands.
