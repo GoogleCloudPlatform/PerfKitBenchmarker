@@ -690,6 +690,121 @@ class TestGceNetwork(BaseGceNetworkTest):
         ' '.join(create_network_cmd), 'compute networks create .*--mtu 1500'
     )
 
+  def testSubnetCreatePrivateIpv6Access(self):
+    for enable_ipv6 in (False, True):
+      with self.subTest(enable_ipv6=enable_ipv6):
+        with (
+            flagsaver.flagsaver(
+                gce_network_type='custom',
+                gce_enable_private_ipv6_access=enable_ipv6,
+            ),
+            mock.patch.object(
+                vm_util, 'IssueCommand', return_value=('', '', 0)
+            ) as mock_issue,
+        ):
+          subnet = gce_network.GceSubnetResource(
+              'test-subnet',
+              'test-network',
+              'us-central1',
+              '10.128.0.0/20',
+              'test-project',
+          )
+          subnet._Create()
+        cmd_str = ' '.join(mock_issue.call_args_list[0][0][0])
+        if enable_ipv6:
+          self.assertIn('--stack-type IPV4_IPV6', cmd_str)
+          self.assertIn('--ipv6-access-type INTERNAL', cmd_str)
+          self.assertIn('--enable-private-ip-google-access', cmd_str)
+          self.assertIn(
+              '--private-ipv6-google-access-type enable-bidirectional-access',
+              cmd_str,
+          )
+        else:
+          self.assertNotIn('--stack-type', cmd_str)
+          self.assertNotIn('--ipv6-access-type', cmd_str)
+          self.assertNotIn('--enable-private-ip-google-access', cmd_str)
+          self.assertNotIn('--private-ipv6-google-access-type', cmd_str)
+
+  @flagsaver.flagsaver(
+      gce_network_type='auto', gce_enable_private_ipv6_access=True
+  )
+  @mock.patch.object(vm_util, 'IssueCommand', return_value=('', '', 0))
+  def testNetworkCreateWithPrivateIpv6AccessSwitchesAutoToCustom(
+      self, mock_issue
+  ):
+    vm = gce_virtual_machine.GceVmSpec(
+        'test_component',
+        project='abc',
+        zone='us-central1-a',
+        cidr=None,
+    )
+    net = gce_network.GceNetwork.GetNetwork(vm)
+    net.Create()
+    cmds = [' '.join(call[0][0]) for call in mock_issue.call_args_list]
+    self.assertTrue(
+        any(
+            'compute networks create' in c
+            and '--subnet-mode custom' in c
+            and '--enable-ula-internal-ipv6' in c
+            for c in cmds
+        ),
+        f'Expected custom ULA IPv6 network creation in {cmds}',
+    )
+    self.assertTrue(
+        any(
+            'compute networks subnets create' in c
+            and '--private-ipv6-google-access-type enable-bidirectional-access'
+            in c
+            for c in cmds
+        ),
+        f'Expected dual-stack subnet creation in {cmds}',
+    )
+
+  @flagsaver.flagsaver(
+      gce_network_type='legacy', gce_enable_private_ipv6_access=True
+  )
+  def testNetworkWithPrivateIpv6AccessRejectsLegacyMode(self):
+    vm = gce_virtual_machine.GceVmSpec(
+        'test_component',
+        project='abc',
+        zone='us-central1-a',
+        cidr=None,
+    )
+    with self.assertRaises(errors.Config.InvalidValue):
+      gce_network.GceNetwork.GetNetwork(vm)
+
+  @flagsaver.flagsaver(gce_enable_private_ipv6_access=True)
+  @mock.patch.object(
+      gce_virtual_machine.GceVirtualMachine,
+      '_WaitUntilRunning',
+      return_value=None,
+  )
+  def testVmCreateCommandAndMetadataWithPrivateIpv6Access(self, _):
+    vm_spec = gce_virtual_machine.GceVmSpec(
+        'test_component',
+        project='abc',
+        zone='us-central1-a',
+        machine_type='n2-standard-4',
+    )
+    vm = gce_virtual_machine.Ubuntu2204BasedGceVirtualMachine(vm_spec)
+    cmd = vm._GenerateCreateCommand('/tmp/ssh_key')
+    ni_idx = cmd.additional_flags.index('--network-interface')
+    ni_val = cmd.additional_flags[ni_idx + 1]
+    self.assertIn('stack-type=IPV4_IPV6', ni_val)
+    self.assertEqual(ni_val.count('stack-type='), 1)
+    self.assertTrue(
+        vm.GetResourceMetadata().get('gce_enable_private_ipv6_access')
+    )
+
+    with flagsaver.flagsaver(
+        gce_extra_network_interface_options=['stack-type=IPV4_IPV6']
+    ):
+      cmd_dedup = vm._GenerateCreateCommand('/tmp/ssh_key')
+      ni_val_dedup = cmd_dedup.additional_flags[
+          cmd_dedup.additional_flags.index('--network-interface') + 1
+      ]
+      self.assertEqual(ni_val_dedup.count('stack-type='), 1)
+
 
 class GceFirewallRuleTest(pkb_common_test_case.PkbCommonTestCase):
 
