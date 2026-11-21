@@ -33,6 +33,7 @@ CLOUDSTACK = 'CloudStack'
 RACKSPACE = 'Rackspace'
 MESOS = 'Mesos'
 PROFITBRICKS = 'ProfitBricks'
+OCI = 'OCI'
 # Though Docker is not a cloud provider, it's inclusion is useful
 # for performing on premise to cloud benchmarks
 DOCKER = 'Docker'
@@ -51,6 +52,7 @@ PROVIDER_DIRECTORY_NAMES = (
     ALICLOUD,
     MESOS,
     PROFITBRICKS,
+    OCI,
     DOCKER,
 )
 # TODO(user): Remove Kubernetes from VALID_CLOUDS.

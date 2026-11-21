@@ -213,7 +213,7 @@ data and how to upload it to different clouds.
 # Running a Single Benchmark
 
 PerfKit Benchmarker can run benchmarks both on Cloud Providers (GCP, AWS, Azure,
-DigitalOcean) as well as any "machine" you can SSH into.
+DigitalOcean, OCI) as well as any "machine" you can SSH into.
 
 ## Example run on GCP
 
@@ -250,6 +250,13 @@ $ ./pkb.py --cloud=AliCloud --machine_type=ecs.s2.large --benchmarks=iperf
 
 ```bash
 $ ./pkb.py --cloud=DigitalOcean --machine_type=16gb --benchmarks=iperf
+```
+
+## Example run on OCI
+
+```bash
+$ ./pkb.py --cloud=OCI --machine_type=VM.Standard.E5.Flex --oci_ocpus=2 \
+    --zone=us-ashburn-1 --benchmarks=iperf
 ```
 
 ## Example run on OpenStack
@@ -434,6 +441,8 @@ the same values that the corresponding Cloud CLIs take:
 | DigitalOcean | sfo1          | You must use a zone that supports the       |
 :              :               : features 'metadata' (for cloud config) and  :
 :              :               : 'private_networking'.                       :
+| OCI          | us-ashburn-1  | Append -ad-N to pick an availability domain |
+:              :               : (e.g. us-ashburn-1-ad-2).                   :
 | OpenStack    | nova          |                                             |
 | CloudStack   | QC-1          |                                             |
 | Rackspace    | IAD           | OnMetal machine-types are available only in |
