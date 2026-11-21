@@ -1,6 +1,7 @@
 """Methods to run kubectl commands against a cluster."""
 
 import logging
+import shlex
 
 from absl import flags
 from perfkitbenchmarker import errors
@@ -48,6 +49,27 @@ _TIMEOUT_ERRORS = [
     'exceeded its progress deadline',
 ]
 
+# Error messages from `kubectl exec` when the target pod restarts, disappears,
+# or drops the connection. Kept separate from `RETRYABLE_KUBECTL_ERRORS` so
+# `RunKubectlCommand` does not blindly retry NotFound or exit code 137 for
+# unrelated callers.
+POD_DISCONNECTION_ERRORS: tuple[str, ...] = (
+    'error from server (notfound): pods',
+    'container not found',
+    'pod does not exist',
+    'unable to upgrade connection',
+    'command terminated with exit code 137',
+    'connection refused',
+    'unexpected eof',
+    'error: eof',
+)
+
+
+def IsPodDisconnectionError(stderr: str) -> bool:
+  """Returns True if `kubectl exec` failed because the pod disconnected."""
+  lowered = stderr.lower()
+  return any(marker in lowered for marker in POD_DISCONNECTION_ERRORS)
+
 
 def _CheckForQuotaFailure(command: list[str]) -> None:
   """Check for quota failure errors in the stderr of a kubectl command."""
@@ -66,9 +88,19 @@ def _CheckForQuotaFailure(command: list[str]) -> None:
     )
 
 
+def BuildKubectlCommand(command: list[str]) -> list[str]:
+  """Builds a kubectl command with `--kubeconfig` injected when set."""
+  cmd = [flags.FLAGS.kubectl]
+  if flags.FLAGS.kubeconfig:
+    cmd.extend(['--kubeconfig', flags.FLAGS.kubeconfig])
+  cmd.extend(command)
+  return cmd
+
+
 def RunKubectlCommand(
     command: list[str],
     check_for_quota_failure: bool = True,
+    input_file: str | None = None,
     **kwargs,
 ) -> tuple[str, str, int]:
   """Runs a kubectl command.
@@ -77,17 +109,24 @@ def RunKubectlCommand(
     command: The kubectl command to run.
     check_for_quota_failure: Whether to check for quota failures when
       encountering suspect retryable/timeout error messages.
+    input_file: Optional local file path to redirect to kubectl's stdin.
     **kwargs: Keyword arguments to pass to vm_util.IssueCommand.
 
   Returns:
     A tuple of (stdout, stderr, retcode).
   """
   kwargs = vm_util.IncrementStackLevel(**kwargs)
-  cmd = [
-      flags.FLAGS.kubectl,
-      '--kubeconfig',
-      flags.FLAGS.kubeconfig,
-  ] + command
+  if input_file is not None:
+    kubectl_cmd = shlex.join(BuildKubectlCommand(command))
+    cmd = ['bash', '-c', f'{kubectl_cmd} < {shlex.quote(input_file)}']
+  else:
+    # Keep legacy `--kubeconfig` inclusion until callers/tests without a mock
+    # are updated to handle missing `kubectl` when `--kubeconfig` is unset.
+    cmd = [
+        flags.FLAGS.kubectl,
+        '--kubeconfig',
+        flags.FLAGS.kubeconfig,
+    ] + command
 
   orig_suppress_failure = None
   if 'suppress_failure' in kwargs:

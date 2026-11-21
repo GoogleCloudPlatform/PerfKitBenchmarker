@@ -17,10 +17,61 @@ import time
 import unittest
 from unittest import mock
 
+from absl.testing import flagsaver
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.resources.container_service import kubectl
 from perfkitbenchmarker.resources.container_service import kubernetes_commands
 from tests import pkb_common_test_case
+
+
+class KubectlCommandTest(pkb_common_test_case.PkbCommonTestCase):
+
+  @flagsaver.flagsaver(kubectl='/bin/kubectl', kubeconfig='/tmp/kubeconfig')
+  def testBuildKubectlCommandIncludesKubeconfigWhenSet(self):
+    self.assertEqual(
+        kubectl.BuildKubectlCommand(['get', 'pods']),
+        ['/bin/kubectl', '--kubeconfig', '/tmp/kubeconfig', 'get', 'pods'],
+    )
+
+  @flagsaver.flagsaver(kubectl='kubectl', kubeconfig=None)
+  def testBuildKubectlCommandOmitsKubeconfigWhenUnset(self):
+    self.assertEqual(
+        kubectl.BuildKubectlCommand(['get', 'pods']),
+        ['kubectl', 'get', 'pods'],
+    )
+
+  @flagsaver.flagsaver(kubectl='kubectl', kubeconfig='/tmp/kubeconfig')
+  def testRunKubectlCommandInputFileQuotesPathAndDetectsRetryableError(self):
+    def _FakeIssueCommand(cmd, **kwargs):
+      self.assertEqual(
+          cmd,
+          [
+              'bash',
+              '-c',
+              (
+                  'kubectl --kubeconfig /tmp/kubeconfig exec -i pod-0 -- sh'
+                  " < '/tmp/dir with space/pw'\"'\"'s.txt'"
+              ),
+          ],
+      )
+      kwargs['suppress_failure']('', '(abnormal closure): unexpected EOF', 1)
+      return ('', '', 1)
+
+    self.enter_context(
+        mock.patch.object(
+            vm_util,
+            'IssueCommand',
+            autospec=True,
+            side_effect=_FakeIssueCommand,
+        )
+    )
+
+    with self.assertRaises(kubectl.RetryableKubectlError):
+      kubectl.RunKubectlCommand(
+          ['exec', '-i', 'pod-0', '--', 'sh'],
+          input_file="/tmp/dir with space/pw's.txt",
+          check_for_quota_failure=False,
+      )
 
 
 class FindPodByNameSubstringTest(pkb_common_test_case.PkbCommonTestCase):

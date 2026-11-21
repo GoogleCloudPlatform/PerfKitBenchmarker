@@ -1,0 +1,59 @@
+#!/bin/bash
+set -eu
+
+rm -rf "{{ cli_dir }}" "{{ tls_dir }}"
+mkdir -p "{{ cli_dir }}" "{{ tls_dir }}"
+chmod 700 "{{ tls_dir }}"
+
+curl -fsSL "{{ cli_url }}" -o "{{ cli_dir }}/cli.tar.gz"
+tar -xzf "{{ cli_dir }}/cli.tar.gz" -C "{{ cli_dir }}"
+chmod +x "{{ cli_bin }}"
+
+"{{ cli_bin }}" certificates create-ca \
+  --ca-certificate-directory="{{ tls_dir }}" \
+  --ca-private-key-directory="{{ tls_dir }}"
+cp "{{ tls_dir }}/ca.crt" "{{ tls_dir }}/ca-api.crt"
+
+"{{ cli_bin }}" certificates create-server \
+  --ca-certificate-directory="{{ tls_dir }}" \
+  --ca-private-key-directory="{{ tls_dir }}" \
+  --output-directory="{{ tls_dir }}" \
+  --filename-prefix=server \
+  --hostnames="{{ pod_hosts }}"
+
+"{{ cli_bin }}" certificates create-server \
+  --ca-certificate-directory="{{ tls_dir }}" \
+  --ca-private-key-directory="{{ tls_dir }}" \
+  --output-directory="{{ tls_dir }}" \
+  --filename-prefix=api \
+  --hostnames="{{ svc_hosts }},{{ pod_hosts }}"
+
+python3 - << 'EOF'
+import base64
+import json
+import pathlib
+
+tls_dir = pathlib.Path("{{ tls_dir }}")
+tls_data = {
+    name: base64.b64encode((tls_dir / name).read_bytes()).decode("ascii")
+    for name in (
+        "ca.crt",
+        "ca-api.crt",
+        "server.crt",
+        "server.key",
+        "api.crt",
+        "api.key",
+    )
+}
+secret = {
+    "apiVersion": "v1",
+    "kind": "Secret",
+    "metadata": {
+        "name": "{{ tls_secret_name }}",
+        "namespace": "{{ namespace }}",
+    },
+    "type": "Opaque",
+    "data": tls_data,
+}
+pathlib.Path("{{ tls_secrets_file }}").write_text(json.dumps(secret))
+EOF

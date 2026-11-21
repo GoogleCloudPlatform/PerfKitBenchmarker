@@ -636,6 +636,17 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
     )
     self.assertEqual(status, 0)
 
+  def test_IsPodDisconnectionError(self):
+    for err in kubectl.POD_DISCONNECTION_ERRORS:
+      self.assertTrue(
+          kubectl.IsPodDisconnectionError(f'prefix: {err.upper()} suffix'),
+          msg=f'Expected True for error: {err}',
+      )
+    self.assertFalse(
+        kubectl.IsPodDisconnectionError('ERROR: INVALID_ARGUMENT: bad SQL')
+    )
+    self.assertFalse(kubectl.IsPodDisconnectionError(''))
+
   def test_PickleKubernetesCluster(self):
     cluster = container_service_mock.CreateTestKubernetesCluster()
     self.assertIsNotNone(cluster.event_poller)

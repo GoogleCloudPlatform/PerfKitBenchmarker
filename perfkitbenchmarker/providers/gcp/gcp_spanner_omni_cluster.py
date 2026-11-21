@@ -13,15 +13,18 @@
 # limitations under the License.
 """GCP (GKE) implementation of the Spanner Omni cluster resource.
 
-Adds the GCP-specific storage class and `license_uri` validation (a Secret
-Manager secret version or a local file) to `BaseSpannerOmniCluster`.
+Adds the GCP-specific pieces to `BaseSpannerOmniCluster`: the license key from
+Secret Manager (or a local file) and the hyperdisk storage class.
 """
 
+from collections.abc import Sequence
 import os
 import re
+import string
 
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import provider_info
+from perfkitbenchmarker.providers.gcp import util as gcp_util
 from perfkitbenchmarker.resources import spanner_omni_cluster
 from perfkitbenchmarker.resources import spanner_omni_cluster_spec
 
@@ -49,7 +52,43 @@ class GcpSpannerOmniCluster(spanner_omni_cluster.BaseSpannerOmniCluster):
   """Spanner Omni on GKE."""
 
   CLOUD = provider_info.GCP
+  HELM_PLATFORM = 'gke'
   STORAGE_CLASS = 'hyperdisk-balanced-rwo'
+
+  def _GetRegionFromZone(self, zone: str) -> str:
+    return gcp_util.GetRegionFromZone(zone)
+
+  def _BuildZoneShortNames(self, zones: Sequence[str]) -> dict[str, str]:
+    """Maps each GCP zone to a unique 1-letter Helm `shortName`.
+
+    Uses the zone's suffix after its region (e.g. `a` for `us-central1-a`) when
+    it is a single unused lowercase letter; otherwise picks the next free
+    letter.
+
+    Args:
+      zones: Sequence of GCP zone names.
+
+    Returns:
+      Mapping from zone name to its unique 1-letter short name.
+    """
+    zone_short_names: dict[str, str] = {}
+    used_short_names: set[str] = set()
+    for zone in zones:
+      region = self._GetRegionFromZone(zone)
+      suffix = zone.removeprefix(region).lstrip('-')
+      if (
+          len(suffix) == 1
+          and suffix in string.ascii_lowercase
+          and suffix not in used_short_names
+      ):
+        short_name = suffix
+      else:
+        short_name = next(
+            c for c in string.ascii_lowercase if c not in used_short_names
+        )
+      used_short_names.add(short_name)
+      zone_short_names[zone] = short_name
+    return zone_short_names
 
   @classmethod
   def CheckSpecPrerequisites(
@@ -74,3 +113,30 @@ class GcpSpannerOmniCluster(spanner_omni_cluster.BaseSpannerOmniCluster):
           ' secret version (projects/<project>/secrets/<secret>/versions/'
           '<version>) or an existing local file.'
       )
+
+  def _FetchLicenseKeyFile(self) -> str:
+    """Fetches the license key from Secret Manager (or a local file).
+
+    Returns:
+      Path of an owner-only local temp file holding the license key; the caller
+      deletes it.
+
+    Raises:
+      errors.Resource.CreationError: If the Secret Manager access fails.
+    """
+    license_uri = self.spec.license_uri or ''
+    if not _IsSecretManagerVersion(license_uri):
+      return super()._FetchLicenseKeyFile()
+    secret_path = self._NewLicenseTempFile()
+    secret_cmd = gcp_util.GcloudCommand(
+        None, 'secrets', 'versions', 'access', license_uri
+    )
+    secret_cmd.flags['out-file'] = secret_path
+    _, stderr, retcode = secret_cmd.Issue(raise_on_failure=False)
+    if retcode != 0:
+      if os.path.exists(secret_path):
+        os.remove(secret_path)
+      raise errors.Resource.CreationError(
+          f'Failed to fetch Spanner Omni license secret {license_uri}: {stderr}'
+      )
+    return secret_path

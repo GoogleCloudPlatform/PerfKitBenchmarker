@@ -51,7 +51,11 @@ class HelmChart:
     chart_ref: The chart reference: a repo URL, packaged .tgz URL, or local
       path.
     namespace: The Kubernetes namespace to install into.
+    version: Optional chart version (`--version`).
     set_values: Extra --set key=value pairs to pass to `helm upgrade`.
+    set_json_values: Extra --set-json key=json_value pairs to pass to `helm
+      upgrade`.
+    set_files: Extra --set-file key=file_path pairs to pass to `helm upgrade`.
     wait: Whether to pass --wait so the install blocks until resources are
       ready.
     atomic: Whether to pass --atomic so a failed install is rolled back.
@@ -60,7 +64,10 @@ class HelmChart:
   release_name: str
   chart_ref: str
   namespace: str = 'default'
+  version: str | None = None
   set_values: dict[str, str] = dataclasses.field(default_factory=dict)
+  set_json_values: dict[str, str] = dataclasses.field(default_factory=dict)
+  set_files: dict[str, str] = dataclasses.field(default_factory=dict)
   wait: bool = True
   atomic: bool = True
 
@@ -78,6 +85,12 @@ def InstallCharts(charts: list[HelmChart]) -> None:
     ]
     for key, value in chart.set_values.items():
       command.extend(['--set', f'{key}={value}'])
+    for key, value in chart.set_json_values.items():
+      command.extend(['--set-json', f'{key}={value}'])
+    for key, value in chart.set_files.items():
+      command.extend(['--set-file', f'{key}={value}'])
+    if chart.version:
+      command.extend(['--version', chart.version])
     if chart.wait:
       command.append('--wait')
     if chart.atomic:

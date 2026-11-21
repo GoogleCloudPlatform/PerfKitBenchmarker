@@ -12,14 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
+import os
 import unittest
 from unittest import mock
 
 from absl import flags
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import virtual_machine
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import gcp_spanner_omni_cluster
 from perfkitbenchmarker.providers.gcp import google_kubernetes_engine
+from perfkitbenchmarker.providers.gcp import util as gcp_util
 from perfkitbenchmarker.resources import spanner_omni_cluster
 from perfkitbenchmarker.resources import spanner_omni_cluster_spec
 from perfkitbenchmarker.resources.container_service import container
@@ -45,6 +49,25 @@ class GcpSpannerOmniClusterTest(pkb_common_test_case.PkbCommonTestCase):
   def setUp(self):
     super().setUp()
     FLAGS.mark_as_parsed()
+    self.temp_dir = self.create_tempdir().full_path
+    self.enter_context(
+        mock.patch.object(
+            vm_util, 'GetTempDir', autospec=True, return_value=self.temp_dir
+        )
+    )
+    self.mock_gcloud_cmd = mock.create_autospec(
+        gcp_util.GcloudCommand, instance=True, spec_set=False
+    )
+    self.mock_gcloud_cmd.flags = {}
+    self.mock_gcloud_cmd.Issue.return_value = ('', '', 0)
+    self.mock_gcloud = self.enter_context(
+        mock.patch.object(
+            gcp_util,
+            'GcloudCommand',
+            autospec=True,
+            return_value=self.mock_gcloud_cmd,
+        )
+    )
     self.mock_cluster = mock.create_autospec(
         google_kubernetes_engine.BaseGkeCluster, instance=True
     )
@@ -80,12 +103,96 @@ class GcpSpannerOmniClusterTest(pkb_common_test_case.PkbCommonTestCase):
         gcp_spanner_omni_cluster.GcpSpannerOmniClusterSpec,
     )
 
-  def testGcpMetadataUsesHyperdisk(self):
+  def testHelmUsesGkePlatformAndHyperdisk(self):
     cluster = self._NewCluster()
+    cluster.omni_version = '2026.r5'
+
+    chart = cluster._BuildHelmChart('/tmp/license.bin')
+
+    self.assertEqual(chart.set_values['global.platform'], 'gke')
+    self.assertEqual(
+        chart.set_values['dataStorageClass'], 'hyperdisk-balanced-rwo'
+    )
+    self.assertEqual(
+        chart.set_values['logsStorageClass'], 'hyperdisk-balanced-rwo'
+    )
     self.assertEqual(
         cluster.GetResourceMetadata()['omni_storage_class'],
         'hyperdisk-balanced-rwo',
     )
+
+  def testGetRegionFromZoneDelegatesToGcpUtil(self):
+    cluster = self._NewCluster()
+    self.assertEqual(cluster._GetRegionFromZone('us-central1-a'), 'us-central1')
+
+  def testBuildLocationsJsonAssignsUniqueShortNames(self):
+    cluster = self._NewCluster()
+    locations = json.loads(
+        cluster._BuildLocationsJson(
+            ['us-central1-c', 'us-east1-b', 'us-west1-b']
+        )
+    )
+    short_names = []
+    for region in locations:
+      short_names.extend(zone['shortName'] for zone in region['zones'])
+    self.assertEqual(short_names, ['c', 'b', 'a'])
+
+  def testBuildZoneShortNamesHandlesCollisionsAndNonLetterSuffixes(self):
+    cluster = self._NewCluster()
+    self.assertEqual(
+        cluster._BuildZoneShortNames(
+            ['us-central1-a', 'us-east1-b', 'us-west1-a', 'us-central1-2']
+        ),
+        {
+            'us-central1-a': 'a',
+            'us-east1-b': 'b',
+            'us-west1-a': 'c',
+            'us-central1-2': 'd',
+        },
+    )
+
+  def testFetchLicenseKeyFileUsesSecretManagerVersion(self):
+    cluster = self._NewCluster(license_uri=_LICENSE_URI)
+
+    path = cluster._FetchLicenseKeyFile()
+
+    self.assertTrue(
+        path.startswith(
+            os.path.join(self.temp_dir, 'spanner_omni_license.bin.')
+        ),
+        path,
+    )
+    self.assertEqual(os.stat(path).st_mode & 0o777, 0o600)
+    self.mock_gcloud.assert_called_once_with(
+        None, 'secrets', 'versions', 'access', _LICENSE_URI
+    )
+    self.assertEqual(self.mock_gcloud_cmd.flags, {'out-file': path})
+
+  def testFetchLicenseKeyFileCopiesLocalFile(self):
+    license_file = self.create_tempfile(content='license-key')
+
+    path = self._NewCluster(
+        license_uri=license_file.full_path
+    )._FetchLicenseKeyFile()
+
+    with open(path) as f:
+      self.assertEqual(f.read(), 'license-key')
+    self.assertEqual(os.stat(path).st_mode & 0o777, 0o600)
+    self.mock_gcloud.assert_not_called()
+
+  def testFetchLicenseKeyFileRejectsUnsupportedUri(self):
+    with self.assertRaisesRegex(
+        errors.Config.InvalidValue, 'not a supported license location'
+    ):
+      self._NewCluster(license_uri='gs://bucket/license')._FetchLicenseKeyFile()
+
+  def testFetchLicenseKeyFileRaisesOnGcloudFailure(self):
+    self.mock_gcloud_cmd.Issue.return_value = ('', 'PERMISSION_DENIED', 1)
+    with self.assertRaisesRegex(
+        errors.Resource.CreationError, 'Failed to fetch Spanner Omni license'
+    ):
+      self._NewCluster(license_uri=_LICENSE_URI)._FetchLicenseKeyFile()
+    self.assertEqual(os.listdir(self.temp_dir), [])
 
   def testCheckSpecPrerequisitesAcceptsSecretManagerVersion(self):
     gcp_spanner_omni_cluster.GcpSpannerOmniCluster.CheckSpecPrerequisites(
@@ -97,6 +204,7 @@ class GcpSpannerOmniClusterTest(pkb_common_test_case.PkbCommonTestCase):
     gcp_spanner_omni_cluster.GcpSpannerOmniCluster.CheckSpecPrerequisites(
         _Spec(license_uri=license_file.full_path)
     )
+    self.mock_gcloud.assert_not_called()
 
   def testCheckSpecPrerequisitesRequiresLicenseUri(self):
     with self.assertRaisesRegex(
@@ -105,6 +213,7 @@ class GcpSpannerOmniClusterTest(pkb_common_test_case.PkbCommonTestCase):
       gcp_spanner_omni_cluster.GcpSpannerOmniCluster.CheckSpecPrerequisites(
           _Spec()
       )
+    self.mock_gcloud.assert_not_called()
 
   def testCheckSpecPrerequisitesRejectsUnsupportedLicenseUri(self):
     for license_uri in (

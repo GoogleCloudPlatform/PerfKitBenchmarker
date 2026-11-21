@@ -68,7 +68,10 @@ class InstallChartsTest(pkb_common_test_case.PkbCommonTestCase):
             release_name='dynamo-platform',
             chart_ref='oci://example.com/dynamo-platform.tgz',
             namespace='default',
+            version='1.2.3',
             set_values={'grove.enabled': 'true'},
+            set_json_values={'locations': '[{"name":"us-central1"}]'},
+            set_files={'licenseKey': '/tmp/license.bin'},
             wait=False,
             atomic=False,
         ),
@@ -103,6 +106,12 @@ class InstallChartsTest(pkb_common_test_case.PkbCommonTestCase):
             'default',
             '--set',
             'grove.enabled=true',
+            '--set-json',
+            'locations=[{"name":"us-central1"}]',
+            '--set-file',
+            'licenseKey=/tmp/license.bin',
+            '--version',
+            '1.2.3',
         ],
     )
 

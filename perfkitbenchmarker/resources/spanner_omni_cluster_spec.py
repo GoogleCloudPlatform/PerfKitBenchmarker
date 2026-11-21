@@ -52,7 +52,9 @@ CHART_VERSION = flags.DEFINE_string(
 OMNI_VERSION = flags.DEFINE_string(
     'spanner_omni_version',
     None,
-    'Optional Spanner Omni release version tag for the CLI and Helm image.tag.',
+    'Optional Spanner Omni release version tag for the CLI and Helm image.tag.'
+    ' Defaults to None (dynamically resolves the latest release from'
+    ' gs://spanner-omni).',
 )
 DEFAULT_REPLICAS_PER_ZONE: int = 3
 REPLICAS_PER_ZONE = flags.DEFINE_integer(
