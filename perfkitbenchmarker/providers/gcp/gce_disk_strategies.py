@@ -56,6 +56,13 @@ def GetCreateDiskStrategy(
       # HdML behaves more like a non-resource disk.
       return GCECreateNonResourceDiskStrategy(vm, disk_spec, disk_count)
     if disk_spec.disk_type in gce_disk.GCE_REMOTE_DISK_TYPES:
+      if (
+          getattr(disk_spec, 'num_local_ssds', 0) > 0
+          or getattr(vm, 'max_local_disks', 0) > 0
+          or getattr(vm, 'machine_type', None)
+          in gce_disk.FIXED_SSD_MACHINE_TYPES
+      ):
+        return CreateHybridPdAndLssdDiskStrategy(vm, disk_spec, disk_count)
       return CreatePDDiskStrategy(vm, disk_spec, disk_count)
     elif disk_spec.disk_type == disk.LOCAL:
       return CreateLSSDDiskStrategy(vm, disk_spec, disk_count)
@@ -85,12 +92,16 @@ class CreatePDDiskStrategy(GCPCreateDiskStrategy):
             disk_spec.multi_writer_mode,
             i,
         )
+        custom_device_name = getattr(disk_spec, 'device_name', None)
+        if custom_device_name and disk_spec.num_striped_disks > 1:
+          custom_device_name = f'{custom_device_name}-{i}'
         data_disk = gce_disk.GceDisk(
             disk_spec,
             name,
             vm.zone,
             vm.project,
             replica_zones=disk_spec.replica_zones,  # pyrefly: ignore[missing-attribute]
+            device_name=custom_device_name,
         )
         if gce_disk.PdDriveIsNvme(vm):
           data_disk.interface = gce_disk.NVME
@@ -102,8 +113,13 @@ class CreatePDDiskStrategy(GCPCreateDiskStrategy):
 
   def DiskCreatedOnVMCreation(self) -> bool:
     """Returns whether the disk is created on VM creation."""
-    if self.disk_spec.replica_zones or self.disk_spec.multi_writer_mode:
-      # GCE regional disks cannot use create-on-create.
+    if (
+        self.disk_spec.replica_zones
+        or self.disk_spec.multi_writer_mode
+        or getattr(self.disk_spec, 'physical_block_size', None)
+    ):
+      # GCE regional disks and custom physical-block-size disks cannot use
+      # create-on-create.
       return False
     return self.disk_spec.create_with_vm
 
@@ -146,6 +162,33 @@ class CreatePDDiskStrategy(GCPCreateDiskStrategy):
     elif self.setup_disk_strategy is None:
       self.setup_disk_strategy = SetUpPDDiskStrategy(self.vm, self.disk_specs)  # pyrefly: ignore[bad-argument-type]
     return self.setup_disk_strategy
+
+
+class CreateHybridPdAndLssdDiskStrategy(CreatePDDiskStrategy):
+  """Creates both remote PD/Hyperdisk and local NVMe SSDs on a GCE VM."""
+
+  def __init__(self, vm: Any, disk_spec: disk.BaseDiskSpec, disk_count: int):
+    super().__init__(vm, disk_spec, disk_count)
+    spec_local_ssds = getattr(disk_spec, 'num_local_ssds', 0)
+    machine_type = getattr(vm, 'machine_type', '') or ''
+    fixed_local_ssds = gce_disk.FIXED_SSD_MACHINE_TYPES.get(machine_type, 0)
+    self.local_ssd_count = (
+        spec_local_ssds or getattr(vm, 'max_local_disks', 0) or fixed_local_ssds
+    )
+    vm.max_local_disks = self.local_ssd_count
+    if not getattr(vm, 'ssd_interface', None):
+      vm.ssd_interface = gce_disk.NVME
+
+  def GetCreationCommand(self) -> dict[str, Any]:
+    dic = super().GetCreationCommand()
+    if self.local_ssd_count > 0 and (
+        getattr(self.vm, 'machine_type', None) is None
+        or self.vm.machine_type not in gce_disk.FIXED_SSD_MACHINE_TYPES
+    ):
+      dic['local-ssd'] = [
+          f'interface={self.vm.ssd_interface}'
+      ] * self.local_ssd_count
+    return dic
 
 
 class CreateLSSDDiskStrategy(GCPCreateDiskStrategy):
