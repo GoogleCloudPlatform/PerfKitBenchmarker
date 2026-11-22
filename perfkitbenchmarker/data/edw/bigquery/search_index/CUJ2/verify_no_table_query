@@ -1,0 +1,4 @@
+-- TODO: Remove hardcoded table name
+SELECT *
+FROM INFORMATION_SCHEMA.TABLES
+WHERE TABLE_NAME = 'prototype_CUJ2_benchmark_100GB_and_growing';
