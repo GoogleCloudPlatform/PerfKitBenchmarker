@@ -164,6 +164,27 @@ class GceVmSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(result.cpus, 1)
     self.assertEqual(result.memory, 7680)
 
+  def testDefaultBootDiskTypeGen3Plus(self):
+    # Gen 3 machine should default to hyperdisk-balanced
+    result = gce_virtual_machine.GceVmSpec(
+        _COMPONENT, machine_type='c3-standard-4'
+    )
+    self.assertEqual(result.boot_disk_type, 'hyperdisk-balanced')
+
+  def testDefaultBootDiskTypeGen2(self):
+    # Gen 2 machine should NOT default to hyperdisk-balanced (remains None)
+    result = gce_virtual_machine.GceVmSpec(
+        _COMPONENT, machine_type='n2-standard-2'
+    )
+    self.assertIsNone(result.boot_disk_type)
+
+  def testExplicitBootDiskTypeGen3Plus(self):
+    # Explicit boot_disk_type should be preserved
+    result = gce_virtual_machine.GceVmSpec(
+        _COMPONENT, machine_type='c3-standard-4', boot_disk_type='pd-ssd'
+    )
+    self.assertEqual(result.boot_disk_type, 'pd-ssd')
+
 
 class GceVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
 
