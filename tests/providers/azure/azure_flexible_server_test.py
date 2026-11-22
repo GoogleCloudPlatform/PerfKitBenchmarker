@@ -196,7 +196,7 @@ class AzureFlexibleServerCreateTestCase(pkb_common_test_case.PkbCommonTestCase):
     with self.subTest(name='StorageType'):
       self.assertIn('--storage-type Premium_LRS', cmd)
     with self.subTest(name='Iops'):
-      self.assertIn('--iops 1000', cmd)
+      self.assertNotIn('--iops', cmd)
     with self.subTest(name='Metadata'):
       self.assertEqual(metadata['disk_type'], 'Premium_LRS')
 
@@ -414,6 +414,78 @@ class AzureFlexibleServerPremiumV2CreateTestCase(
 
     with self.assertRaises(errors.Resource.CreationError):
       bm_spec.relational_db._Create()  # pyrefly: ignore[missing-attribute]
+
+  def testCreatePostgresPremiumV2Fallback(self):
+    mock_cmd = self.MockIssueCommand({
+        'rest --method PUT': [(
+            '',
+            "'Azure-AsyncOperation': 'https://management.azure.com/async_op'",
+            0,
+        )],
+        'rest --method GET': [(
+            '{"status": "Failed", "error": {"code": "ServerDropping"}}',
+            '',
+            0,
+        )],
+        'postgres flexible-server delete': [('', '', 0)],
+        'postgres flexible-server create': [('', '', 0)],
+    })
+    yaml_spec = inspect.cleandoc(f"""
+        sysbench:
+          relational_db:
+            cloud: {provider_info.AZURE}
+            engine: {sql_engine_utils.FLEXIBLE_SERVER_POSTGRES}
+            engine_version: '13'
+            db_tier: GeneralPurpose
+            db_spec:
+              {provider_info.AZURE}:
+                machine_type: Standard_D2ds_v4
+                zone: eastus
+            db_disk_spec:
+              {provider_info.AZURE}:
+                disk_size: 128
+                disk_type: PremiumV2_LRS
+                provisioned_iops: 1000
+                provisioned_throughput: 200
+            vm_groups:
+              clients:
+                vm_spec: *default_dual_core
+                disk_spec: *default_500_gb
+    """)
+    bm_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
+        yaml_spec, 'sysbench'
+    )
+    bm_spec.ConstructRelationalDb()
+    db = bm_spec.relational_db
+    db.resource_group.name = 'az_resource'
+
+    db._Create()
+
+    self.assertEqual(mock_cmd.func_to_mock.call_count, 4)
+    put_call, get_call, delete_call, create_call = (
+        mock_cmd.func_to_mock.call_args_list
+    )
+
+    put_cmd = ' '.join(put_call[0][0])
+    self.assertIn('rest --method PUT', put_cmd)
+    self.assertIn('PremiumV2_LRS', put_cmd)
+
+    get_cmd = ' '.join(get_call[0][0])
+    self.assertIn('rest --method GET', get_cmd)
+
+    delete_cmd = ' '.join(delete_call[0][0])
+    self.assertIn('postgres flexible-server delete', delete_cmd)
+    self.assertIn('--name pkb-db-instance-test_run_uri', delete_cmd)
+
+    create_cmd = ' '.join(create_call[0][0])
+    self.assertIn('postgres flexible-server create', create_cmd)
+    self.assertIn('--name pkb-db-instance-test_run_uri-fb', create_cmd)
+    self.assertIn('--storage-type Premium_LRS', create_cmd)
+    self.assertNotIn('--iops', create_cmd)
+    self.assertNotIn('--throughput', create_cmd)
+
+    self.assertEqual(db.instance_id, 'pkb-db-instance-test_run_uri-fb')
+    self.assertEqual(db.storage_type, 'Premium_LRS')
 
 
 if __name__ == '__main__':
