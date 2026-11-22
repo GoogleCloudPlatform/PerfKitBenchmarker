@@ -1,0 +1,7 @@
+# Transparent Hugepages configuration
+# THP=always can reduce TLB misses for memory-intensive workloads
+# Default is 'madvise' (only MADV_HUGEPAGE regions)
+# Risk: may increase memory usage and cause latency spikes during compaction
+linuxConfig:
+  transparentHugepageEnabled: TRANSPARENT_HUGEPAGE_ENABLED_ALWAYS
+  transparentHugepageDefrag: TRANSPARENT_HUGEPAGE_DEFRAG_DEFER
