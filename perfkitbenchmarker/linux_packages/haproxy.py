@@ -1,0 +1,116 @@
+# Copyright 2024 PerfKitBenchmarker Authors. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+"""Module containing HAProxy installation and configuration for Redis HA."""
+
+from absl import flags
+from perfkitbenchmarker import errors
+from perfkitbenchmarker import vm_util
+
+FLAGS = flags.FLAGS
+
+HAPROXY_CONFIG = '/etc/haproxy/haproxy.cfg'
+
+
+def Install(vm):
+  """Installs HAProxy on the VM."""
+  vm.RemoteCommand('sudo apt-get update', ignore_failure=True)
+  vm.RemoteCommand('sudo apt-get install -y haproxy')
+
+  # Verify installation
+  vm.RemoteCommand('haproxy -v')
+
+
+def Configure(vm, primary_ip, replica_ip):
+  """Configures HAProxy to proxy Redis traffic to primary and replica."""
+  config_content = f"""
+global
+    log /dev/log local0
+    log /dev/log local1 notice
+    chroot /var/lib/haproxy
+    stats socket /run/haproxy/admin.sock mode 660 level admin
+    stats timeout 30s
+    user haproxy
+    group haproxy
+    daemon
+
+defaults
+    log global
+    mode tcp
+    option tcplog
+    timeout connect 5000
+    timeout client  50000
+    timeout server  50000
+
+# Frontend for writes (port 6379) -> Primary
+frontend redis_write
+    bind *:6379
+    default_backend redis_primary
+
+# Backend for Primary
+backend redis_primary
+    mode tcp
+    server primary {primary_ip}:6379 check
+
+# Frontend for reads (port 6380) -> Replica
+frontend redis_read
+    bind *:6380
+    default_backend redis_replica
+
+# Backend for Replica
+backend redis_replica
+    mode tcp
+    server replica {replica_ip}:6379 check
+"""
+
+  # Write config to file
+  vm.RemoteCommand(f'echo "{config_content}" | sudo tee {HAPROXY_CONFIG}')
+
+
+@vm_util.Retry(poll_interval=2, timeout=30)
+def _WaitForHAProxyUp(vm):
+  """Waits until HAProxy is running and listening on its ports."""
+  haproxy_check = vm.RemoteCommand('pgrep -f haproxy', ignore_failure=True)[0]
+  if not haproxy_check:
+    raise errors.Resource.RetryableCreationError(
+        'HAProxy process not found yet.'
+    )
+
+  # Check if HAProxy is listening on ports 6379 and 6380
+  vm.RemoteCommand('echo "=== Checking HAProxy ports ==="')
+  vm.RemoteCommand(
+      'sudo netstat -tlnp | grep haproxy || ss -tlnp | grep haproxy',
+      ignore_failure=True,
+  )
+
+  # Verify ports are reachable via netcat
+  _, _, rc_6379 = vm.RemoteCommandWithReturnCode(
+      'nc -zv localhost 6379', ignore_failure=True
+  )
+  _, _, rc_6380 = vm.RemoteCommandWithReturnCode(
+      'nc -zv localhost 6380', ignore_failure=True
+  )
+
+  if rc_6379 != 0 or rc_6380 != 0:
+    raise errors.Resource.RetryableCreationError(
+        'HAProxy ports not reachable yet.'
+    )
+
+
+def Start(vm):
+  """Starts HAProxy as a background process."""
+  # Start HAProxy directly (not via systemctl - doesn't exist in containers)
+  vm.RemoteCommand('sudo haproxy -f /etc/haproxy/haproxy.cfg -D')
+
+  _WaitForHAProxyUp(vm)
+  vm.RemoteCommand('echo "=== HAProxy started successfully ==="')
