@@ -7,6 +7,8 @@
 
 ### New features:
 
+-   Add `--gce_max_run_duration` and `--gce_instance_termination_action` so
+    GCE deletes or stops a VM after a fixed lifetime even if PKB exits.
 -   Add FairSeq Roberta Masked Multilingual LM benchmark for linux.
 -   Add bulk delete API operation to object storage API scripts.
 -   Catch preemptible instance's interrupt event.
