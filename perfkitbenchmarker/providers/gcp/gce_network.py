@@ -881,6 +881,16 @@ class GceSubnetResource(resource.BaseResource):
     cmd.flags['network'] = self.network_name
     cmd.flags['region'] = self.region
     cmd.flags['range'] = self.addr_range
+    if (
+        gcp_flags.GCE_ENABLE_PRIVATE_IPV6_ACCESS.value
+        or gcp_flags.GCE_SUBNET_ENABLE_PRIVATE_IPV6.value
+    ):
+      cmd.flags['stack-type'] = 'IPV4_IPV6'
+      cmd.flags['ipv6-access-type'] = 'INTERNAL'
+      cmd.flags['enable-private-ip-google-access'] = True
+      cmd.flags['private-ipv6-google-access-type'] = (
+          'enable-bidirectional-access'
+      )
     cmd.Issue()
 
   def _Exists(self) -> bool:
