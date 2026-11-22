@@ -377,6 +377,47 @@ class AzureFlexibleServerPremiumV2CreateTestCase(
     with self.assertRaises(errors.Resource.CreationError):
       bm_spec.relational_db._Create()  # pyrefly: ignore[missing-attribute]
 
+  def testCreatePostgresPremiumV2ServerDroppingFails(self):
+    self.MockIssueCommand({
+        'rest --method PUT': [(
+            '',
+            "'Azure-AsyncOperation': 'https://management.azure.com/async_op'",
+            0,
+        )],
+        'rest --method GET': [(
+            '{"status": "Failed", "error": {"code": "ServerDropping"}}',
+            '',
+            0,
+        )],
+    })
+    yaml_spec = inspect.cleandoc(f"""
+        sysbench:
+          relational_db:
+            cloud: {provider_info.AZURE}
+            engine: {sql_engine_utils.FLEXIBLE_SERVER_POSTGRES}
+            engine_version: '13'
+            db_tier: GeneralPurpose
+            db_spec:
+              {provider_info.AZURE}:
+                machine_type: Standard_D2ds_v4
+                zone: eastus
+            db_disk_spec:
+              {provider_info.AZURE}:
+                disk_size: 128
+                disk_type: PremiumV2_LRS
+            vm_groups:
+              clients:
+                vm_spec: *default_dual_core
+                disk_spec: *default_500_gb
+    """)
+    bm_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
+        yaml_spec, 'sysbench'
+    )
+    bm_spec.ConstructRelationalDb()
+
+    with self.assertRaises(errors.Resource.RetryableCreationError):
+      bm_spec.relational_db._Create()  # pyrefly: ignore[missing-attribute]
+
   def testCreatePostgresPremiumV2NoAsyncHeader(self):
     self.MockIssueCommand(
         {
