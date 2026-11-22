@@ -1,0 +1,24 @@
+---
+apiVersion: podsnapshot.gke.io/v1
+kind: PodSnapshotStorageConfig
+metadata:
+  name: benchmark-pssc-gcs
+spec:
+  snapshotStorageConfig:
+    gcs:
+      bucket: "{{ bucket_name }}"
+      path: "{{ snapshot_folder }}"
+---
+apiVersion: podsnapshot.gke.io/v1
+kind: PodSnapshotPolicy
+metadata:
+  name: benchmark-psp
+  namespace: {{ ns }}
+spec:
+  storageConfigName: benchmark-pssc-gcs
+  selector:
+    matchLabels:
+      app: snapshot-benchmark-workload
+  triggerConfig:
+    type: manual
+    postCheckpoint: resume
