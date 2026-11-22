@@ -1,0 +1,355 @@
+{% if namespace and namespace != 'default' -%}
+---
+# Namespace for AlloyDB Omni (PostgreSQL-compatible) resources
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ namespace }}
+  labels:
+    pod-security.kubernetes.io/enforce: privileged
+{%- endif %}
+{% if create_storage_class | default(true) -%}
+---
+# Storage class for AlloyDB Omni data
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: {{ storage_class | default('postgres-storage-class') }}
+provisioner: {{ storage_class_provisioner }}
+parameters:
+  type: {{ disk_type }}
+reclaimPolicy: Delete
+allowVolumeExpansion: true
+volumeBindingMode: WaitForFirstConsumer
+{%- endif %}
+---
+# Secret for AlloyDB Omni credentials
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-secret
+  namespace: {{ namespace }}
+type: Opaque
+stringData:
+  POSTGRES_USER: "{{ postgres_user }}"
+  POSTGRES_PASSWORD: "{{ postgres_password }}"
+  POSTGRES_DB: "{{ postgres_database }}"
+---
+# ConfigMap for pg_hba.conf authentication configuration
+# Note: We intentionally do NOT overwrite /etc/postgresql/postgresql.conf so
+# that google/alloydbomni's built-in postgresql.conf (including
+# shared_preload_libraries for google_columnar_engine, google_job_scheduler,
+# google_ml_integration, and google_storage) is preserved. Tuning parameters
+# are applied via postgres -c flags and ALTER SYSTEM SET in init.sql.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-config
+  namespace: {{ namespace }}
+data:
+  pg_hba.conf: |
+    # TYPE  DATABASE        USER            ADDRESS                 METHOD
+    local   all             all                                     trust
+    host    all             all             127.0.0.1/32            trust
+    host    all             all             ::1/128                 trust
+    host    all             all             0.0.0.0/0               scram-sha-256
+    host    all             all             ::/0                    scram-sha-256
+---
+# ConfigMap for init scripts
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init-scripts
+  namespace: {{ namespace }}
+data:
+  init.sql: |
+    -- Grant privileges
+    GRANT ALL PRIVILEGES ON DATABASE {{ postgres_database }} TO {{ postgres_user }};
+
+    -- Persist baseline configuration in postgresql.auto.conf while keeping
+    -- AlloyDB Omni's default shared_preload_libraries intact
+    ALTER SYSTEM SET max_connections = '{{ max_connections }}';
+    ALTER SYSTEM SET shared_buffers = '{{ shared_buffers }}';
+    ALTER SYSTEM SET effective_cache_size = '{{ effective_cache_size }}';
+    ALTER SYSTEM SET maintenance_work_mem = '1GB';
+    ALTER SYSTEM SET work_mem = '{{ work_mem }}';
+    ALTER SYSTEM SET max_worker_processes = '{{ max_worker_processes }}';
+    ALTER SYSTEM SET max_parallel_workers_per_gather = '{{ max_parallel_workers_per_gather }}';
+    ALTER SYSTEM SET max_parallel_workers = '{{ max_parallel_workers }}';
+    ALTER SYSTEM SET wal_buffers = '{{ wal_buffers }}';
+    ALTER SYSTEM SET max_wal_size = '{{ max_wal_size }}';
+    ALTER SYSTEM SET min_wal_size = '80MB';
+    ALTER SYSTEM SET checkpoint_timeout = '{{ checkpoint_timeout }}';
+    ALTER SYSTEM SET checkpoint_completion_target = '{{ checkpoint_completion_target }}';
+    ALTER SYSTEM SET effective_io_concurrency = '{{ effective_io_concurrency }}';
+    ALTER SYSTEM SET random_page_cost = '{{ random_page_cost }}';
+    {% if enable_columnar_engine is defined %}
+    ALTER SYSTEM SET google_columnar_engine.enabled = '{{ 'on' if enable_columnar_engine else 'off' }}';
+    {% endif %}
+    {% if columnar_memory_size_mb is defined and columnar_memory_size_mb %}
+    ALTER SYSTEM SET google_columnar_engine.memory_size_in_mb = '{{ columnar_memory_size_mb }}';
+    {% endif %}
+
+  init-permissions.sh: |
+    #!/bin/bash
+    set -e
+
+    echo "Setting up AlloyDB Omni data directory permissions..."
+    # Ensure proper permissions on data directory
+    chown -R postgres:postgres /var/lib/postgresql/data || true
+    chmod 700 /var/lib/postgresql/data || true
+    echo "Permissions set successfully"
+---
+# Service for AlloyDB Omni (named postgres-standalone as expected by benchmark)
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-standalone
+  namespace: {{ namespace }}
+spec:
+  type: ClusterIP
+  selector:
+    app: postgres-standalone
+  ports:
+  - port: 5432
+    targetPort: 5432
+    protocol: TCP
+    name: postgres
+---
+# StatefulSet for AlloyDB Omni
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres-standalone
+  namespace: {{ namespace }}
+spec:
+  serviceName: postgres-standalone
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres-standalone
+  template:
+    metadata:
+      labels:
+        app: postgres-standalone
+    spec:
+      {% if host_network is defined and host_network %}
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      {% endif %}
+      securityContext:
+        fsGroup: 999  # postgres group ID
+      {% if pin_to_nodepool | default(true) %}
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: pkb_nodepool
+                operator: In
+                values:
+                - postgres
+      {% endif %}
+      tolerations:
+      - key: "kubernetes.io/arch"
+        operator: "Equal"
+        value: "arm64"
+        effect: "NoSchedule"
+      {% if use_init_container is defined and use_init_container %}
+      initContainers:
+      - name: init-permissions
+        image: {{ omni_image | default('google/alloydbomni:' ~ (postgres_version | default('16'))) }}
+        command:
+        - "bash"
+        - "-c"
+        - "/scripts/init-permissions.sh"
+        securityContext:
+          runAsUser: 0  # Run as root for permissions setup
+        volumeMounts:
+        - name: init-scripts
+          mountPath: /scripts
+        - name: postgres-data
+          mountPath: /var/lib/postgresql/data
+      {% endif %}
+      containers:
+      - name: postgres
+        image: {{ omni_image | default('google/alloydbomni:' ~ (postgres_version | default('16'))) }}
+        ports:
+        - containerPort: 5432
+          name: postgres
+        envFrom:
+        - secretRef:
+            name: postgres-secret
+        env:
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
+        - name: POSTGRES_HOST_AUTH_METHOD
+          value: "scram-sha-256"
+        volumeMounts:
+        - name: postgres-data
+          mountPath: /var/lib/postgresql/data
+        - name: dshm
+          mountPath: /dev/shm
+        - name: postgres-config
+          mountPath: /etc/postgresql/pg_hba.conf
+          subPath: pg_hba.conf
+        - name: init-scripts
+          mountPath: /docker-entrypoint-initdb.d/init.sql
+          subPath: init.sql
+        resources:
+          requests:
+            cpu: "{{ cpu_request | default('6') }}"
+            memory: "{{ memory_request | default('15Gi') }}"
+          {% if (cpu_limit | default('10')) != 'None' or (memory_limit | default('20Gi')) != 'None' %}
+          limits:
+            {% if (cpu_limit | default('10')) != 'None' %}
+            cpu: "{{ cpu_limit | default('10') }}"
+            {% endif %}
+            {% if (memory_limit | default('20Gi')) != 'None' %}
+            memory: "{{ memory_limit | default('20Gi') }}"
+            {% endif %}
+          {% endif %}
+        command:
+        - "docker-entrypoint.sh"
+        - "postgres"
+        - "-c"
+        - "hba_file=/etc/postgresql/pg_hba.conf"
+        - "-c"
+        - "listen_addresses=*"
+        - "-c"
+        - "max_connections={{ max_connections }}"
+        - "-c"
+        - "shared_buffers={{ shared_buffers }}"
+        - "-c"
+        - "effective_cache_size={{ effective_cache_size }}"
+        - "-c"
+        - "maintenance_work_mem=1GB"
+        - "-c"
+        - "work_mem={{ work_mem }}"
+        - "-c"
+        - "max_worker_processes={{ max_worker_processes }}"
+        - "-c"
+        - "max_parallel_workers_per_gather={{ max_parallel_workers_per_gather }}"
+        - "-c"
+        - "max_parallel_workers={{ max_parallel_workers }}"
+        - "-c"
+        - "wal_buffers={{ wal_buffers }}"
+        - "-c"
+        - "max_wal_size={{ max_wal_size }}"
+        - "-c"
+        - "min_wal_size=80MB"
+        - "-c"
+        - "checkpoint_timeout={{ checkpoint_timeout }}"
+        - "-c"
+        - "checkpoint_completion_target={{ checkpoint_completion_target }}"
+        - "-c"
+        - "effective_io_concurrency={{ effective_io_concurrency }}"
+        - "-c"
+        - "random_page_cost={{ random_page_cost }}"
+        - "-c"
+        - "wal_level={{ wal_level | default('replica') }}"
+        - "-c"
+        - "synchronous_commit={{ synchronous_commit | default('on') }}"
+        - "-c"
+        - "autovacuum=on"
+        - "-c"
+        - "autovacuum_max_workers={{ autovacuum_max_workers }}"
+        - "-c"
+        - "autovacuum_naptime=10s"
+        - "-c"
+        - "log_destination=stderr"
+        - "-c"
+        - "logging_collector=off"
+        - "-c"
+        - "log_checkpoints={{ log_checkpoints | default('on') }}"
+        - "-c"
+        - "log_connections={{ log_connections | default('off') }}"
+        - "-c"
+        - "log_disconnections={{ log_disconnections | default('off') }}"
+        - "-c"
+        - "log_lock_waits={{ log_lock_waits | default('off') }}"
+        - "-c"
+        - "log_temp_files={{ log_temp_files | default('0') }}"
+        - "-c"
+        - "log_autovacuum_min_duration={{ log_autovacuum_min_duration | default('-1') }}"
+        - "-c"
+        - "log_error_verbosity={{ log_error_verbosity | default('default') }}"
+        - "-c"
+        - "client_min_messages={{ client_min_messages | default('notice') }}"
+        - "-c"
+        - "log_min_messages={{ log_min_messages | default('warning') }}"
+        - "-c"
+        - "log_min_error_statement={{ log_min_error_statement | default('error') }}"
+        - "-c"
+        - "log_min_duration_statement={{ log_min_duration_statement | default('-1') }}"
+        - "-c"
+        - "track_activities=on"
+        - "-c"
+        - "track_counts=on"
+        - "-c"
+        - "track_io_timing=on"
+        - "-c"
+        - "google_columnar_engine.enabled={{ 'on' if (enable_columnar_engine | default(false)) else 'off' }}"
+        {% if columnar_memory_size_mb is defined and columnar_memory_size_mb %}
+        - "-c"
+        - "google_columnar_engine.memory_size_in_mb={{ columnar_memory_size_mb }}"
+        {% endif %}
+        {% for pg_flag in extra_postgres_flags | default([]) %}
+        - "-c"
+        - "{{ pg_flag }}"
+        {% endfor %}
+        readinessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -h
+            - 127.0.0.1
+            - -p
+            - "5432"
+            - -U
+            - {{ postgres_user }}
+            - -d
+            - {{ postgres_database }}
+          initialDelaySeconds: 15
+          periodSeconds: 5
+          timeoutSeconds: 10
+          failureThreshold: 120
+        livenessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -h
+            - 127.0.0.1
+            - -p
+            - "5432"
+            - -U
+            - {{ postgres_user }}
+          initialDelaySeconds: 300
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 20
+      volumes:
+      - name: dshm
+        emptyDir:
+          medium: Memory
+          {% if shm_size is defined and shm_size %}
+          sizeLimit: "{{ shm_size }}"
+          {% endif %}
+      - name: postgres-config
+        configMap:
+          name: postgres-config
+      - name: init-scripts
+        configMap:
+          name: postgres-init-scripts
+          defaultMode: 0755
+  volumeClaimTemplates:
+  - metadata:
+      name: postgres-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      {% if storage_class is not defined or storage_class %}
+      storageClassName: {{ storage_class | default('postgres-storage-class') }}
+      {% endif %}
+      resources:
+        requests:
+          storage: {{ disk_size }}

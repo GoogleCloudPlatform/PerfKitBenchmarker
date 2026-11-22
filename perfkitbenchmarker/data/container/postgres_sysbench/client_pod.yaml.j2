@@ -8,6 +8,7 @@ metadata:
   labels:
     app: postgres-client
 spec:
+  {% if pin_to_nodepool | default(true) %}
   affinity:
     nodeAffinity:
       requiredDuringSchedulingIgnoredDuringExecution:
@@ -17,6 +18,7 @@ spec:
             operator: In
             values:
             - clients
+  {% endif %}
   tolerations:
   - key: "kubernetes.io/arch"
     operator: "Equal"
