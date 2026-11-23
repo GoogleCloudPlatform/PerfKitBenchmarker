@@ -16,10 +16,20 @@ rules. If there are no comments to add, grant approval.
 -   **No Global Functions for Resources:** All cloud resources must inherit from
     `resource.BaseResource`.
 -   **Cloud-Agnostic Core:** Cloud-specific implementations belong in
-    `perfkitbenchmarker/providers/`. An `if cloud ==` check is a red flag.
+    `perfkitbenchmarker/providers/`. An `if cloud ==` check is a red flag, as
+    are implicit single-cloud assumptions in `resources/` base classes (e.g.,
+    assuming GCP's `<region>-<zone>` naming scheme instead of delegating to
+    provider subclasses via `@abc.abstractmethod`). Dispatch provider subclasses
+    via the standard `CLOUD` attribute rather than custom attributes unless a
+    single cloud has multiple implementations, and prefix provider module
+    filenames in `providers/<cloud>/` with the provider name (e.g.,
+    `gcp_foo.py`) rather than reusing the basename of `resources/foo.py`.
 -   **Benchmark Separation:** `benchmark` scripts must not contain
     provider-specific logic (e.g., no `gcloud` commands directly in benchmark
     files; delegate to the resource classes via cloud-agnostic parent methods).
+    Conversely, `resources/` modules should consume decoded specs rather than
+    mutating raw `benchmark_config` dictionaries (config preprocessing belongs
+    in the benchmark's `GetConfig`).
 -   **Readiness vs. Existence:**
     -   `_Exists()`: Verifies the resource appears in list/describe.
     -   `_IsReady()`: True only when the resource is actually usable/serving
@@ -27,11 +37,13 @@ rules. If there are no comments to add, grant approval.
 -   **Client VM Isolation:** Limit new dependencies on the runner VM. Whenever
     possible, install dependencies and execute operations on the *Client VM* or
     *Worker VMs* instead.
--   **Shared Benchmark Utilities:** Factor reusable workload preparation steps
-    (e.g., disk preconditioning, multi-VM filesystem creation and mounting, disk
-    striping) and shared suite or configuration helper logic into common utility
-    modules (e.g., `lssd_workloads_util.py` or shared config helpers) instead of
-    duplicating logic across individual benchmark or suite files.
+-   **Shared Benchmark and Infrastructure Utilities:** Factor reusable workload
+    preparation steps (e.g., disk preconditioning, multi-VM filesystem creation
+    and mounting, disk striping), shared suite or configuration helper logic,
+    and general CLI/transport helpers (e.g., generic `kubectl`, `helm`, or VM
+    error classifiers and command builders) into shared utility or
+    infrastructure modules instead of keeping them inside individual benchmark,
+    suite, or resource files.
 -   **Separate Benchmarks for High-Variance Hardware/Storage:** Maintain
     distinct benchmark files (e.g., `cassandra_stress_lssd_benchmark.py` vs.
     `cassandra_stress_benchmark.py`) for specialized storage or hardware
@@ -117,9 +129,17 @@ rules. If there are no comments to add, grant approval.
     configurable flags or spec attributes, not hardcoded dictionary literals.
 -   **Single-Use Flags:** Mark flags private if used only in one file.
 -   **Namespace Custom Flags:** Flags must be explicit (e.g.,
-    `gke_python_benchmark_threads` has the prefix `gke_python_benchmark`).
+    `gke_python_benchmark_threads` has the prefix `gke_python_benchmark`). Use
+    lowercase strings for `DEFINE_enum` values unless matching an established
+    uppercase convention, and when a PKB flag's default intentionally differs
+    from the underlying cloud or tool default, note both defaults in the flag
+    help text.
 -   **No 1:1 API Flag Mapping:** Group related features logically rather than
-    exposing raw Cloud API arguments 1:1.
+    exposing raw Cloud API arguments 1:1. Avoid adding multiple per-cloud flags
+    for a single cross-cloud concept (e.g., separate project and secret-name
+    flags that would multiply across GCP, AWS, and Azure) when one
+    cloud-agnostic URI or spec option can represent it and let each provider
+    parse its native format.
 -   **Minimal Configuration Overrides:** When defining or overriding shared
     service, benchmark, or suite configurations for a workload variant, inherit
     from the existing base configuration and only override parameters that
@@ -174,11 +194,24 @@ rather than diverging unless there is a strong reason to differ:
         specific messages is found, an error is thrown.
 -   **Retry Mechanics:** Require using the Python `@vm_util.Retry` decorator
     when managing flaky commands and waits, instead of `for`/`while` loops (in
-    Python or shell) which continue running a command until they succeed.
-    `time.sleep()` is not okay in threads and not okay in timed `Run` phases,
-    but can be okay if the timing is not important, such as when waiting for the
-    system to calm down after provisioning/pre-loading.
+    Python or shell) which continue running a command until they succeed. When
+    polling for a state drain, cleanup barrier, or readiness condition required
+    for valid measurements, let `@vm_util.Retry` raise on timeout rather than
+    logging a warning and continuing. `time.sleep()` is not okay in threads and
+    not okay in timed `Run` phases, but can be okay if the timing is not
+    important, such as when waiting for the system to calm down after
+    provisioning/pre-loading.
 -   **Teardown Safety:** All resource teardowns must be idempotent.
+-   **Single-Boundary Guards; No Defense-in-Depth Swallowing:** Enforce state
+    preconditions at a single responsible boundary (respecting `BaseResource`
+    invariants such as `user_managed` already implying `created`) rather than
+    duplicating the same guard and `try/except` wrappers across multiple layers
+    of the call stack. Do not catch illegal-state or broad `Exception` errors
+    around code whose preconditions are already checked, add speculative
+    handlers for errors that do not occur in practice, or wrap
+    `resource.Delete()` calls in `try/except` at caller sites (handle
+    resource-specific teardown failures inside the subclass's `_Delete` or
+    `_DeleteResource` hooks instead).
 -   **No Redundant Exception Handling with `ignore_failure=True`:** When
     invoking commands with `ignore_failure=True` or
     `raise_on_failure=False`, do not wrap calls in redundant
@@ -207,7 +240,8 @@ rather than diverging unless there is a strong reason to differ:
 -   **Concise, High-Signal Inline Comments:** Keep code and configuration
     comments brief and focused on non-obvious rationale. Flag verbose multi-line
     explanations, comments that restate obvious code or config names, inline
-    copies of external tool documentation, business-decision writeups (which
+    copies of external tool documentation, low-level implementation details
+    stuffed into top-level module docstrings, business-decision writeups (which
     belong outside the code), and comments in `third_party` files referencing
     downstream-only scenarios that cannot occur in PKB. When non-default tuning
     parameters (e.g., I/O capacities, cache limits, or `ulimit` overrides) or
@@ -246,6 +280,15 @@ rather than diverging unless there is a strong reason to differ:
     placeholder values (e.g., `https://adb-1234.1.azuredatabricks.net` or
     `mock-token`) instead. Real values are only acceptable in internal `artemis`
     GCL configurations, never in `third_party`.
+-   **Keep Inline Remote Shell Commands Simple:** Avoid embedding multi-line
+    bash loops, conditionals, counting logic, or long `&&`-chained scripts
+    inside Python strings passed to `RemoteCommand`. Handle iteration, counting,
+    and validation in Python.
+-   **Scope Release Notes to Major Changes:** Reserve `github/CHANGES.next.md`
+    entries for substantial user-facing features or behavioral changes (at most
+    one concise single-sentence entry for an entire multi-CL feature chain); for
+    minor refactors, metadata tweaks, tests, or intermediate stack CLs, omit
+    `CHANGES.next.md` edits and use `NO_RELEASE_NOTES=TRUE` instead.
 
 ## 6. Performance Metrics
 
@@ -262,6 +305,11 @@ rather than diverging unless there is a strong reason to differ:
     wiring without exercising real behavior, parsing, or state transitions. Such
     change-detector tests add maintenance overhead while providing little
     regression protection.
+-   **Assert Concrete Expected Literals in Unit Tests:** Write expected values
+    in unit test assertions as concrete literals (e.g., the exact expected
+    quoted command string) rather than recomputing them with the same helper
+    functions or formatting logic (such as `shlex.quote`) used by the code under
+    test, which can mask bugs when both sides share a mistake.
 
 ## Resource specific comments
 
