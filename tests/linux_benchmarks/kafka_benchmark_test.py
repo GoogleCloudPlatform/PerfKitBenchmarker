@@ -1074,13 +1074,14 @@ class KafkaBenchmarkRunTest(KafkaBenchmarkTestCaseBase):
         kafka_benchmark, '_RunSingleTrial', side_effect=_mock_single
     ) as mock_single, mock.patch.object(time, 'sleep'):
       results = kafka_benchmark.Run(self.benchmark_spec)
-      self.assertLen(mock_single.call_args_list, 6)
+      self.assertLen(mock_single.call_args_list, 7)
       expected_calls = [
-          mock.call(self.benchmark_spec, 2**i, 15_000_000) for i in range(5)
+          mock.call(self.benchmark_spec, t, 15_000_000)
+          for t in [1, 2, 4, 8, 16, 32]
       ]
       mock_single.assert_has_calls(expected_calls)
       self.assertLen(results, 2)
-      self.assertEqual(results[0].value, 1600.0)
+      self.assertEqual(results[0].value, 3200.0)
 
   def testRunSweepEarlyStopping(self):
     trial_data = {

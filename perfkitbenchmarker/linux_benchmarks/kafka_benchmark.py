@@ -103,7 +103,7 @@ _KAFKA_NUM_THREADS = flags.DEFINE_list(
     'kafka_num_threads',
     None,
     'List of thread counts to use for the benchmark (e.g. 4,8,16). If None '
-    'or empty, sweeps through powers of 2 from 1 up to 16 iteratively, then '
+    'or empty, sweeps through powers of 2 from 1 up to 32 iteratively, then '
     'refines the optimal thread count via binary search.',
 )
 _KAFKA_REPORTING_INTERVAL = flags.DEFINE_integer(
@@ -143,6 +143,7 @@ _CONSUMER_THROUGHPUT_MB = 'Consumer Throughput (MB/sec)'
 _CONSUMER_THROUGHPUT_RECORDS = 'Consumer Throughput (Records/sec)'
 
 _THROUGHPUT_MARGIN = 0.03
+_DEFAULT_NUM_THREADS = (1, 2, 4, 8, 16, 32)
 
 
 def _InstallKafka(vm):
@@ -1178,7 +1179,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   if _KAFKA_NUM_THREADS.value:
     thread_counts = sorted(int(t) for t in _KAFKA_NUM_THREADS.value)
   else:
-    thread_counts = [2**i for i in range(5)]
+    thread_counts = list(_DEFAULT_NUM_THREADS)
 
   num_records = int(_KAFKA_NUM_RECORDS.value)
   # Warmup
