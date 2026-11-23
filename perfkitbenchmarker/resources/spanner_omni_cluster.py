@@ -20,8 +20,8 @@ client VM in the same VPC, both initialized by PKB.
 multi-zone Spanner Omni cluster via Helm in secure TLS mode with password
 authentication and manages PostgreSQL-dialect databases through the Spanner
 Omni CLI running inside a Spanner pod. Provider subclasses (e.g.
-`providers/gcp/gcp_spanner_omni_cluster.py`) supply the license key and storage
-class.
+`providers/gcp/gcp_spanner_omni_cluster.py`) supply the license key, storage
+class, and backup storage integration.
 """
 
 import abc
@@ -35,6 +35,7 @@ import os
 import re
 import shutil
 import tempfile
+import time
 from typing import Any
 import urllib.request
 
@@ -53,7 +54,9 @@ import yaml
 
 RELEASE_NAME: str = 'spanner-omni'
 NAMESPACE: str = 'spanner-ns'
+EXTERNAL_STORAGE_ID: str = 'backup-storage'
 _DATABASE_DIALECT: str = 'POSTGRESQL'
+_BACKUP_RETENTION_PERIOD: str = '365d'
 _ADMIN_USERNAME: str = 'admin'
 _SPANNER_GRPC_PORT: int = 15000
 _SPANNER_POD_WAIT_TIMEOUT_SEC: int = 1200
@@ -63,9 +66,29 @@ _KUBECTL_DEFAULT_TIMEOUT_SEC: int = 60
 # --async CLI commands (DDL, backup import/restore) return right after the
 # operation is submitted.
 _SPANNER_ASYNC_SUBMIT_TIMEOUT_SEC: int = 300
+_SPANNER_BACKUP_IMPORT_CLI_TIMEOUT: str = '2h'
+_SPANNER_DATABASE_RESTORE_CLI_TIMEOUT: str = '6h'
+# Poll budgets for backup import (2h CLI deadline) and database restore (6h CLI
+# deadline), each with a 10-minute margin so the poll does not expire before the
+# CLI's own deadline.
+_SPANNER_BACKUP_IMPORT_TIMEOUT_SEC: int = 60 * 60 * 2 + 600
+_SPANNER_BACKUP_RESTORE_TIMEOUT_SEC: int = 60 * 60 * 6 + 600
+_SPANNER_CLI_MAX_ATTEMPTS: int = 3
 _CLI_LOGIN_MAX_ATTEMPTS: int = 5
 _LIVENESS_PROBE_FAILURE_THRESHOLD: int = 60
 _LIVENESS_PROBE_TIMEOUT_SEC: int = 15
+_SPANNER_IMPORT_BACKUP_NAME: str = 'restored-backup'
+_RESOURCE_READY_STATE: str = 'READY'
+_RESOURCE_TERMINAL_FAILURE_STATES: frozenset[str] = frozenset(
+    {'FAILED', 'CANCELLED', 'ERROR'}
+)
+_RETRYABLE_GRPC_CODES: tuple[str, ...] = (
+    'UNAVAILABLE',
+    'DEADLINE_EXCEEDED',
+    'ABORTED',
+    'RESOURCE_EXHAUSTED',
+    'INTERNAL',
+)
 _SPANNER_CLI_BIN: str = '/google/spanner/bin/spanner'
 _BOOTSTRAP_JOB_NAME: str = 'spanner-bootstrap-job'
 _TLS_SECRET_NAME: str = 'tls-certs'
@@ -163,6 +186,21 @@ def _IsAlreadyExistsError(stderr: str) -> bool:
   return _StderrHasCode(stderr, 'ALREADY_EXISTS')
 
 
+def _IsNotFoundError(stderr: str, resource_name: str) -> bool:
+  """Returns True if `stderr` is a Spanner CLI NOT_FOUND for the resource."""
+  if kubectl.IsPodDisconnectionError(stderr):
+    return False
+  lowered = stderr.lower()
+  has_not_found_code = (
+      'not_found' in lowered
+      or 'code = notfound' in lowered
+      or 'code=notfound' in lowered
+  )
+  if not has_not_found_code:
+    return False
+  return resource_name.lower() in lowered
+
+
 def _IsAuthError(stderr: str) -> bool:
   """Returns True if `stderr` indicates an authentication/login error."""
   lowered = stderr.lower()
@@ -173,15 +211,7 @@ def _IsRetryableCliError(stderr: str) -> bool:
   """Returns True if a non-zero Spanner CLI exit is transient/retryable."""
   if _IsAuthError(stderr) or kubectl.IsPodDisconnectionError(stderr):
     return True
-  return any(
-      _StderrHasCode(stderr, code)
-      for code in (
-          'UNAVAILABLE',
-          'DEADLINE_EXCEEDED',
-          'ABORTED',
-          'RESOURCE_EXHAUSTED',
-      )
-  )
+  return any(_StderrHasCode(stderr, code) for code in _RETRYABLE_GRPC_CODES)
 
 
 def _StripCliSpinnerOutput(stdout: str) -> str:
@@ -232,27 +262,30 @@ class BaseSpannerOmniCluster(resource.BaseResource):
 
   Lifecycle:
     * `_CreateDependencies`: validates the topology, resolves the release,
-      generates TLS certificates (with the Spanner CLI on the client VM) and
+      generates TLS certificates (with the Spanner CLI on the client VM), and
       creates the TLS and admin password Kubernetes Secrets.
     * `_Create`: fetches the license key and installs the Helm chart.
     * `_IsReady`: all Spanner pods are Ready and the bootstrap job completed.
-    * `_PostCreate`: logs into the CLI and creates an empty database.
+    * `_PostCreate`: logs into the CLI, registers external backup storage and
+      restores the database from a backup or creates an empty database.
     * `_Delete`: uninstalls the release and deletes the PVCs so the
       underlying persistent disks do not leak.
 
   Provider subclasses set `CLOUD`, `HELM_PLATFORM` and `STORAGE_CLASS` and
   implement `_FetchLicenseKeyFile`, `_GetRegionFromZone`, and
-  `_BuildZoneShortNames`; they may override `CheckSpecPrerequisites`.
+  `_BuildZoneShortNames`; they may override `_ExternalStorageCliArgs` and
+  `CheckSpecPrerequisites`.
 
   Attributes:
     spec: The `SpannerOmniClusterSpec`.
     container_cluster: The Kubernetes cluster hosting Spanner Omni.
     client_vm: The client VM running the Spanner CLI (for certificates);
       attached by `SetVms` from the `client_vm_group` VM group.
-    database_name: The PostgreSQL-dialect database to create.
+    database_name: The PostgreSQL-dialect database created or restored.
     omni_version: The resolved Spanner Omni release version tag.
     pod_endpoints: Sorted `(pod_name, pod_ip)` tuples of the Spanner pods; the
       first entry is a root server in the client VM's zone when possible.
+    spanner_restored: True once the database has been restored from a backup.
   """
 
   RESOURCE_TYPE = 'BaseSpannerOmniCluster'
@@ -278,6 +311,8 @@ class BaseSpannerOmniCluster(resource.BaseResource):
     self.database_name = omni_spec.database_name
     self.omni_version: str | None = omni_spec.version
     self.pod_endpoints: list[tuple[str, str]] = []
+    self.spanner_restored: bool = False
+    self.restore_duration_sec: float | None = None
     self._admin_password: str | None = None
     self._bound_pv_names: list[str] = []
 
@@ -356,7 +391,7 @@ class BaseSpannerOmniCluster(resource.BaseResource):
     return self.container_cluster.num_nodes or None
 
   def _ValidateTopology(self) -> None:
-    """Validates zones, replicas_per_zone, and root_servers_per_zone."""
+    """Validates zones, replicas_per_zone, root_servers_per_zone, and storage."""
     cluster_zones = self._ClusterZones()
     if self.spec.zones:
       if not cluster_zones:
@@ -393,6 +428,11 @@ class BaseSpannerOmniCluster(resource.BaseResource):
           f'spanner_omni_root_servers_per_zone ({self.root_servers_per_zone})'
           ' must not exceed servers per zone'
           f' ({self.replicas_per_zone}).'
+      )
+    if self.spec.backup_descriptor_id and not self._ExternalStorageCliArgs():
+      raise errors.Config.InvalidValue(
+          'Restoring a Spanner Omni backup requires external backup storage'
+          ' to be configured for the provider.'
       )
 
   @property
@@ -480,6 +520,14 @@ class BaseSpannerOmniCluster(resource.BaseResource):
     path = self._NewLicenseTempFile()
     shutil.copyfile(license_uri, path)
     return path
+
+  def _ExternalStorageCliArgs(self) -> list[str]:
+    """Returns `external-storages create` args, or [] if none is configured."""
+    return []
+
+  # ---------------------------------------------------------------------------
+  # Resource lifecycle.
+  # ---------------------------------------------------------------------------
 
   def _CreateDependencies(self) -> None:
     """Creates the namespace, TLS and admin password Secrets."""
@@ -591,9 +639,14 @@ class BaseSpannerOmniCluster(resource.BaseResource):
     return self._IsBootstrapJobComplete()
 
   def _PostCreate(self) -> None:
-    """Logs in and creates the database."""
+    """Logs in and creates or restores the database."""
     self.LoginSpannerCli()
-    self.CreateDatabase(self.database_name)
+    if self._ExternalStorageCliArgs():
+      self._CreateExternalStorage()
+    if self.spec.backup_descriptor_id:
+      self._RestoreDatabaseFromBackup(self.database_name)
+    else:
+      self.CreateDatabase(self.database_name)
 
   def _DeleteResource(self) -> None:
     """Deletes Spanner Omni without failing the rest of the teardown.
@@ -714,6 +767,7 @@ class BaseSpannerOmniCluster(resource.BaseResource):
         'omni_storage_class': self.STORAGE_CLASS,
         'omni_data_disk_size': self.spec.data_disk_size,
         'omni_logs_disk_size': self.spec.logs_disk_size,
+        'omni_restored_from_backup': self.spanner_restored,
         'omni_run_analyze': self.spec.run_analyze,
     })
     optional_metadata = {
@@ -724,6 +778,8 @@ class BaseSpannerOmniCluster(resource.BaseResource):
         ),
         'omni_version': self.omni_version,
         'omni_chart_version': self.spec.chart_version,
+        'omni_backup_descriptor_id': self.spec.backup_descriptor_id,
+        'omni_restore_duration_sec': self.restore_duration_sec,
     }
     metadata.update(
         {k: v for k, v in optional_metadata.items() if v is not None}
@@ -1115,6 +1171,16 @@ class BaseSpannerOmniCluster(resource.BaseResource):
           pod_name,
       )
 
+  def _CreateExternalStorage(self) -> None:
+    """Registers the external backup storage in Spanner Omni."""
+    logging.info('Registering external storage %s', EXTERNAL_STORAGE_ID)
+    self._RunRetryableCliCommand([
+        'external-storages',
+        'create',
+        EXTERNAL_STORAGE_ID,
+        *self._ExternalStorageCliArgs(),
+    ])
+
   def CreateDatabase(self, database_name: str) -> None:
     """Creates a PostgreSQL-dialect database; an existing one is a no-op.
 
@@ -1156,6 +1222,184 @@ class BaseSpannerOmniCluster(resource.BaseResource):
       raise errors.Resource.CreationError(
           f'Timed out creating Spanner Omni database {database_name!r}: {e}'
       ) from e
+
+  def _DatabaseExists(self, database_name: str) -> bool:
+    """Returns True if `databases describe` confirms `database_name` exists."""
+    try:
+      _, _, retcode = self._RunAuthenticatedCli(
+          ['databases', 'describe', database_name]
+      )
+    except (errors.Resource.RetryableCreationError, vm_util.RetryError):
+      return False
+    return retcode == 0
+
+  def _WaitUntilResourceReady(
+      self,
+      resource_type: str,
+      resource_name: str,
+      timeout: int = _SPANNER_BACKUP_RESTORE_TIMEOUT_SEC,
+      poll_interval: int = 30,
+  ) -> None:
+    """Waits for a Spanner Omni backup or database to reach `state: READY`."""
+    last_state = '<unknown>'
+
+    @vm_util.Retry(
+        poll_interval=poll_interval,
+        fuzz=0,
+        timeout=timeout,
+        retryable_exceptions=(errors.Resource.RetryableCreationError,),
+    )
+    def _PollReady() -> None:
+      nonlocal last_state
+      stdout, stderr, retcode = self._RunAuthenticatedCli(
+          [resource_type, 'describe', resource_name]
+      )
+      if retcode != 0:
+        if _IsNotFoundError(stderr, resource_name):
+          raise errors.Resource.CreationError(
+              f'Spanner Omni {resource_type} {resource_name!r} not found:'
+              f' {stderr}'
+          )
+        if _IsRetryableCliError(stderr):
+          raise errors.Resource.RetryableCreationError(
+              f'Transient error describing {resource_type} {resource_name}:'
+              f' {stderr}'
+          )
+        raise errors.Resource.CreationError(
+            f'Failed to describe {resource_type} {resource_name}: {stderr}'
+        )
+      cleaned_stdout, data = _ParseCliYaml(stdout)
+      if not isinstance(data, dict):
+        raise errors.Resource.CreationError(
+            'Unexpected non-YAML output describing Spanner Omni'
+            f' {resource_type} {resource_name!r}:\n{cleaned_stdout}'
+        )
+      state = str(data.get('state', '')).strip().upper()
+      has_error = bool(data.get('error'))
+      if state:
+        last_state = state
+      if state == _RESOURCE_READY_STATE:
+        logging.info(
+            'Spanner Omni %s %s is ready.', resource_type, resource_name
+        )
+        return
+      if has_error or state in _RESOURCE_TERMINAL_FAILURE_STATES:
+        raise errors.Resource.CreationError(
+            f'Spanner Omni {resource_type} {resource_name!r} failed'
+            f' (state={state}):\n{cleaned_stdout}'
+        )
+      raise errors.Resource.RetryableCreationError(
+          f'{resource_type.capitalize()} {resource_name} is not yet in state:'
+          f' {_RESOURCE_READY_STATE}:\n{cleaned_stdout}'
+      )
+
+    try:
+      _PollReady()
+    except vm_util.RetryError as e:
+      raise errors.Resource.CreationError(
+          f'Timed out after {timeout}s waiting for Spanner Omni {resource_type}'
+          f' {resource_name!r} to reach {_RESOURCE_READY_STATE}'
+          f' (last_state={last_state}).'
+      ) from e
+
+  def _RunRetryableCliCommand(self, cli_args: Sequence[str]) -> None:
+    """Submits an idempotent CLI command, retrying transient errors.
+
+    Treats `ALREADY_EXISTS` as success. Callers with command-specific recovery
+    inspect the raised `CreationError`.
+
+    Args:
+      cli_args: Spanner Omni CLI arguments.
+
+    Raises:
+      errors.Resource.CreationError: If the command fails with a permanent
+        error or exhausts all transient-error retries.
+    """
+
+    @vm_util.Retry(
+        poll_interval=15,
+        max_retries=_SPANNER_CLI_MAX_ATTEMPTS - 1,
+        timeout=-1,
+        fuzz=0,
+        retryable_exceptions=(errors.Resource.RetryableCreationError,),
+    )
+    def _Issue() -> None:
+      _, stderr, retcode = self._RunAuthenticatedCli(
+          cli_args, timeout=_SPANNER_ASYNC_SUBMIT_TIMEOUT_SEC
+      )
+      if retcode == 0 or _IsAlreadyExistsError(stderr):
+        return
+      message = (
+          f'Spanner Omni CLI command {list(cli_args[:2])} failed'
+          f' (retcode={retcode}): {stderr}'
+      )
+      if _IsRetryableCliError(stderr):
+        raise errors.Resource.RetryableCreationError(message)
+      raise errors.Resource.CreationError(message)
+
+    try:
+      _Issue()
+    except vm_util.RetryError as e:
+      raise errors.Resource.CreationError(
+          f'Spanner Omni CLI command {list(cli_args[:2])} failed after'
+          f' {_SPANNER_CLI_MAX_ATTEMPTS} attempts.'
+      ) from e
+
+  def _RestoreDatabaseFromBackup(self, database_name: str) -> None:
+    """Imports the backup descriptor and restores `database_name`."""
+    start_time = time.monotonic()
+    logging.info(
+        'Importing Spanner Omni backup descriptor %s from %s',
+        self.spec.backup_descriptor_id,
+        EXTERNAL_STORAGE_ID,
+    )
+    try:
+      self._RunRetryableCliCommand([
+          'backups',
+          'import',
+          _SPANNER_IMPORT_BACKUP_NAME,
+          f'--external-storage={EXTERNAL_STORAGE_ID}',
+          f'--backup-descriptor={self.spec.backup_descriptor_id}',
+          f'--retention-period={_BACKUP_RETENTION_PERIOD}',
+          '--async',
+          f'--timeout={_SPANNER_BACKUP_IMPORT_CLI_TIMEOUT}',
+      ])
+    except errors.Resource.CreationError as e:
+      if 'already being used by an active backup' not in str(e).lower():
+        raise
+    self._WaitUntilResourceReady(
+        'backups',
+        _SPANNER_IMPORT_BACKUP_NAME,
+        timeout=_SPANNER_BACKUP_IMPORT_TIMEOUT_SEC,
+    )
+
+    self.LoginSpannerCli()
+    logging.info(
+        'Restoring Spanner Omni database %s from backup %s',
+        database_name,
+        _SPANNER_IMPORT_BACKUP_NAME,
+    )
+    try:
+      self._RunRetryableCliCommand([
+          'databases',
+          'restore',
+          f'--source-backup={_SPANNER_IMPORT_BACKUP_NAME}',
+          f'--destination-database={database_name}',
+          '--async',
+          f'--timeout={_SPANNER_DATABASE_RESTORE_CLI_TIMEOUT}',
+      ])
+    except errors.Resource.CreationError as e:
+      # `spanner databases restore --async` can return an empty `Error: failed
+      # to restore database:` message after the server has already created the
+      # destination database and begun restoring it; verify via `describe`.
+      if not (
+          str(e).strip().lower().endswith('failed to restore database:')
+          and self._DatabaseExists(database_name)
+      ):
+        raise
+    self._WaitUntilResourceReady('databases', database_name)
+    self.restore_duration_sec = round(time.monotonic() - start_time, 2)
+    self.spanner_restored = True
 
   def RunDDLQuery(
       self,

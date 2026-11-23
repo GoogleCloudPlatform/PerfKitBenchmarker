@@ -95,6 +95,11 @@ LOGS_DISK_SIZE = flags.DEFINE_string(
     '200Gi',
     'Size of the logs PVC per Spanner Omni pod.',
 )
+BACKUP_DESCRIPTOR_ID = flags.DEFINE_string(
+    'spanner_omni_backup_descriptor_id',
+    None,
+    'Backup descriptor ID in external storage to import and restore from.',
+)
 RUN_ANALYZE = flags.DEFINE_bool(
     'spanner_omni_run_analyze',
     True,
@@ -122,6 +127,7 @@ _FLAG_OVERRIDES: dict[str, flags.FlagHolder[Any]] = {
     'memory_request': MEMORY_REQUEST,
     'data_disk_size': DATA_DISK_SIZE,
     'logs_disk_size': LOGS_DISK_SIZE,
+    'backup_descriptor_id': BACKUP_DESCRIPTOR_ID,
     'run_analyze': RUN_ANALYZE,
     'license_uri': LICENSE_URI,
 }
@@ -159,6 +165,8 @@ class SpannerOmniClusterSpec(spec.BaseSpec):
     chart_uri: Helm chart URI or local path.
     chart_version: Optional Helm chart version.
     version: Optional Spanner Omni release; latest public release if unset.
+    backup_descriptor_id: Backup descriptor to import from the provider's
+      external backup storage and restore.
     run_analyze: Whether to run ANALYZE after loading or restoring.
     license_uri: Location of the license key (provider secret ID or local file
       path).
@@ -186,6 +194,7 @@ class SpannerOmniClusterSpec(spec.BaseSpec):
     self.chart_uri: str
     self.chart_version: str | None
     self.version: str | None
+    self.backup_descriptor_id: str | None
     self.run_analyze: bool
     self.license_uri: str | None
     super().__init__(component_full_name, flag_values=flag_values, **kwargs)
@@ -238,6 +247,7 @@ class SpannerOmniClusterSpec(spec.BaseSpec):
         ),
         'chart_version': _DEFAULT_NONE_STRING,
         'version': _DEFAULT_NONE_STRING,
+        'backup_descriptor_id': _DEFAULT_NONE_STRING,
         'run_analyze': (
             option_decoders.BooleanDecoder,
             {'default': RUN_ANALYZE.default},

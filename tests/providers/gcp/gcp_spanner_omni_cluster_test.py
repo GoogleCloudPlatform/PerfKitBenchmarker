@@ -18,6 +18,7 @@ import unittest
 from unittest import mock
 
 from absl import flags
+from absl.testing import flagsaver
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
@@ -101,6 +102,64 @@ class GcpSpannerOmniClusterTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertIs(
         spanner_omni_cluster_spec.GetSpannerOmniClusterSpecClass('GCP'),
         gcp_spanner_omni_cluster.GcpSpannerOmniClusterSpec,
+    )
+
+  @flagsaver.flagsaver(spanner_omni_gcs_backup_bucket='bucket')
+  def testGcpFlagsOverrideSpec(self):
+    FLAGS['spanner_omni_gcs_backup_bucket'].present = 1
+
+    omni_spec = _Spec(gcs_backup_bucket='other')
+
+    self.assertEqual(omni_spec.gcs_backup_bucket, 'bucket')
+
+  def testGcpSpecRejectsBackupWithoutBucket(self):
+    with self.assertRaisesRegex(
+        errors.Config.InvalidValue, 'gcs_backup_bucket must be set'
+    ):
+      _Spec(backup_descriptor_id='desc')
+
+  def testGcpSpecNormalizesGcsBackupBucketUri(self):
+    self.assertEqual(
+        _Spec(gcs_backup_bucket='  gs://bucket/  ').gcs_backup_bucket, 'bucket'
+    )
+    self.assertIsNone(_Spec(gcs_backup_bucket='gs://').gcs_backup_bucket)
+
+  def testGcpSpecRejectsBucketWithObjectPath(self):
+    with self.assertRaisesRegex(
+        errors.Config.InvalidValue, 'without an object path prefix'
+    ):
+      _Spec(gcs_backup_bucket='gs://bucket/prefix')
+
+  def testNormalizedGcsBackupBucketReachesAccessCheckAndCli(self):
+    self.assertIsNone(_Spec().gcs_backup_bucket)
+    self.assertEqual(self._NewCluster()._ExternalStorageCliArgs(), [])
+    omni_spec = _Spec(
+        gcs_backup_bucket='gs://bucket/',
+        backup_descriptor_id='CIOAgICAIBDIivTowuCXAxjP9ZvqwuCXAw',
+        license_uri=_LICENSE_URI,
+    )
+
+    gcp_spanner_omni_cluster.GcpSpannerOmniCluster.CheckSpecPrerequisites(
+        omni_spec
+    )
+
+    self.mock_gcloud.assert_called_once_with(
+        None, 'storage', 'ls', 'gs://bucket'
+    )
+    self.assertEqual(self.mock_gcloud_cmd.flags, {'format': 'gsutil'})
+    self.mock_gcloud_cmd.Issue.assert_called_once_with(raise_on_failure=False)
+    cluster = gcp_spanner_omni_cluster.GcpSpannerOmniCluster(
+        omni_spec, self.mock_cluster
+    )
+    self.assertEqual(
+        cluster._ExternalStorageCliArgs(), ['--gcs-bucket-name=bucket']
+    )
+
+  def testMetadataIncludesBackupBucket(self):
+    cluster = self._NewCluster(gcs_backup_bucket='bucket')
+    self.assertEqual(
+        cluster.GetResourceMetadata()['omni_gcs_backup_bucket'],
+        'bucket',
     )
 
   def testHelmUsesGkePlatformAndHyperdisk(self):
@@ -194,6 +253,31 @@ class GcpSpannerOmniClusterTest(pkb_common_test_case.PkbCommonTestCase):
       self._NewCluster(license_uri=_LICENSE_URI)._FetchLicenseKeyFile()
     self.assertEqual(os.listdir(self.temp_dir), [])
 
+  def testCheckSpecPrerequisitesFailsWhenBucketCannotBeListed(self):
+    for stderr in (
+        'HTTPError 403',
+        'HTTPError 404: NotFound',
+        'network unreachable for gs://pkb-403-404-backups',
+    ):
+      with self.subTest(stderr=stderr):
+        self.mock_gcloud_cmd.Issue.return_value = ('', stderr, 1)
+        with self.assertRaisesRegex(
+            errors.Setup.InvalidConfigurationError,
+            'Cannot list Spanner Omni GCS backup bucket gs://my-backup-bucket',
+        ):
+          gcp_spanner_omni_cluster.GcpSpannerOmniCluster.CheckSpecPrerequisites(
+              _Spec(
+                  gcs_backup_bucket='my-backup-bucket',
+                  license_uri=_LICENSE_URI,
+              )
+          )
+
+  def testCheckSpecPrerequisitesSkipsBucketCheckWithoutBucket(self):
+    gcp_spanner_omni_cluster.GcpSpannerOmniCluster.CheckSpecPrerequisites(
+        _Spec(license_uri=_LICENSE_URI)
+    )
+    self.mock_gcloud.assert_not_called()
+
   def testCheckSpecPrerequisitesAcceptsSecretManagerVersion(self):
     gcp_spanner_omni_cluster.GcpSpannerOmniCluster.CheckSpecPrerequisites(
         _Spec(license_uri=_LICENSE_URI)
@@ -204,7 +288,6 @@ class GcpSpannerOmniClusterTest(pkb_common_test_case.PkbCommonTestCase):
     gcp_spanner_omni_cluster.GcpSpannerOmniCluster.CheckSpecPrerequisites(
         _Spec(license_uri=license_file.full_path)
     )
-    self.mock_gcloud.assert_not_called()
 
   def testCheckSpecPrerequisitesRequiresLicenseUri(self):
     with self.assertRaisesRegex(
@@ -213,7 +296,6 @@ class GcpSpannerOmniClusterTest(pkb_common_test_case.PkbCommonTestCase):
       gcp_spanner_omni_cluster.GcpSpannerOmniCluster.CheckSpecPrerequisites(
           _Spec()
       )
-    self.mock_gcloud.assert_not_called()
 
   def testCheckSpecPrerequisitesRejectsUnsupportedLicenseUri(self):
     for license_uri in (

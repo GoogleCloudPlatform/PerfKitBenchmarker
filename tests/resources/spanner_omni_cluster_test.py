@@ -19,7 +19,6 @@ import os
 import pathlib
 import pickle
 import time
-import unittest
 from unittest import mock
 import urllib.request
 
@@ -30,6 +29,11 @@ from perfkitbenchmarker import resource
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
+from perfkitbenchmarker.configs import option_decoders
+
+# Register GCP flags (such as --spanner_omni_gcs_backup_bucket) at import time
+# so PkbCommonTestCase's flagsaver snapshot preserves them across tests.
+from perfkitbenchmarker.providers.gcp import gcp_spanner_omni_cluster
 from perfkitbenchmarker.providers.gcp import google_kubernetes_engine
 from perfkitbenchmarker.resources import spanner_omni_cluster
 from perfkitbenchmarker.resources import spanner_omni_cluster_spec
@@ -47,9 +51,18 @@ _LICENSE_FILENAME = 'fake_license.bin'
 class FakeSpannerOmniClusterSpec(
     spanner_omni_cluster_spec.SpannerOmniClusterSpec
 ):
-  """Provider spec stub."""
+  """Provider spec stub with a provider-specific backup bucket option."""
 
   CLOUD = 'FakeOmniCloud'
+
+  @classmethod
+  def _GetOptionDecoderConstructions(cls):
+    result = super()._GetOptionDecoderConstructions()
+    result['fake_bucket'] = (
+        option_decoders.StringDecoder,
+        {'default': None, 'none_ok': True},
+    )
+    return result
 
 
 class FakeSpannerOmniCluster(spanner_omni_cluster.BaseSpannerOmniCluster):
@@ -80,6 +93,10 @@ class FakeSpannerOmniCluster(spanner_omni_cluster.BaseSpannerOmniCluster):
     path = os.path.join(vm_util.GetTempDir(), _LICENSE_FILENAME)
     pathlib.Path(path).write_bytes(b'license')
     return path
+
+  def _ExternalStorageCliArgs(self) -> list[str]:
+    bucket = getattr(self.spec, 'fake_bucket', None)
+    return [f'--fake-bucket={bucket}'] if bucket else []
 
 
 def _Pod(name, ip, ready=True, **metadata):
@@ -189,6 +206,7 @@ class SpecTest(SpannerOmniClusterTestBase):
     self.assertEqual(omni_spec.memory_request, '23Gi')
     self.assertEqual(omni_spec.data_disk_size, '1200Gi')
     self.assertTrue(omni_spec.run_analyze)
+    self.assertIsNone(omni_spec.backup_descriptor_id)
 
   @flagsaver.flagsaver(
       spanner_omni_zones=['us-central1-a', 'us-central1-b'],
@@ -219,6 +237,7 @@ class SpecTest(SpannerOmniClusterTestBase):
         'test_component', flag_values=FLAGS, cloud='Unknown'
     )
     self.assertIsNone(omni_spec.license_uri)
+    self.assertFalse(hasattr(omni_spec, 'gcs_backup_bucket'))
 
   @flagsaver.flagsaver(spanner_omni_license_uri='/path/from/flag')
   def testLicenseUriFlagOverridesConfig(self):
@@ -258,10 +277,13 @@ class SpecTest(SpannerOmniClusterTestBase):
     )
     omni_spec = config_spec.spanner_omni_cluster  # pyrefly: ignore[missing-attribute]
     # Decoded with the provider spec registered for the cloud.
-    self.assertEqual(type(omni_spec).__name__, 'GcpSpannerOmniClusterSpec')
+    self.assertIsInstance(
+        omni_spec, gcp_spanner_omni_cluster.GcpSpannerOmniClusterSpec
+    )
     self.assertEqual(omni_spec.cloud, 'GCP')
     self.assertEqual(omni_spec.database_name, 'sbtest')
     self.assertIsNone(omni_spec.license_uri)
+    self.assertIsNone(omni_spec.gcs_backup_bucket)
 
   @flagsaver.flagsaver(cloud='GCP')
   def testDecodedFromBenchmarkConfigRespectsCloudFlagOverride(self):
@@ -276,7 +298,9 @@ class SpecTest(SpannerOmniClusterTestBase):
         },
     )
     omni_spec = config_spec.spanner_omni_cluster  # pyrefly: ignore[missing-attribute]
-    self.assertEqual(type(omni_spec).__name__, 'GcpSpannerOmniClusterSpec')
+    self.assertIsInstance(
+        omni_spec, gcp_spanner_omni_cluster.GcpSpannerOmniClusterSpec
+    )
     self.assertEqual(omni_spec.cloud, 'GCP')
 
   @flagsaver.flagsaver
@@ -727,6 +751,100 @@ class LifecycleTest(SpannerOmniClusterTestBase):
     )
     self.assertEqual(os.listdir(self.temp_dir), [])
 
+  def testCreateRestoresFromBackup(self):
+    responder, _ = self._KubectlResponder(
+        _PodsJson(
+            _Pod('spanner-a-rt-0', '10.68.0.5'),
+            _Pod('spanner-b-rt-0', '10.68.1.5'),
+            _Pod('spanner-c-rt-0', '10.68.2.5'),
+        ),
+        extra=[
+            ('Created external storage', '', 0),
+            ('Backup import in progress.', '', 0),
+            ('state: READY', '', 0),
+            ('Database restore in progress.', '', 0),
+            ('state: READY', '', 0),
+        ],
+    )
+    mock_kubectl = self._MockKubectl(side_effect=responder)
+    self._MockLogin()
+    cluster = self._NewCluster(
+        prepared=False,
+        fake_bucket='my-backup-bucket',
+        backup_descriptor_id='desc-456',
+    )
+    self.assertFalse(cluster.spanner_restored)
+
+    cluster.Create()
+
+    self.assertTrue(cluster.spanner_restored)
+    metadata = cluster.GetResourceMetadata()
+    self.assertTrue(metadata['omni_restored_from_backup'])
+    self.assertGreaterEqual(metadata['omni_restore_duration_sec'], 0.0)
+    cli_commands = [
+        ' '.join(c[0][0])
+        for c in mock_kubectl.call_args_list
+        if 'exec' in c[0][0]
+    ]
+    self.assertLen(cli_commands, 5)
+    self.assertIn(
+        'external-storages create backup-storage'
+        ' --fake-bucket=my-backup-bucket',
+        cli_commands[0],
+    )
+    self.assertIn('backups import', cli_commands[1])
+    self.assertIn('desc-456', cli_commands[1])
+    self.assertIn('backups describe restored-backup', cli_commands[2])
+    self.assertIn('databases restore', cli_commands[3])
+    self.assertIn('databases describe benchbase', cli_commands[4])
+    self.assertFalse(any('databases create' in c for c in cli_commands))
+    login_calls = [
+        c for c in self.mock_run_kubectl.call_args_list if 'exec' in c.args[0]
+    ]
+    self.assertLen(login_calls, 2)
+
+  def testCreateWithExternalStorageWithoutDescriptorCreatesDatabase(self):
+    responder, _ = self._KubectlResponder(
+        _PodsJson(
+            _Pod('spanner-a-rt-0', '10.68.0.5'),
+            _Pod('spanner-b-rt-0', '10.68.1.5'),
+            _Pod('spanner-c-rt-0', '10.68.2.5'),
+        ),
+        extra=[
+            ('Created external storage', '', 0),
+            ('Database created', '', 0),
+        ],
+    )
+    mock_kubectl = self._MockKubectl(side_effect=responder)
+    self._MockLogin()
+    cluster = self._NewCluster(
+        prepared=False,
+        fake_bucket='my-backup-bucket',
+    )
+
+    cluster.Create()
+
+    self.assertFalse(cluster.spanner_restored)
+    cli_commands = [' '.join(c[0][0]) for c in mock_kubectl.call_args_list]
+    self.assertTrue(
+        any(
+            'external-storages create backup-storage'
+            ' --fake-bucket=my-backup-bucket'
+            in c
+            for c in cli_commands
+        )
+    )
+    self.assertTrue(any('databases create' in c for c in cli_commands))
+    self.assertFalse(any('backups import' in c for c in cli_commands))
+
+  def testCheckPrerequisitesRejectsBackupDescriptorWithoutExternalStorage(self):
+    cluster = self._NewCluster(backup_descriptor_id='desc-456')
+    with self.assertRaisesRegex(
+        errors.Config.InvalidValue,
+        'requires external backup storage to be configured',
+    ):
+      cluster.CheckPrerequisites()
+
   def testIsReadyFalseWhenPodsMissing(self):
     self._MockKubectl(
         return_value=(_PodsJson(_Pod('spanner-a-rt-0', '10.0.0.1')), '', 0)
@@ -1156,6 +1274,182 @@ class CliTest(SpannerOmniClusterTestBase):
     ):
       _ = cluster.first_pod_name
 
+  def testRestoreHandlesAlreadyExistsAndWaitsForStrictReadyState(self):
+    mock_kubectl = self._MockKubectl(
+        side_effect=[
+            ('', 'ERROR: ALREADY_EXISTS: backup restored-backup', 1),
+            ('state: CREATING', '', 0),
+            ('state: READY', '', 0),
+            ('', 'ERROR: ALREADY_EXISTS: database benchbase', 1),
+            ('state: READY_OPTIMIZING', '', 0),
+            ('state: READY', '', 0),
+        ]
+    )
+    self._MockLogin()
+    cluster = self._NewCluster(
+        fake_bucket='test-bucket', backup_descriptor_id='desc-456'
+    )
+
+    cluster._RestoreDatabaseFromBackup('benchbase')
+
+    self.assertTrue(cluster.spanner_restored)
+    self.assertEqual(mock_kubectl.call_count, 6)
+    cli_commands = [' '.join(c[0][0]) for c in mock_kubectl.call_args_list]
+    self.assertIn('backups import restored-backup', cli_commands[0])
+    self.assertIn('backups describe restored-backup', cli_commands[1])
+    self.assertIn('backups describe restored-backup', cli_commands[2])
+    self.assertIn('databases restore', cli_commands[3])
+    self.assertIn('databases describe benchbase', cli_commands[4])
+    self.assertIn('databases describe benchbase', cli_commands[5])
+
+  def testRestoreRetriesOnTransientExecDisconnectAndRelogins(self):
+    self.mock_cluster.zones = ['us-central1-a']
+    self.mock_cluster.zone = 'us-central1-a'
+    mock_kubectl = self._MockKubectl(
+        side_effect=[
+            ('Backup import in progress.', '', 0),
+            ('state: READY', '', 0),
+            ('', 'command terminated with exit code 137', 137),
+            (_PodsJson(_Pod('spanner-a-rt-0', '10.68.0.5')), '', 0),
+            ('', 'Error: failed to restore database: \n', 1),
+            ('state: READY_OPTIMIZING', '', 0),
+            ('state: READY_OPTIMIZING', '', 0),
+            ('state: READY', '', 0),
+        ]
+    )
+    mock_login = self._MockLogin()
+    cluster = self._NewCluster(
+        fake_bucket='test-bucket', backup_descriptor_id='desc-456'
+    )
+
+    cluster._RestoreDatabaseFromBackup('benchbase')
+
+    self.assertTrue(cluster.spanner_restored)
+    self.assertEqual(mock_kubectl.call_count, 8)
+    self.assertEqual(mock_login.call_count, 2)
+
+  def testRestoreHandlesActiveBackupAlreadyExistsOnImport(self):
+    self._MockKubectl(
+        side_effect=[
+            (
+                '',
+                (
+                    'ERROR: INVALID_ARGUMENT: backup_id is already being used'
+                    ' by an active backup'
+                ),
+                1,
+            ),
+            ('state: READY', '', 0),
+            ('Database restore in progress.', '', 0),
+            ('state: READY', '', 0),
+        ]
+    )
+    self._MockLogin()
+    cluster = self._NewCluster(
+        fake_bucket='test-bucket', backup_descriptor_id='desc-456'
+    )
+
+    cluster._RestoreDatabaseFromBackup('benchbase')
+
+    self.assertTrue(cluster.spanner_restored)
+
+  def testRestoreEmptyErrorRaisesWhenDatabaseDoesNotExist(self):
+    self._MockKubectl(
+        side_effect=[
+            ('Backup import in progress.', '', 0),
+            ('state: READY', '', 0),
+            ('', 'Error: failed to restore database:\n', 1),
+            ('', 'ERROR: NOT_FOUND: Database not found: benchbase', 1),
+        ]
+    )
+    self._MockLogin()
+    cluster = self._NewCluster(
+        fake_bucket='test-bucket', backup_descriptor_id='desc-456'
+    )
+
+    with self.assertRaisesRegex(
+        errors.Resource.CreationError, 'failed to restore database'
+    ):
+      cluster._RestoreDatabaseFromBackup('benchbase')
+
+    self.assertFalse(cluster.spanner_restored)
+
+  def testWaitUntilResourceReadyTimesOutWithLastState(self):
+    self._MockKubectl(return_value=('state: CREATING', '', 0))
+    cluster = self._NewCluster()
+
+    with self.assertRaisesRegex(
+        errors.Resource.CreationError,
+        r'Timed out after 1s.*benchbase.*last_state=CREATING',
+    ):
+      cluster._WaitUntilResourceReady(
+          'databases', 'benchbase', timeout=1, poll_interval=1
+      )
+
+  def testWaitUntilResourceReadyRetriesTransientDescribeFailure(self):
+    mock_kubectl = self._MockKubectl(
+        side_effect=[
+            ('', 'ERROR: INTERNAL: transient glitch', 1),
+            ('state: READY', '', 0),
+        ]
+    )
+    cluster = self._NewCluster()
+
+    cluster._WaitUntilResourceReady(
+        'databases', 'benchbase', timeout=10, poll_interval=1
+    )
+
+    self.assertEqual(mock_kubectl.call_count, 2)
+
+  def testWaitUntilResourceReadyFailsFastOnPermanentDescribeError(self):
+    mock_kubectl = self._MockKubectl(
+        return_value=('', 'ERROR: PERMISSION_DENIED: forbidden', 1)
+    )
+    cluster = self._NewCluster()
+
+    with self.assertRaisesRegex(
+        errors.Resource.CreationError, 'PERMISSION_DENIED'
+    ):
+      cluster._WaitUntilResourceReady(
+          'databases', 'benchbase', timeout=60, poll_interval=1
+      )
+
+    self.assertEqual(mock_kubectl.call_count, 1)
+
+  def testRestoreFailsFastOnPermanentError(self):
+    mock_kubectl = self._MockKubectl(
+        return_value=('', 'ERROR: INVALID_ARGUMENT: bad descriptor', 1)
+    )
+    self._MockLogin()
+    cluster = self._NewCluster(
+        fake_bucket='test-bucket', backup_descriptor_id='bad-desc'
+    )
+
+    with self.assertRaisesRegex(
+        errors.Resource.CreationError, 'INVALID_ARGUMENT'
+    ):
+      cluster._RestoreDatabaseFromBackup('benchbase')
+
+    self.assertFalse(cluster.spanner_restored)
+    self.assertEqual(mock_kubectl.call_count, 1)
+
+  def testRestoreExhaustedRetriesRaisesCreationError(self):
+    mock_kubectl = self._MockKubectl(
+        return_value=('', 'ERROR: UNAVAILABLE: backend unavailable', 1)
+    )
+    self._MockLogin()
+    cluster = self._NewCluster(
+        fake_bucket='test-bucket', backup_descriptor_id='desc-456'
+    )
+
+    with self.assertRaisesRegex(
+        errors.Resource.CreationError, 'failed after 3 attempts'
+    ):
+      cluster._RestoreDatabaseFromBackup('benchbase')
+
+    self.assertFalse(cluster.spanner_restored)
+    self.assertEqual(mock_kubectl.call_count, 3)
+
   def testAuthenticatedCliRelogsInAndRetriesOnAuthError(self):
     mock_kubectl = self._MockKubectl(
         side_effect=[
@@ -1215,11 +1509,109 @@ class CliTest(SpannerOmniClusterTestBase):
     self.assertEqual(mock_kubectl.call_count, 3)
     mock_login.assert_called_once()
 
-  def testCreateDatabaseIgnoresAlreadyExists(self):
+  def testDatabaseExistsReturnsFalseOnTimeout(self):
     self._MockKubectl(
+        side_effect=vm_util.TimeoutExceededRetryError('deadline exceeded')
+    )
+    self._MockLogin()
+
+    self.assertFalse(self._NewCluster()._DatabaseExists('benchbase'))
+
+  def testWaitUntilResourceReadyFailsFastOnTerminalFailure(self):
+    self._MockKubectl(return_value=('state: FAILED\n', '', 0))
+    with self.assertRaisesRegex(
+        errors.Resource.CreationError, 'failed.*state=FAILED'
+    ):
+      self._NewCluster()._WaitUntilResourceReady('databases', 'benchbase')
+
+  def testWaitUntilResourceReadyFailsFastOnNonYamlOutput(self):
+    self._MockKubectl(
+        return_value=('state: CREATING\nerror: restore failed: [bad\n', '', 0)
+    )
+    with self.assertRaisesRegex(
+        errors.Resource.CreationError, 'Unexpected non-YAML output'
+    ):
+      self._NewCluster()._WaitUntilResourceReady('databases', 'benchbase')
+
+  def testWaitUntilResourceReadyFailsFastOnNotFound(self):
+    self._MockKubectl(
+        return_value=('', 'ERROR: NOT_FOUND: database benchbase', 1)
+    )
+    with self.assertRaisesRegex(errors.Resource.CreationError, 'not found'):
+      self._NewCluster()._WaitUntilResourceReady('databases', 'benchbase')
+
+  def testWaitUntilResourceReadyRetriesOnKubectlPodOrContainerNotFound(self):
+    self.mock_cluster.zones = ['us-central1-a']
+    self.mock_cluster.zone = 'us-central1-a'
+    mock_kubectl = self._MockKubectl(
+        side_effect=[
+            (
+                '',
+                'Error from server (NotFound): pods "spanner-a-rt-0" not found',
+                1,
+            ),
+            (_PodsJson(_Pod('spanner-a-rt-0', '10.68.0.5')), '', 0),
+            ('', 'unable to upgrade connection: container not found', 1),
+            ('', 'unable to upgrade connection: container not found', 1),
+            (_PodsJson(_Pod('spanner-a-rt-0', '10.68.0.5')), '', 0),
+            ('state: READY\n', '', 0),
+        ]
+    )
+    mock_login = self._MockLogin()
+
+    self._NewCluster()._WaitUntilResourceReady('databases', 'benchbase')
+
+    self.assertEqual(mock_kubectl.call_count, 6)
+    self.assertEqual(mock_login.call_count, 2)
+
+  def testWaitUntilResourceReadyRetriesOnKubectlTimeout(self):
+    mock_kubectl = self._MockKubectl(
+        side_effect=[
+            vm_util.TimeoutExceededRetryError('context deadline exceeded'),
+            ('state: READY\n', '', 0),
+        ]
+    )
+    mock_login = self._MockLogin()
+
+    self._NewCluster()._WaitUntilResourceReady('databases', 'benchbase')
+
+    self.assertEqual(mock_kubectl.call_count, 2)
+    mock_login.assert_not_called()
+
+  def testCreateExternalStorageAndDatabaseIgnoreAlreadyExists(self):
+    mock_kubectl = self._MockKubectl(
         return_value=('', 'ERROR: ALREADY_EXISTS: resource exists', 1)
     )
-    self._NewCluster().CreateDatabase('benchbase')
+    cluster = self._NewCluster(fake_bucket='test-bucket')
+    cluster._CreateExternalStorage()
+    cluster.CreateDatabase('benchbase')
+
+    storage_cmd = mock_kubectl.call_args_list[0][0][0]
+    self.assertIn('external-storages', storage_cmd)
+    self.assertIn('backup-storage', storage_cmd)
+    self.assertIn('--fake-bucket=test-bucket', storage_cmd)
+
+  def testCreateExternalStorageRetriesTransientErrorAndFailsOnPermanentError(
+      self,
+  ):
+    mock_kubectl = self._MockKubectl(
+        side_effect=[
+            ('', 'ERROR: UNAVAILABLE: transient', 1),
+            ('Created external storage', '', 0),
+            ('', 'ERROR: PERMISSION_DENIED: forbidden', 1),
+        ]
+    )
+    self._MockLogin()
+    cluster = self._NewCluster(fake_bucket='test-bucket')
+
+    cluster._CreateExternalStorage()
+    self.assertEqual(mock_kubectl.call_count, 2)
+
+    with self.assertRaisesRegex(
+        errors.Resource.CreationError, 'PERMISSION_DENIED'
+    ):
+      cluster._CreateExternalStorage()
+    self.assertEqual(mock_kubectl.call_count, 3)
 
   def testCreateDatabaseRelogsInAndRetriesOnAuthError(self):
     mock_kubectl = self._MockKubectl(
@@ -1446,4 +1838,4 @@ class CliTest(SpannerOmniClusterTestBase):
 
 
 if __name__ == '__main__':
-  unittest.main()
+  pkb_common_test_case.absltest.main()
