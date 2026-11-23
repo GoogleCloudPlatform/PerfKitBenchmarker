@@ -197,7 +197,7 @@ class LogDmesgTestCase(pkb_common_test_case.PkbCommonTestCase):
     remote_command.assert_called_once_with('hostname && sudo dmesg')
 
 
-class TestLsCpu(unittest.TestCase, test_util.SamplesTestMixin):
+class TestLsCpu(parameterized.TestCase, test_util.SamplesTestMixin):
   LSCPU_DATA = {
       'NUMA node(s)': '1',
       'Core(s) per socket': '2',
@@ -240,7 +240,7 @@ class TestLsCpu(unittest.TestCase, test_util.SamplesTestMixin):
     vm = self.CreateVm(os_types.DEFAULT, self.LsCpuText(self.LSCPU_DATA))
     samples = linux_virtual_machine.CreateLscpuSamples([vm])
     vm.RemoteCommand.assert_called_with('lscpu')
-    self.assertEqual(1, len(samples))
+    self.assertLen(samples, 1)
     metadata = {'node_name': vm.name}
     metadata.update(self.LSCPU_DATA)
     expected = sample.Sample('lscpu', 0, '', metadata, samples[0].timestamp)
@@ -249,7 +249,7 @@ class TestLsCpu(unittest.TestCase, test_util.SamplesTestMixin):
   def testRecordLscpuOutputNonLinux(self):
     vm = self.CreateVm(os_types.WINDOWS, '')
     samples = linux_virtual_machine.CreateLscpuSamples([vm])
-    self.assertEqual(0, len(samples))
+    self.assertEmpty(samples)
     vm.RemoteCommand.assert_not_called()
 
   def testMissingRequiredLsCpuEntries(self):
@@ -276,6 +276,62 @@ class TestLsCpu(unittest.TestCase, test_util.SamplesTestMixin):
         },
         results.data,
     )
+
+  @parameterized.named_parameters(
+      dict(
+          testcase_name='dash_socket_dual_cluster',
+          lscpu_data={
+              'NUMA node(s)': '2',
+              'Core(s) per cluster': '70',
+              'Thread(s) per core': '1',
+              'Socket(s)': '-',
+              'Cluster(s)': '2',
+          },
+          expected_numa_nodes=2,
+          expected_cores_per_socket=70,
+          expected_sockets=2,
+          expected_threads_per_core=1,
+      ),
+      dict(
+          testcase_name='missing_socket_single_cluster',
+          lscpu_data={
+              'NUMA node(s)': '1',
+              'Core(s) per cluster': '8',
+              'Thread(s) per core': '1',
+              'Cluster(s)': '1',
+          },
+          expected_numa_nodes=1,
+          expected_cores_per_socket=8,
+          expected_sockets=1,
+          expected_threads_per_core=1,
+      ),
+  )
+  def testLsCpuClusterFallbackParsing(
+      self,
+      lscpu_data,
+      expected_numa_nodes,
+      expected_cores_per_socket,
+      expected_sockets,
+      expected_threads_per_core,
+  ):
+    vm = self.CreateVm(os_types.DEFAULT, self.LsCpuText(lscpu_data))
+    results = vm.CheckLsCpu()
+    self.assertEqual(expected_numa_nodes, results.numa_node_count)
+    self.assertEqual(expected_cores_per_socket, results.cores_per_socket)
+    self.assertEqual(expected_sockets, results.socket_count)
+    self.assertEqual(expected_threads_per_core, results.threads_per_core)
+
+  def testLsCpuDashSocketWithoutClusterRaisesValueError(self):
+    lscpu_text = self.LsCpuText({
+        'NUMA node(s)': '1',
+        'Core(s) per cluster': '8',
+        'Thread(s) per core': '1',
+        'Socket(s)': '-',
+    })
+    with self.assertRaisesRegex(
+        ValueError, r'Could not find integer "Socket\(s\)" or "Cluster\(s\)"'
+    ):
+      linux_virtual_machine.LsCpuResults(lscpu_text)
 
   def testProcCpuParsing(self):
     vm = self.CreateVm(os_types.DEFAULT, self.PROC_CPU_TEXT)

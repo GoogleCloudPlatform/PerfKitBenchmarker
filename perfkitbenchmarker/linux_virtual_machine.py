@@ -3648,16 +3648,21 @@ class LsCpuResults:
     for stanza in _ParseTextProperties(lscpu):
       self.data.update(stanza)
 
-    def GetInt(key):
-      if key in self.data and self.data[key].isdigit():
-        return int(self.data[key])
+    def GetInt(*keys: str) -> int:
+      for key in keys:
+        if key in self.data and self.data[key].isdigit():
+          return int(self.data[key])
+      key_names = '" or "'.join(keys)
       raise ValueError(
-          'Could not find integer "{}" in {}'.format(key, sorted(self.data))
+          f'Could not find integer "{key_names}" in {sorted(self.data)}'
       )
 
+    # On FDT-booted ARM64 systems without ACPI PPTT, util-linux lscpu reports
+    # "Core(s) per cluster" instead of "Core(s) per socket" and "Cluster(s)"
+    # with "Socket(s): -".
     self.numa_node_count = GetInt('NUMA node(s)')
-    self.cores_per_socket = GetInt('Core(s) per socket')
-    self.socket_count = GetInt('Socket(s)')
+    self.cores_per_socket = GetInt('Core(s) per socket', 'Core(s) per cluster')
+    self.socket_count = GetInt('Socket(s)', 'Cluster(s)')
     self.threads_per_core = GetInt('Thread(s) per core')
 
 
