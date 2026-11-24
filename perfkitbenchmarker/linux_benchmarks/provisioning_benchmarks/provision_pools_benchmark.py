@@ -92,6 +92,7 @@ provision_node_pools:
 INIT_BATCH_NAME = "init-batch"
 TEST_BATCH_NAME = "test-batch"
 JOB_MANIFEST_TEMPLATE = "provision_node_pools/job_manifest.yaml.j2"
+_POLL_INTERVAL_SECONDS = 10
 
 
 def GetConfig(user_config):
@@ -169,18 +170,19 @@ def _CreateJobsAndWait(
   # RunRetryableKubectlCommand is required as sometimes during master resize
   # the RunKubectlCommand fails before timeout.
   while True:
+    poll_start = time.monotonic()
     try:
       stdout, _, _ = kubectl.RunKubectlCommand([
           "get",
           "pods",
           "-l",
-          "batch=%s" % batch_name,
+          f"batch={batch_name}",
           "--field-selector",
           "status.phase=Running",
           "--output",
-          "jsonpath='{.items[*].metadata.name}'",
+          "jsonpath={.items[*].metadata.name}",
       ])
-      running = 0 if not stdout else len(stdout.split())
+      running = len(stdout.split())
       if running >= jobs:
         break
       logging.info(
@@ -204,7 +206,10 @@ def _CreateJobsAndWait(
           "Timed out waiting for all jobs in batch '%s' to be running."
           % batch_name
       )
-    time.sleep(60)
+    # Compensate for how long kubectl took so polls stay on a steady interval.
+    remaining_sleep = _POLL_INTERVAL_SECONDS - (time.monotonic() - poll_start)
+    if remaining_sleep > 0:
+      time.sleep(remaining_sleep)
   ready_time = time.monotonic() - start
   logging.info(
       "All %d jobs in batch '%s' are running. Wait time: %d seconds.",
