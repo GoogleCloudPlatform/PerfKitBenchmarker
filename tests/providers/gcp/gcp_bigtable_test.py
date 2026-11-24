@@ -596,6 +596,31 @@ class GcpBigtableTestCase(pkb_common_test_case.PkbCommonTestCase):
         json={'labels': {'benchmark': 'test_benchmark'}},
     )
 
+  @parameterized.named_parameters(
+      dict(
+          testcase_name='DefaultEphemeral',
+          parsed_flags={},
+          expected_user_managed=False,
+      ),
+      dict(
+          testcase_name='NamedDefaultUserManaged',
+          parsed_flags={'google_bigtable_instance_name': NAME},
+          expected_user_managed=True,
+      ),
+      dict(
+          testcase_name='NamedExplicitEphemeral',
+          parsed_flags={
+              'google_bigtable_instance_name': NAME,
+              'google_bigtable_user_managed': 'false',
+          },
+          expected_user_managed=False,
+      ),
+  )
+  def testUserManagedResolution(self, parsed_flags, expected_user_managed):
+    with flagsaver.as_parsed(**parsed_flags):
+      instance = GetTestBigtableInstance(spec=_TEST_BENCHMARK_SPEC_MINIMAL)
+    self.assertEqual(instance.user_managed, expected_user_managed)
+
 
 if __name__ == '__main__':
   unittest.main()

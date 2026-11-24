@@ -50,10 +50,17 @@ ADMIN_ENDPOINT = flags.DEFINE_string(
 flags.DEFINE_string(
     'google_bigtable_instance_name',
     None,
-    'Bigtable instance name. If not specified, new instance '
+    'Bigtable instance name. If not specified, a new instance '
     'will be created and deleted on the fly. If specified, '
-    'the instance is considered user managed and will not '
-    'created/deleted by PKB.',
+    'the instance is considered user managed by default unless '
+    '--nogoogle_bigtable_user_managed is set.',
+)
+_USER_MANAGED = flags.DEFINE_boolean(
+    'google_bigtable_user_managed',
+    None,
+    'Whether the Bigtable instance is user-managed (not created or deleted by '
+    'PKB). Defaults to True if --google_bigtable_instance_name is specified, '
+    'False otherwise.',
 )
 APP_PROFILE_ID = flags.DEFINE_string(
     'google_bigtable_app_profile_id',
@@ -172,6 +179,7 @@ class BigtableSpec(non_relational_db.BaseNonRelationalDbSpec):
   autoscaling_min_nodes: int
   autoscaling_max_nodes: int
   autoscaling_cpu_target: int
+  user_managed: bool
 
   def __init__(self, component_full_name, flag_values, **kwargs):
     super().__init__(component_full_name, flag_values=flag_values, **kwargs)
@@ -195,6 +203,7 @@ class BigtableSpec(non_relational_db.BaseNonRelationalDbSpec):
         'autoscaling_min_nodes': (option_decoders.IntDecoder, none_ok),
         'autoscaling_max_nodes': (option_decoders.IntDecoder, none_ok),
         'autoscaling_cpu_target': (option_decoders.IntDecoder, none_ok),
+        'user_managed': (option_decoders.BooleanDecoder, none_ok),
     })
     return result
 
@@ -235,6 +244,7 @@ class BigtableSpec(non_relational_db.BaseNonRelationalDbSpec):
         'bigtable_autoscaling_min_nodes': 'autoscaling_min_nodes',
         'bigtable_autoscaling_max_nodes': 'autoscaling_max_nodes',
         'bigtable_autoscaling_cpu_target': 'autoscaling_cpu_target',
+        'google_bigtable_user_managed': 'user_managed',
     }
     for flag_name, option_name in option_name_from_flag.items():
       if flag_values[flag_name].present:
@@ -287,10 +297,13 @@ class GcpBigtableInstance(non_relational_db.BaseNonRelationalDb):
       autoscaling_min_nodes: int | None,
       autoscaling_max_nodes: int | None,
       autoscaling_cpu_target: int | None,
+      user_managed: bool | None = None,
       **kwargs,
   ):
     super().__init__(**kwargs)
-    if name is not None:
+    if user_managed is not None:
+      self.user_managed = user_managed
+    elif name is not None:
       self.user_managed = True
     self.name: str = name or f'pkb-bigtable-{FLAGS.run_uri}'
     self.zone: str = zone or FLAGS.google_bigtable_zone
@@ -326,6 +339,7 @@ class GcpBigtableInstance(non_relational_db.BaseNonRelationalDb):
         autoscaling_min_nodes=spec.autoscaling_min_nodes,
         autoscaling_max_nodes=spec.autoscaling_max_nodes,
         autoscaling_cpu_target=spec.autoscaling_cpu_target,
+        user_managed=spec.user_managed,
         delete_on_freeze_error=spec.delete_on_freeze_error,
         create_on_restore_error=spec.create_on_restore_error,
         enable_freeze_restore=spec.enable_freeze_restore,

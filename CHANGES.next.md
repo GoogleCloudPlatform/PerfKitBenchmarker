@@ -518,6 +518,8 @@
 -   Add `--gke_enable_dataplane_v2` and `--gke_kubernetes_unstable_apis` GKE
     cluster flags, plus `enable_nested_virtualization` and boot disk
     `provisioned_iops`/`provisioned_throughput` support on GKE node pools.
+-   Add `--google_bigtable_user_managed` flag to support custom-named ephemeral
+    Cloud Bigtable instances.
 
 ### Bug fixes and maintenance updates:
 
