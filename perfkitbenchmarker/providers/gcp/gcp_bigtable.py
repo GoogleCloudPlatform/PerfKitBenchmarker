@@ -701,14 +701,7 @@ def GetClustersDescription(instance_name, project):
   cmd = _GetBigtableGcloudCommand(None, 'bigtable', 'clusters', 'list')
   cmd.flags['instances'] = instance_name
   cmd.flags['project'] = project
-  stdout, stderr, retcode = cmd.Issue(raise_on_failure=False)
-  if retcode:
-    logging.error(
-        'Command "%s" failed:\nSTDOUT:\n%s\nSTDERR:\n%s',
-        repr(cmd),
-        stdout,
-        stderr,
-    )
+  stdout, _, _ = cmd.Issue()
   output = json.loads(stdout)
 
   result = []

@@ -621,6 +621,14 @@ class GcpBigtableTestCase(pkb_common_test_case.PkbCommonTestCase):
       instance = GetTestBigtableInstance(spec=_TEST_BENCHMARK_SPEC_MINIMAL)
     self.assertEqual(instance.user_managed, expected_user_managed)
 
+  def testGetClustersDescriptionRaisesOnCommandFailure(self):
+    self.MockIssueCommand(
+        {'bigtable clusters list': [('', 'ERROR: not found', 1)]}
+    )
+
+    with self.assertRaises(errors.VmUtil.IssueCommandError):
+      gcp_bigtable.GetClustersDescription(NAME, PROJECT)
+
 
 if __name__ == '__main__':
   unittest.main()
