@@ -777,3 +777,4 @@
     commands.
 -   Add `--cassandra_create_snapshot` to `cassandra_stress` to capture a clean
     post-preload snapshot.
+-   Upgrade ClickHouse server and keeper images from 24.10 to 26.8 LTS.

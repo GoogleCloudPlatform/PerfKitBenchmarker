@@ -59,7 +59,25 @@ class ClickhouseTest(pkb_common_test_case.PkbCommonTestCase):
     keeper_yaml = mock_tf.write.call_args_list[0].args[0]
     cluster_yaml = mock_tf.write.call_args_list[1].args[0]
     self.assertIn('ClickHouseKeeperInstallation', keeper_yaml)
+    self.assertIn('clickhouse/clickhouse-keeper:26.8', keeper_yaml)
     self.assertIn('ClickHouseInstallation', cluster_yaml)
+    self.assertIn('clickhouse/clickhouse-server:26.8', cluster_yaml)
+    self.assertNotIn('allow_experimental_json_type', cluster_yaml)
+    self.assertIn(
+        '<s3_allow_server_credentials_in_user_queries>1'
+        '</s3_allow_server_credentials_in_user_queries>',
+        cluster_yaml,
+    )
+    self.assertIn(
+        '<distributed_ddl_use_initial_user_and_roles>1'
+        '</distributed_ddl_use_initial_user_and_roles>',
+        cluster_yaml,
+    )
+    self.assertIn(
+        '<distributed_ddl_entry_format_version>8'
+        '</distributed_ddl_entry_format_version>',
+        cluster_yaml,
+    )
     self.assertIn('<external replace="1">', cluster_yaml)
     self.assertIn('<password_sha256_hex>', cluster_yaml)
 
@@ -177,7 +195,7 @@ class ClickhouseTest(pkb_common_test_case.PkbCommonTestCase):
   def testIsReadyTrue(self):
     db = clickhouse.Clickhouse(EDW_SERVICE_SPEC)
     mock_cmd = self.MockIssueCommand({
-        'curl': [('24.10.1.1', '', 0)],
+        'curl': [('26.8.1.1', '', 0)],
     })
     self.assertTrue(db._IsReady())
     self.assertTrue(mock_cmd.func_to_mock.called)

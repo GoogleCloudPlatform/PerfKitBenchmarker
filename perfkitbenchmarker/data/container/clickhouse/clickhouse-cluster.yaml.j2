@@ -6,11 +6,16 @@ metadata:
 spec:
   configuration:
     files:
+      config.d/distributed_ddl.xml: |
+        <clickhouse>
+          <distributed_ddl_use_initial_user_and_roles>1</distributed_ddl_use_initial_user_and_roles>
+        </clickhouse>
       users.d/{{ user }}.xml: |
         <clickhouse>
           <profiles>
             <default>
-              <allow_experimental_json_type>1</allow_experimental_json_type>
+              <s3_allow_server_credentials_in_user_queries>1</s3_allow_server_credentials_in_user_queries>
+              <distributed_ddl_entry_format_version>8</distributed_ddl_entry_format_version>
             </default>
           </profiles>
           <users>
@@ -42,7 +47,7 @@ spec:
         spec:
           containers:
             - name: clickhouse
-              image: clickhouse/clickhouse-server:24.10
+              image: clickhouse/clickhouse-server:26.8
               resources:
                 limits:
                   memory: {{ memory }}G
