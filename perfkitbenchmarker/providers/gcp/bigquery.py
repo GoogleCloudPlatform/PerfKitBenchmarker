@@ -62,6 +62,15 @@ BQ_CA_CHAT_MODE = flags.DEFINE_enum(
     'project.',
 )
 
+BQ_CA_THINKING_MODE = flags.DEFINE_enum(
+    'bq_ca_thinking_mode',
+    'THINKING_MODE_UNSPECIFIED',
+    ['THINKING_MODE_UNSPECIFIED', 'FAST', 'THINKING'],
+    'The ChatRequest.ThinkingMode for BigQuery Conversational Analytics. '
+    'THINKING_MODE_UNSPECIFIED lets the API pick its default for the data '
+    'source.',
+)
+
 BQ_CA_CLIENT = flags.DEFINE_enum(
     'bq_ca_client',
     'bq_data_agent',
@@ -663,6 +672,7 @@ class ConversationalAnalyticsClientInterface(
     """Get the metadata attributes for the Client Interface."""
     metadata = super().GetMetadata()
     metadata['ca_chat_mode'] = BQ_CA_CHAT_MODE.value
+    metadata['ca_thinking_mode'] = BQ_CA_THINKING_MODE.value
     return metadata
 
   @override
@@ -690,6 +700,7 @@ class ConversationalAnalyticsClientInterface(
         'source .venv/bin/activate && python3 bq_ca_driver.py single '
         f'--project={self.project_id} '
         f'--chat_mode={BQ_CA_CHAT_MODE.value} '
+        f'--thinking_mode={BQ_CA_THINKING_MODE.value} '
     )
     if BQ_CA_CHAT_MODE.value == BQ_CA_CHAT_MODE_DATA_AGENT:
       cmd += f'--agent={BQ_CA_DATA_AGENT.value} '
