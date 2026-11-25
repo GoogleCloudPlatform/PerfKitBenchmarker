@@ -312,6 +312,9 @@
     sglang.bench_serving.
 -   Add a `spanner_omni_cluster` resource for running Spanner Omni on Kubernetes
     (GKE provider).
+-   Add Oracle Cloud Infrastructure (OCI) as a new provider, supporting VMs
+    (Ubuntu 22.04/24.04, Oracle Linux 8/9), VCN networking with firewall rules,
+    and block volume scratch disks. (GH-7174 from @gadgilrajeev)
 
 ### Enhancements:
 
