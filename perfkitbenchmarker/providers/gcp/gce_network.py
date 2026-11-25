@@ -58,6 +58,7 @@ _PLACEMENT_GROUP_PREFIXES = frozenset([
     'h3',
     'c4',
     'c4d',
+    'c4n',
 ])
 # Machine families that support compact placement, but do not support same-rack
 # placement (max_distance=1). Refer to

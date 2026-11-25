@@ -20,13 +20,16 @@ from unittest import mock
 
 from absl import flags
 from absl.testing import flagsaver
+from absl.testing import parameterized
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_benchmarks
+from perfkitbenchmarker import placement_group
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.gcp import gce_network
+from perfkitbenchmarker.providers.gcp import gce_placement_group
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 from tests import pkb_common_test_case
 
@@ -689,6 +692,81 @@ class TestGceNetwork(BaseGceNetworkTest):
     self.assertRegex(
         ' '.join(create_network_cmd), 'compute networks create .*--mtu 1500'
     )
+
+  @parameterized.named_parameters(
+      dict(testcase_name='c4n', machine_type='c4n-standard-4', expected=True),
+      dict(testcase_name='c4d', machine_type='c4d-standard-4', expected=True),
+      dict(testcase_name='e2', machine_type='e2-standard-4', expected=False),
+  )
+  def testIsPlacementGroupCompatible(
+      self, machine_type: str, expected: bool
+  ) -> None:
+    self.assertEqual(
+        gce_network.IsPlacementGroupCompatible(machine_type), expected
+    )
+
+  @parameterized.named_parameters(
+      dict(
+          testcase_name='collocated_default_distance',
+          placement_group_style=gce_placement_group.COLLOCATED,
+          prefer_rack=False,
+          expected_max_distance=None,
+      ),
+      dict(
+          testcase_name='collocated_prefer_rack',
+          placement_group_style=gce_placement_group.COLLOCATED,
+          prefer_rack=True,
+          expected_max_distance=1,
+      ),
+      dict(
+          testcase_name='closest_supported_prefer_rack',
+          placement_group_style=(
+              placement_group.PLACEMENT_GROUP_CLOSEST_SUPPORTED
+          ),
+          prefer_rack=True,
+          expected_max_distance=1,
+      ),
+  )
+  def testC4nPlacementGroup(
+      self,
+      placement_group_style: str,
+      prefer_rack: bool,
+      expected_max_distance: int | None,
+  ) -> None:
+    with flagsaver.flagsaver(
+        placement_group_style=placement_group_style,
+        gce_prefer_rack_placement=prefer_rack,
+        zone=['us-central1-a'],
+    ):
+      vm = gce_virtual_machine.GceVmSpec(
+          'test_component',
+          project='abc',
+          zone='us-central1-a',
+          machine_type='c4n-standard-4',
+          cidr=None,
+      )
+      net = gce_network.GceNetwork.GetNetwork(vm)
+    self.assertIsNotNone(net.placement_group)
+    self.assertEqual(net.placement_group.style, gce_placement_group.COLLOCATED)
+    self.assertEqual(net.placement_group.max_distance, expected_max_distance)
+
+  @flagsaver.flagsaver(
+      placement_group_style=gce_placement_group.COLLOCATED,
+      zone=['us-central1-a'],
+  )
+  def testUnsupportedMachineTypePlacementGroupRaises(self) -> None:
+    vm = gce_virtual_machine.GceVmSpec(
+        'test_component',
+        project='abc',
+        zone='us-central1-a',
+        machine_type='e2-standard-4',
+        cidr=None,
+    )
+    with self.assertRaisesRegex(
+        errors.Benchmarks.UnsupportedConfigError,
+        'machine type e2-standard-4 does not support placement groups',
+    ):
+      gce_network.GceNetwork.GetNetwork(vm)
 
 
 class GceFirewallRuleTest(pkb_common_test_case.PkbCommonTestCase):
